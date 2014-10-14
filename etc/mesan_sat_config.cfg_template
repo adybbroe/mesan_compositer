@@ -1,0 +1,27 @@
+[offline]
+
+composite_output_dir = /path/to/mesan/output
+ct_composite_filename = mesan_composite_%(area)s_%Y%m%d_%H%M_ct
+
+pps_direct_readout_dir = /path/to/pps/direct/readout/products
+pps_metop_gds_dir = /path/to/pps/global/metop/products
+
+pps_cty_filename = %(satellite)s_%Y%m%d_%H%M_?????_satproj_?????_?????_cloudtype.h5
+pps_ctth_filename = %(satellite)s_%Y%m%d_%H%M_%(orbit)s_satproj_?????_?????_ctth.h5
+polar_satellites = ['npp', 'noaa19', 'noaa18', 'noaa16', 'metop02']
+
+msg_dir = /path/to/msg/products
+msg_satellites = ['meteosat10']
+msg_cty_filename = SAFNWC_%(satellite)s_CT___%Y%m%d%H%M_%(area)s.PLAX.CTTH.0.h5
+msg_cty_file_ext = PLAX.CTTH.0.h5
+msg_areaname = "EuropeCanary"
+
+
+[prod]
+
+
+[test]
+
+
+
+[utv]

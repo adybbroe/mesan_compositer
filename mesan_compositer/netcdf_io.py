@@ -1,0 +1,264 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+# Copyright (c) 2014 Adam.Dybbroe
+
+# Author(s):
+
+#   Adam.Dybbroe <a000680@c14526.ad.smhi.se>
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+"""Defining the netCDF4 mesan-composite object with read and write methods
+"""
+
+import numpy as np
+from mpop.satout.cfscene import proj2cf
+
+TIME_UNITS = "seconds since 1970-01-01 00:00:00"
+CF_FLOAT_TYPE = np.float64
+CF_DATA_TYPE = np.int16
+# To be complete, get from appendix F of cf conventions
+MAPPING_ATTRIBUTES = {'grid_mapping_name': "proj",
+                      'standard_parallel': ["lat_1", "lat_2"],
+                      'latitude_of_projection_origin': "lat_0",
+                      'longitude_of_projection_origin': "lon_0",
+                      'longitude_of_central_meridian': "lon_0",
+                      'grid_north_pole_longitude': 'o_lon_p',
+                      'grid_north_pole_latitude': 'o_lat_p',
+                      'perspective_point_height': "h",
+                      'false_easting': "x_0",
+                      'false_northing': "y_0",
+                      'semi_major_axis': "a",
+                      'semi_minor_axis': "b",
+                      'inverse_flattening': "rf",
+                      'ellipsoid': "ellps",  # not in CF conventions...
+                      }
+
+# To be completed, get from appendix F of cf conventions
+PROJNAME = {"vertical_perspective": "nsper",
+            "geostationary": "geos",
+            "albers_conical_equal_area": "aea",
+            "azimuthal_equidistant": "aeqd",
+            "equirectangular": "eqc",
+            "transverse_mercator": "tmerc",
+            "stereographic": "stere",
+            "general_oblique_transformation": "ob_tran"
+            }
+
+
+class InfoObject(object):
+
+    """Simple data and info container.
+    """
+
+    def __init__(self):
+        self.info = {}
+        self.data = None
+
+
+class ncCloudTypeComposite(object):
+
+    """netcdf cloud type composite object"""
+
+    def __init__(self):
+
+        self.info = {}
+        #self.info["Conventions"] = "CF-1.6"
+        self.info["Conventions"] = "Undefined"
+
+        self.time = InfoObject()
+        self.cloudtype = InfoObject()
+        self.weight = InfoObject()
+        self.id = InfoObject()
+        self.area = InfoObject()
+
+    def store(self, comp_dict, area_obj, product_id='MSG/PPS Cloud Type composite'):
+        """Store the composite into the object"""
+
+        self.info["product"] = product_id
+
+        resolution = 1000  # FIXME!
+        str_res = '1000 m'
+        dim_names = ['y' + str_res, 'x' + str_res]
+
+        self.time.data = comp_dict["time"]
+        valid_min, valid_max = (self.time.data.min(), self.time.data.max())
+        self.time.info = {"var_name": "time",
+                          "var_data": self.time.data,
+                          "var_dim_names": dim_names,
+                          "long_name": "observation time of best cloud type",
+                          "standard_name": "time",
+                          "valid_range": np.array([valid_min, valid_max]),
+                          "units": TIME_UNITS}
+
+        self.cloudtype.data = comp_dict["cloudtype"]
+        valid_min, valid_max = (0, 20)
+        self.cloudtype.info = {"var_name": "cloudtype",
+                               "var_data": self.cloudtype.data,
+                               'var_dim_names': dim_names,
+                               "standard_name": "Cloudtype",
+                               "valid_range": np.array([valid_min, valid_max]),
+                               "resolution": resolution}
+        self.cloudtype.info["description"] = 'NWCSAF cloudtype classification'
+
+        # Weight:
+        self.weight.data = comp_dict["weight"]
+        valid_min, valid_max = (self.weight.data.min(), self.weight.data.max())
+        self.weight.info = {"var_name": "weight",
+                            "var_data": self.weight.data,
+                            'var_dim_names': dim_names,
+                            "standard_name": "Cloud Type weight",
+                            "valid_range": np.array([valid_min, valid_max]),
+                            "resolution": 1000}
+        self.weight.info["description"] = "Weight of the best Cloud Type"
+
+        # Id:
+        self.id.data = comp_dict["id"]
+        valid_min, valid_max = (self.id.data.min(), self.id.data.max())
+        self.id.info = {"var_name": "id",
+                        "var_data": self.id.data,
+                        'var_dim_names': dim_names,
+                        "standard_name": "Cloud Type id",
+                        "valid_range": np.array([valid_min, valid_max]),
+                        "resolution": 1000}
+        self.id.info[
+            "description"] = "Id (pps=0 or msg=1) of the best Cloud Type"
+
+        # Grid mapping:
+        self.area.data = 0
+        self.area.info = {"var_name": 'area',
+                          "var_data": self.area.data,
+                          "var_dim_names": ()}
+        self.area.info.update(proj2cf(area_obj.proj_dict))
+
+        setattr(self, self.area.info["var_name"], self.area)
+        x__ = InfoObject()
+        area_obj.get_proj_coords(cache=True)
+        x__.data = area_obj.projection_x_coords[0, :]
+        x__.info = {"var_name": "x" + str_res,
+                    "var_data": x__.data,
+                    "var_dim_names": ("x" + str_res,),
+                    "units": "m",
+                    "standard_name": "projection_x_coordinate",
+                    "long_name": "x coordinate of projection"}
+        setattr(self, x__.info["var_name"], x__)
+
+        y__ = InfoObject()
+        y__.data = area_obj.projection_y_coords[:, 0]
+        y__.info = {"var_name": "y" + str_res,
+                    "var_data": y__.data,
+                    "var_dim_names": ("y" + str_res,),
+                    "units": "m",
+                    "standard_name": "projection_y_coordinate",
+                    "long_name": "y coordinate of projection"}
+        setattr(self, y__.info["var_name"], y__)
+
+        self.cloudtype.info["grid_mapping"] = self.area.info["var_name"]
+        self.weight.info["grid_mapping"] = self.area.info["var_name"]
+        self.id.info["grid_mapping"] = self.area.info["var_name"]
+        self.time.info["grid_mapping"] = self.area.info["var_name"]
+
+    def write(self, filename):
+        """Write the data to netCDF file"""
+
+        from mpop.satout import netcdf4
+        netcdf4.netcdf_cf_writer(filename, self)
+
+        return
+
+    def load(self, filename):
+        """Read the cloudtype composite from file"""
+
+        import numpy as np
+        from netCDF4 import Dataset
+
+        rootgrp = Dataset(filename, 'r')
+
+        self.info["Conventions"] = rootgrp.Conventions
+        self.info["product"] = rootgrp.product
+
+        for var_name in rootgrp.variables.keys():
+            print var_name
+            var = rootgrp.variables[str(var_name)]
+            dims = var.dimensions
+
+            cnt = 0
+            for cnt, dim in enumerate(dims):
+                if dim.startswith("x") or dim.startswith("y"):
+                    break
+
+            if hasattr(self, str(var_name)):
+                print "set data..."
+                item = getattr(self, str(var_name))
+                setattr(item, 'data', var[:])
+
+                info = {}
+                for attr in var.ncattrs():
+                    info[str(attr)] = getattr(var, str(attr))
+                    setattr(item, 'info', info)
+
+            area = None
+            try:
+                area_var_name = getattr(var, "grid_mapping")
+                area_var = rootgrp.variables[area_var_name]
+                proj4_dict = {}
+                for attr, projattr in MAPPING_ATTRIBUTES.items():
+                    try:
+                        the_attr = getattr(area_var, attr)
+                        if projattr == "proj":
+                            proj4_dict[projattr] = PROJNAME[the_attr]
+                        elif(isinstance(projattr, (list, tuple))):
+                            try:
+                                for i, subattr in enumerate(the_attr):
+                                    proj4_dict[projattr[i]] = subattr
+                            except TypeError:
+                                proj4_dict[projattr[0]] = the_attr
+                        else:
+                            proj4_dict[projattr] = the_attr
+                    except AttributeError:
+                        pass
+                y_name, x_name = dims[:cnt] + dims[cnt:]
+                x__ = rootgrp.variables[x_name][:]
+                y__ = rootgrp.variables[y_name][:]
+
+                if proj4_dict["proj"] == "ob_tran":
+                    proj4_dict["o_proj"] = 'eqc'  # FIXME!
+                elif proj4_dict["proj"] == "geos":
+                    x__ *= proj4_dict["h"]
+                    y__ *= proj4_dict["h"]
+
+                x_pixel_size = abs((np.diff(x__)).mean())
+                y_pixel_size = abs((np.diff(y__)).mean())
+
+                llx = x__[0] - x_pixel_size / 2.0
+                lly = y__[-1] - y_pixel_size / 2.0
+                urx = x__[-1] + x_pixel_size / 2.0
+                ury = y__[0] + y_pixel_size / 2.0
+
+                area_extent = (llx, lly, urx, ury)
+                try:
+                    # create the pyresample areadef
+                    from pyresample.geometry import AreaDefinition
+                    area = AreaDefinition("myareaid", "myareaname",
+                                          "myprojid", proj4_dict,
+                                          len(x__), len(y__),
+                                          area_extent)
+
+                except ImportError:
+                    print("Pyresample not found, "
+                          "cannot load area descrition")
+                print("Grid mapping found and used.")
+            except AttributeError:
+                print("No grid mapping found.")
