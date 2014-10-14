@@ -36,7 +36,7 @@ SHORT_DESC = ("Mesan satellite compositer")
 version = imp.load_source(
     'mesan_compositer.version', 'mesan_compositer/version.py')
 
-setup(name='mesan-compositer',
+setup(name='SMHI-SAF-mesan-compositer',
       version='v0.1.0',
       description=SHORT_DESC,
       author='Adam Dybbroe, Tomas Landelius',
