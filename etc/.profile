@@ -1,18 +1,18 @@
-
-
 if [ -f /etc/profile.d/smhi.sh -a -z "$SMHI_MODE" ]
 # don't touch SMHI_MODE if it is already set.
 then
 . /etc/profile.d/smhi.sh
 fi
 
-case $SMHI_DIST in
+case $SMHI_MODE in
 offline)
 
 MESAN_COMPOSITE_CONFIG_DIR=/local_disk/laptop/Satsa/Mesan/mesan-sat-preproc/etc
 export MESAN_COMPOSITE_CONFIG_DIR
 PPP_CONFIG_DIR=/local_disk/laptop/Satsa/Mesan/mesan-sat-preproc/etc
 export PPP_CONFIG_DIR
+
+  ;;
 
 utv)
 
@@ -55,4 +55,5 @@ export PPP_CONFIG_DIR
 *)
 echo "No SMHI_DIST set..."
    ;;
+
 esac
