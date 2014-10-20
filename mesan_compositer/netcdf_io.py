@@ -83,6 +83,7 @@ class ncCloudTypeComposite(object):
         self.weight = InfoObject()
         self.id = InfoObject()
         self.area = InfoObject()
+        self.area_def = None
 
     def store(self, comp_dict, area_obj, product_id='MSG/PPS Cloud Type composite'):
         """Store the composite into the object"""
@@ -255,7 +256,7 @@ class ncCloudTypeComposite(object):
                                           "myprojid", proj4_dict,
                                           len(x__), len(y__),
                                           area_extent)
-
+                    self.area_def = area
                 except ImportError:
                     print("Pyresample not found, "
                           "cannot load area descrition")
