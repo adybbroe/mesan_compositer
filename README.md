@@ -1,9 +1,11 @@
-mesan-compositer
+mesan_compositer
 ================
 
-Generates satellite composites with cloud type and cloud height (CTTH) for the
-meso scale analysis model Mesan and make super observations from a set of
-geostationary and polar cloud products from NWCSAF/MSG and NWCSAF/PPS.
+Generates satellite cloud product composites and super observations for the
+meso scale analysis model Mesan. The cloud products currently being input are
+the cloud type and cloud height (CTTH) for the geostationary and polar cloud
+products from NWCSAF/MSG and NWCSAF/PPS.
+
 
 
 Adam Dybbroe & Tomas Landelius
