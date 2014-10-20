@@ -168,10 +168,11 @@ def derive_sobs(ct_comp, ipar, npix, resultfile):
     """Derive the super observations and print data to file"""
 
     # Get the lon,lat:
-    from pyresample import utils
-    area = utils.load_area(
-        '/local_disk/laptop/Satsa/Mesan/mesan-sat-preproc/etc/areas.def', 'mesanX')
-    lon, lat = area.get_lonlats()
+    # from pyresample import utils
+    # area = utils.load_area(
+    #     '/local_disk/laptop/Satsa/Mesan/mesan-sat-preproc/etc/areas.def', 'mesanX')
+    # lon, lat = area.get_lonlats()
+    lon, lat = ct_comp.area_def.get_lonlats()
 
     ctype = ct_comp.cloudtype.data.astype('int')
     weight = ct_comp.weight.data
@@ -271,6 +272,14 @@ if __name__ == "__main__":
 
     ipar = str(args.ipar)
     npix = int(args.size)
+
+    # from mesan_compositer.netcdf_io import (MAPPING_ATTRIBUTES, PROJNAME)
+    # proj_dict = {}
+    # for key in comp.area.info:
+    #     mykey = MAPPING_ATTRIBUTES.get(key, None)
+    #     if mykey:
+    #         item = comp.area.info[key]
+    #         proj_dict[mykey] = PROJNAME.get(item, item)
 
     bname = obstime.strftime(options['cloudamount_filename']) % values
     path = options['composite_output_dir']
