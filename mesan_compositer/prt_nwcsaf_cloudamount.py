@@ -273,4 +273,7 @@ if __name__ == "__main__":
     ipar = str(args.ipar)
     npix = int(args.size)
 
-    derive_sobs(comp, ipar, npix, './testresults.dat')
+    bname = obstime.strftime(options['cloudamount_filename']) % values
+    path = options['composite_output_dir']
+    filename = os.path.join(path, bname + '.dat')
+    derive_sobs(comp, ipar, npix, filename)
