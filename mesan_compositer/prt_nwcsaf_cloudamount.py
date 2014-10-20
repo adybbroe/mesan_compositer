@@ -28,7 +28,6 @@ import numpy as np
 from mesan_compositer.netcdf_io import ncCloudTypeComposite
 import argparse
 from datetime import datetime
-import sys
 import os
 import ConfigParser
 
