@@ -16,6 +16,9 @@ msg_cty_filename = SAFNWC_%(satellite)s_CT___%Y%m%d%H%M_%(area)s.PLAX.CTTH.0.h5
 msg_cty_file_ext = PLAX.CTTH.0.h5
 msg_areaname = "EuropeCanary"
 
+mesan_log_file = /var/log/satellit/mesan_compositer.log
+log_rotation_days = 1
+log_rotation_backup = 10
 
 [prod]
 
