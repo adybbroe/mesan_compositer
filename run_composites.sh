@@ -36,13 +36,16 @@ esac
 
 export MESAN_LOG_DIR
 
-# $1 = yyyymmddhh (time and date of analysis in hour resolution)
-# $2 = MM (Time window in minutes)
-# $3 = area_id (Area id)
 
+echo $PYTHONPATH
 source ${APPL_HOME}/etc/.mesan_compositer_profile
+echo $PYTHONPATH
 
-python ${APPL_HOME}/bin/make_ct_composite.py -d $1 -t $2 -a $3
-python ${APPL_HOME}/bin/ct_quicklooks.py -d $1 -a $3
-python ${APPL_HOME}/bin/prt_nwcsaf_cloudamount.py -d $1 -a $3 --ipar 71 --size 32
+timestamp=`date +%Y%m%d%H`
+echo "timestamp=$timestamp"
+areaid='mesanX'
+
+python ${APPL_HOME}/bin/make_ct_composite.py -d $timestamp -t 30 -a $areaid
+python ${APPL_HOME}/bin/ct_quicklooks.py -d $timestamp -a $areaid
+python ${APPL_HOME}/bin/prt_nwcsaf_cloudamount.py -d $timestamp -a $areaid --ipar 71 --size 32
 
