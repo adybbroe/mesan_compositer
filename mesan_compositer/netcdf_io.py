@@ -264,4 +264,4 @@ class ncCloudTypeComposite(object):
                               "cannot load area descrition")
                 LOG.info("Grid mapping found and used")
             except AttributeError:
-                LOG.error("No grid mapping found")
+                LOG.info("No grid mapping found")
