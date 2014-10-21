@@ -28,7 +28,16 @@ from datetime import datetime
 from mesan_compositer.netcdf_io import ncCloudTypeComposite
 import sys
 import os
-from PIL import Image
+
+import logging
+LOG = logging.getLogger(__name__)
+
+#: Default time format
+_DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
+
+#: Default log format
+_DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
+
 import ConfigParser
 
 CFG_DIR = os.environ.get('MESAN_COMPOSITE_CONFIG_DIR', './')
@@ -40,9 +49,11 @@ if not os.path.exists(configfile):
     raise IOError('Config file %s does not exist!' % configfile)
 conf.read(configfile)
 
-options = {}
+OPTIONS = {}
 for option, value in conf.items(MODE, raw=True):
-    options[option] = value
+    OPTIONS[option] = value
+
+_MESAN_LOG_FILE = OPTIONS.get('mesan_log_file', None)
 
 
 if __name__ == "__main__":
@@ -54,6 +65,33 @@ if __name__ == "__main__":
                         required=True)
 
     args = parser.parse_args()
+
+    from logging import handlers
+
+    if _MESAN_LOG_FILE:
+        ndays = int(OPTIONS["log_rotation_days"])
+        ncount = int(OPTIONS["log_rotation_backup"])
+        handler = handlers.TimedRotatingFileHandler(_MESAN_LOG_FILE,
+                                                    when='midnight',
+                                                    interval=ndays,
+                                                    backupCount=ncount,
+                                                    encoding=None,
+                                                    delay=False,
+                                                    utc=True)
+
+        handler.doRollover()
+    else:
+        handler = logging.StreamHandler(sys.stderr)
+
+    handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter(fmt=_DEFAULT_LOG_FORMAT,
+                                  datefmt=_DEFAULT_TIME_FORMAT)
+    handler.setFormatter(formatter)
+    logging.getLogger('').addHandler(handler)
+    logging.getLogger('').setLevel(logging.DEBUG)
+    logging.getLogger('mpop').setLevel(logging.DEBUG)
+
+    LOG = logging.getLogger('ct_quicklooks')
 
     obstime = datetime.strptime(args.datetime, '%Y%m%d%H')
     values = {"area": args.area_id, }

@@ -294,7 +294,7 @@ if __name__ == "__main__":
     logging.getLogger('').setLevel(logging.DEBUG)
     logging.getLogger('mpop').setLevel(logging.DEBUG)
 
-    LOG = logging.getLogger('mesan_compositer')
+    LOG = logging.getLogger('make_ct_composite')
 
     time_of_analysis = datetime.strptime(args.datetime, '%Y%m%d%H')
     delta_t = timedelta(minutes=int(args.time_window))
