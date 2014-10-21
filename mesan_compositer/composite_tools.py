@@ -122,8 +122,6 @@ def get_msglist(filelist, timewindow, area_id, satellites=None):
                       'meteosat10', 'meteosat11']
     metsats = [MSGSATS.get(s, 'MSGx') for s in satellites]
 
-    print metsats
-
     mlist = []
     for filename in filelist:
         bname = os.path.basename(filename)
@@ -146,8 +144,8 @@ def get_msglist(filelist, timewindow, area_id, satellites=None):
         try:
             timeslot = datetime.strptime(bname[17:17 + 12], '%Y%m%d%H%M')
         except ValueError:
-            print("Failure: Can't get the time of the msg scene! " +
-                  str(bname))
+            LOG.error("Failure: Can't get the time of the msg scene! " +
+                      str(bname))
             continue
 
         # Now filter out all passes outside time window:

@@ -22,6 +22,8 @@
 
 """Defining the netCDF4 mesan-composite object with read and write methods
 """
+import logging
+LOG = logging.getLogger(__name__)
 
 import numpy as np
 from mpop.satout.cfscene import proj2cf
@@ -191,7 +193,7 @@ class ncCloudTypeComposite(object):
         self.info["product"] = rootgrp.product
 
         for var_name in rootgrp.variables.keys():
-            print var_name
+            LOG.debug(str(var_name))
             var = rootgrp.variables[str(var_name)]
             dims = var.dimensions
 
@@ -201,7 +203,7 @@ class ncCloudTypeComposite(object):
                     break
 
             if hasattr(self, str(var_name)):
-                print "set data..."
+                LOG.debug("set data...")
                 item = getattr(self, str(var_name))
                 setattr(item, 'data', var[:])
 
@@ -258,8 +260,8 @@ class ncCloudTypeComposite(object):
                                           area_extent)
                     self.area_def = area
                 except ImportError:
-                    print("Pyresample not found, "
-                          "cannot load area descrition")
-                print("Grid mapping found and used.")
+                    LOG.error("Pyresample not found, "
+                              "cannot load area descrition")
+                LOG.info("Grid mapping found and used")
             except AttributeError:
-                print("No grid mapping found.")
+                LOG.error("No grid mapping found")

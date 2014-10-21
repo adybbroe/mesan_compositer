@@ -23,7 +23,6 @@
 """Make a Cloud Type composite
 """
 
-
 import argparse
 from datetime import datetime, timedelta
 import numpy as np
@@ -46,6 +45,17 @@ METOPS = ['metop02', 'metop01']
 SENSOR = {'noaa': 'avhrr',
           'metop': 'avhrr',
           'npp': 'viirs'}
+
+import logging
+LOG = logging.getLogger(__name__)
+
+#: Default time format
+_DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
+
+#: Default log format
+_DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
+
+_MESAN_LOG_FILE = OPTIONS.get('mesan_log_file', None)
 
 
 def ctype_pps(pps, areaid='mesanX'):
@@ -136,12 +146,12 @@ class ctCompositer(object):
 
         now = datetime.utcnow()
         gds_list = glob(os.path.join(pps_gds_dir, '*cloudtype.h5'))
-        print "Number of Metop GDS files in dir: " + str(len(gds_list))
+        LOG.info("Number of Metop GDS files in dir: " + str(len(gds_list)))
         ppsgds = get_ppslist(gds_list, self.time_window,
                              satellites=METOPS, variant='global')
         tic = datetime.utcnow()
-        print("Retrieve the metop-gds list took " +
-              str((tic - now).seconds) + " sec")
+        LOG.info("Retrieve the metop-gds list took " +
+                 str((tic - now).seconds) + " sec")
         self.pps_scenes = ppsdr + ppsgds
 
         # Get all geostationary satellite scenes:
@@ -168,7 +178,7 @@ class ctCompositer(object):
         # for scene in self.pps_scenes + self.msg_scenes:
         for scene in self.msg_scenes + self.pps_scenes:
             x_CT = None
-            print scene
+            LOG.info(str(scene))
             if scene.platform == "meteosat" and not hasattr(scene, 'orbit'):
                 is_MSG = True
                 x_local = ctype_msg(scene)
@@ -215,7 +225,6 @@ class ctCompositer(object):
 
         self.longitude = comp_lon
         self.latitude = comp_lat
-
         self.area = x_local.area
 
         composite = {"cloudtype": comp_CT,
@@ -247,6 +256,33 @@ if __name__ == "__main__":
                         required=False)
 
     args = parser.parse_args()
+
+    from logging import handlers
+
+    if _MESAN_LOG_FILE:
+        ndays = int(OPTIONS["log_rotation_days"])
+        ncount = int(OPTIONS["log_rotation_backup"])
+        handler = handlers.TimedRotatingFileHandler(_MESAN_LOG_FILE,
+                                                    when='midnight',
+                                                    interval=ndays,
+                                                    backupCount=ncount,
+                                                    encoding=None,
+                                                    delay=False,
+                                                    utc=True)
+
+        handler.doRollover()
+    else:
+        handler = logging.StreamHandler(sys.stderr)
+
+    handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter(fmt=_DEFAULT_LOG_FORMAT,
+                                  datefmt=_DEFAULT_TIME_FORMAT)
+    handler.setFormatter(formatter)
+    logging.getLogger('').addHandler(handler)
+    logging.getLogger('').setLevel(logging.DEBUG)
+    logging.getLogger('mpop').setLevel(logging.DEBUG)
+
+    LOG = logging.getLogger('mesan_compositer')
 
     time_of_analysis = datetime.strptime(args.datetime, '%Y%m%d%H')
     delta_t = timedelta(minutes=int(args.time_window))
