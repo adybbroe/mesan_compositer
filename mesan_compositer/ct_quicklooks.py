@@ -95,8 +95,8 @@ if __name__ == "__main__":
 
     obstime = datetime.strptime(args.datetime, '%Y%m%d%H')
     values = {"area": args.area_id, }
-    bname = obstime.strftime(options['ct_composite_filename']) % values
-    path = options['composite_output_dir']
+    bname = obstime.strftime(OPTIONS['ct_composite_filename']) % values
+    path = OPTIONS['composite_output_dir']
     filename = os.path.join(path, bname)
 
     comp = ncCloudTypeComposite()
