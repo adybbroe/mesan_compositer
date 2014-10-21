@@ -273,14 +273,6 @@ if __name__ == "__main__":
     ipar = str(args.ipar)
     npix = int(args.size)
 
-    # from mesan_compositer.netcdf_io import (MAPPING_ATTRIBUTES, PROJNAME)
-    # proj_dict = {}
-    # for key in comp.area.info:
-    #     mykey = MAPPING_ATTRIBUTES.get(key, None)
-    #     if mykey:
-    #         item = comp.area.info[key]
-    #         proj_dict[mykey] = PROJNAME.get(item, item)
-
     bname = obstime.strftime(options['cloudamount_filename']) % values
     path = options['composite_output_dir']
     filename = os.path.join(path, bname + '.dat')
