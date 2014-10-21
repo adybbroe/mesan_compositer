@@ -17,9 +17,9 @@ export PPP_CONFIG_DIR
 utv)
 
 
-MESAN_COMPOSITE_CONFIG_DIR=/local_disk/laptop/Satsa/Mesan/mesan-sat-preproc/etc
+MESAN_COMPOSITE_CONFIG_DIR=/usr/local/etc
 export MESAN_COMPOSITE_CONFIG_DIR
-PPP_CONFIG_DIR=/local_disk/laptop/Satsa/Mesan/mesan-sat-preproc/etc
+PPP_CONFIG_DIR=/data/proj/safutv/dev/mesan
 export PPP_CONFIG_DIR
 
   ;;
