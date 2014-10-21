@@ -138,7 +138,7 @@ class ctCompositer(object):
         gds_list = glob(os.path.join(pps_gds_dir, '*cloudtype.h5'))
         print "Number of Metop GDS files in dir: " + str(len(gds_list))
         ppsgds = get_ppslist(gds_list, self.time_window,
-                             satellites=METOPS)
+                             satellites=METOPS, variant='global')
         tic = datetime.utcnow()
         print("Retrieve the metop-gds list took " +
               str((tic - now).seconds) + " sec")
