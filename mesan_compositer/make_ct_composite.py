@@ -55,6 +55,18 @@ _DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 #: Default log format
 _DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
 
+import ConfigParser
+
+conf = ConfigParser.ConfigParser()
+configfile = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
+if not os.path.exists(configfile):
+    raise IOError('Config file %s does not exist!' % configfile)
+conf.read(configfile)
+
+OPTIONS = {}
+for option, value in conf.items(MODE, raw=True):
+    OPTIONS[option] = value
+
 _MESAN_LOG_FILE = OPTIONS.get('mesan_log_file', None)
 
 
