@@ -70,6 +70,10 @@ for option, value in conf.items(MODE, raw=True):
 _MESAN_LOG_FILE = OPTIONS.get('mesan_log_file', None)
 
 
+class ProjectException(Exception):
+    pass
+
+
 def ctype_pps(pps, areaid='mesanX'):
     """Load PPS Cloudtype and reproject"""
     from mpop.satellites import PolarFactory
@@ -77,7 +81,11 @@ def ctype_pps(pps, areaid='mesanX'):
                                             SENSOR.get(pps.platform, 'avhrr'),
                                             pps.timeslot, pps.orbit)
     global_data.load(['CloudType'])
-    return global_data.project(areaid)
+    if global_data.area:
+        return global_data.project(areaid)
+    else:
+        raise ProjectException('MPOP Scene object has no area instance' +
+                               ' and product cannot be projected')
 
 
 def ctype_msg(msg, areaid='mesanX'):
@@ -202,8 +210,13 @@ class ctCompositer(object):
                 x_id = 1 * np.ones(np.shape(x_CT))
             else:
                 is_MSG = False
+                try:
+                    x_local = ctype_pps(scene)
+                except ProjectException, err:
+                    LOG.warning("Couldn't load pps scene: \n" + str(scene))
+                    LOG.warning("Exception was: " + str(err))
+                    continue
 
-                x_local = ctype_pps(scene)
                 x_CT = x_local['CloudType'].cloudtype.data
                 x_flag = x_local['CloudType'].quality_flag.data
                 x_id = 0 * np.ones(np.shape(x_CT))
