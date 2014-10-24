@@ -23,7 +23,8 @@
 """The unit test package
 """
 
-from mesan_compositer.tests import test_input
+from mesan_compositer.tests import (test_input,
+                                    test_pps_msg_converter)
 
 
 import unittest
@@ -46,6 +47,7 @@ def suite():
 
     # Use the unittests also
     mysuite.addTests(test_input.suite())
+    mysuite.addTests(test_pps_msg_converter.suite())
 
     return mysuite
 
