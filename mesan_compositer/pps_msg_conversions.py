@@ -207,7 +207,7 @@ def ctth_procflags2pps(data):
     """Convert ctth processing flags from MSG to PPS format.
     """
 
-    ones = np.ones(data.shape, "h")
+    ones = np.ones(data.shape, "int32")
 
     # 2 bits to define processing status
     # (maps to pps bits 0 and 1:)
@@ -244,8 +244,7 @@ def ctth_procflags2pps(data):
     retv = np.add(retv, arr)
     del is_bit2_set
 
-    # 3 bits to describe NWP input data
-    # (maps to pps bits 4&5:)
+    # 3 bits to describe NWP input data (maps to pps bits 4&5:)
     is_bit3_set = get_bit_from_flags(data, 3)
     is_bit4_set = get_bit_from_flags(data, 4)
     is_bit5_set = get_bit_from_flags(data, 5)
@@ -253,16 +252,13 @@ def ctth_procflags2pps(data):
     nwp_bits = (is_bit3_set * np.left_shift(ones, 0) +
                 is_bit4_set * np.left_shift(ones, 1) +
                 is_bit5_set * np.left_shift(ones, 2))
-    arr = np.where(np.logical_and(np.greater_equal(nwp_bits, 3),
-                                  np.less_equal(nwp_bits, 5)),
-                   np.left_shift(ones, 4),
-                   0)
+    arr = np.where(np.equal(nwp_bits, 5), np.left_shift(ones, 4), 0)
     arr = np.add(arr, np.where(np.logical_or(np.equal(nwp_bits, 2),
                                              np.equal(nwp_bits, 4)),
-                               np.left_shift(ones, 5),
-                               0))
+                               np.left_shift(ones, 5), 0))
 
     retv = np.add(retv, arr)
+
     del is_bit3_set
     del is_bit4_set
     del is_bit5_set
@@ -298,10 +294,21 @@ def ctth_procflags2pps(data):
         np.equal(method_bits, 13)),
         np.left_shift(ones, 2),
         0)
+    arr = np.add(arr, np.where(
+                 np.logical_or(np.equal(method_bits, 1),
+                               np.equal(method_bits, 13)),
+                 np.left_shift(ones, 7),
+                 0))  # Using rttov
+    arr = np.add(arr, np.where(
+                 np.logical_or(np.equal(method_bits, 1),
+                               np.equal(method_bits, 13)),
+                 np.left_shift(ones, 3),
+                 0))  # rttov available
+
     arr = np.add(arr,
-                 np.where(np.equal(method_bits, 1),
-                          np.left_shift(ones, 7),
-                          0))
+                 np.where(np.equal(method_bits, 13),
+                          np.left_shift(ones, 5),
+                          0))  # Thermal inversion
     arr = np.add(arr,
                  np.where(np.logical_and(
                      np.greater_equal(method_bits, 3),
@@ -345,7 +352,7 @@ def ctth_procflags2pps(data):
     del is_bit12_set
     del is_bit13_set
 
-    return retv.astype('h')
+    return retv.astype('int32')
 
 
 def ctype_procflags2pps(data):
