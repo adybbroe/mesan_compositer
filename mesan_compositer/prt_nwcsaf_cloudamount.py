@@ -310,7 +310,7 @@ if __name__ == "__main__":
 
     # Load the Cloud Type composite from file
     comp = ncCloudTypeComposite()
-    comp.load(filename + '.nc')
+    comp.load(filename)
 
     ipar = str(args.ipar)
     npix = int(args.size)
