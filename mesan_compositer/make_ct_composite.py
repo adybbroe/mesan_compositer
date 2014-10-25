@@ -31,7 +31,7 @@ from mpop.satin.msg_hdf import ctype_procflags2pps
 
 from mesan_compositer.composite_tools import (get_msglist,
                                               get_ppslist,
-                                              wCT)
+                                              get_weight_cloudtype)
 from mesan_compositer.netcdf_io import ncCloudTypeComposite
 
 import sys
@@ -240,11 +240,11 @@ class ctCompositer(object):
                 comp_flag = x_flag
                 comp_time = x_time
                 comp_id = x_id
-                comp_w = wCT(
+                comp_w = get_weight_cloudtype(
                     x_CT, x_flag, lat, abs(self.obstime - scene.timeslot), idx_MSG)
             else:
                 # compare with quality of current CT
-                x_w = wCT(
+                x_w = get_weight_cloudtype(
                     x_CT, x_flag, lat, abs(self.obstime - scene.timeslot), idx_MSG)
 
                 # replace info where current CT data is best

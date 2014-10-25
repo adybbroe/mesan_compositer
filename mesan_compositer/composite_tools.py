@@ -163,8 +163,8 @@ def get_nwcsaf_files(basedir, file_ext):
     return glob(os.path.join(basedir, '*' + file_ext))
 
 
-def wCT(CT, CT_flag, lat, tdiff, MSG):
-    """Weights for given CT, CT flag, time diff and latitude (only MSG).
+def get_weight_cloudtype(ctype, ctype_flag, lat, tdiff, MSG):
+    """Weights for given ctype, ctype flag, time diff and latitude (only MSG).
     """
     #
     import numpy as np
@@ -177,7 +177,7 @@ def wCT(CT, CT_flag, lat, tdiff, MSG):
     # weight factor is 0.5 if diff > TDIFF
     TDIFF = 30.0
     #
-    # weight factors per CT quality flag (MSG,PPS)
+    # weight factors per ctype quality flag (MSG,PPS)
     # this is based on pps flags, msg flags are mapped to pps
     wCTflg = np.array([
         [1.0,  1.0],  # 00 Land
@@ -194,8 +194,8 @@ def wCT(CT, CT_flag, lat, tdiff, MSG):
         [1.0,  1.0]   # 11 Stratiform-cumuliform distinction performed
     ])
     #
-    # weight factors per CT class
-    wCTcl = np.array([
+    # weight factors per ctype class
+    weights_ctype_class = np.array([
         0.0,  # 00 Not processed
         0.95,  # 01 Cloud free land
         1.0,  # 02 Cloud free sea
@@ -227,15 +227,15 @@ def wCT(CT, CT_flag, lat, tdiff, MSG):
         return res.astype('b')
     #
     # default quality is 1.0
-    w = np.ones(np.shape(CT_flag))
+    w = np.ones(np.shape(ctype_flag))
     #
     # large time diff to analysis time - decrease weight
     if abs(tdiff).seconds / 60 > TDIFF:
         w *= 0.5
     #
-    # reduce quality according to CT flag, MSG = 0 / 1
+    # reduce quality according to ctype flag, MSG = 0 / 1
     for bit in range(len(wCTflg)):
-        b = get_bit_from_flags(CT_flag, bit)
+        b = get_bit_from_flags(ctype_flag, bit)
         # need integer for index to this array
         w[np.nonzero(b)] *= wCTflg[bit, 1 * MSG[np.nonzero(b)]]
 
@@ -251,18 +251,18 @@ def wCT(CT, CT_flag, lat, tdiff, MSG):
     # why? increase q to override ceilometers???
     #
     # if weight is very small: set to 0.0
-    ii = (CT >= 9) * (CT <= 18) * (w < 1e-6)
+    ii = (ctype >= 9) * (ctype <= 18) * (w < 1e-6)
     w[ii] = 0.0
     # if not low quality: set to 1.0
-    b = get_bit_from_flags(CT_flag, 9)
-    ii = (CT >= 9) * (CT <= 18) * (b == 0)
+    b = get_bit_from_flags(ctype_flag, 9)
+    ii = (ctype >= 9) * (ctype <= 18) * (b == 0)
     w[ii] = 1.0
     #
-    # all CT above 20 are set to 20 (undefined with weight 0)
-    # howto index with x_CT.astype('int') from masked array ?
-    CT[CT > 20] = 20
+    # all ctype above 20 are set to 20 (undefined with weight 0)
+    # howto index with x_ctype.astype('int') from masked array ?
+    ctype[ctype > 20] = 20
     #
-    # dependece on cloud type
-    w *= wCTcl[CT.astype('int')]
+    # dependence on cloud type
+    w *= weights_ctype_class[ctype.astype('int')]
     #
     return w
