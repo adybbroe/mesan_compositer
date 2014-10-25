@@ -64,7 +64,7 @@ setup(name='mesan-compositer',
       #'pyorbital >= v0.2.3'],
 
       test_requires=["mock"],
-      extras_require={'netCDF4'},
+      extras_require={'netcdf4-python': ['netCDF4']},
       scripts=['mesan_compositer/make_ct_composite.py',
                'mesan_compositer/prt_nwcsaf_cloudamount.py',
                'mesan_compositer/ct_quicklooks.py'],
