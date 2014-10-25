@@ -79,7 +79,7 @@ if __name__ == "__main__":
                                                     delay=False,
                                                     utc=True)
 
-        handler.doRollover()
+        # handler.doRollover()
     else:
         handler = logging.StreamHandler(sys.stderr)
 
@@ -97,10 +97,13 @@ if __name__ == "__main__":
     values = {"area": args.area_id, }
     bname = obstime.strftime(OPTIONS['ct_composite_filename']) % values
     path = OPTIONS['composite_output_dir']
-    filename = os.path.join(path, bname)
+    filename = os.path.join(path, bname) + '.nc'
+    if not os.path.exists(filename):
+        LOG.error("File " + str(filename) + " does not exist!")
+        sys.exit(-1)
 
     comp = ncCloudTypeComposite()
-    comp.load(filename + '.nc')
+    comp.load(filename)
 
     import mpop.imageo.palettes
     palette = mpop.imageo.palettes.cms_modified()

@@ -74,13 +74,20 @@ class ProjectException(Exception):
     pass
 
 
+class LoadException(Exception):
+    pass
+
+
 def ctype_pps(pps, areaid='mesanX'):
     """Load PPS Cloudtype and reproject"""
     from mpop.satellites import PolarFactory
     global_data = PolarFactory.create_scene(pps.platform, str(pps.number),
                                             SENSOR.get(pps.platform, 'avhrr'),
                                             pps.timeslot, pps.orbit)
-    global_data.load(['CloudType'])
+    try:
+        global_data.load(['CloudType'])
+    except AttributeError:
+        return LoadException('MPOP scene object fails to load!')
     if global_data.area:
         return global_data.project(areaid)
     else:
@@ -212,7 +219,7 @@ class ctCompositer(object):
                 is_MSG = False
                 try:
                     x_local = ctype_pps(scene)
-                except ProjectException, err:
+                except (ProjectException, LoadException) as err:
                     LOG.warning("Couldn't load pps scene: \n" + str(scene))
                     LOG.warning("Exception was: " + str(err))
                     continue

@@ -29,7 +29,17 @@ from mesan_compositer.netcdf_io import ncCloudTypeComposite
 import argparse
 from datetime import datetime
 import os
+import sys
 import ConfigParser
+
+import logging
+LOG = logging.getLogger(__name__)
+
+#: Default time format
+_DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
+
+#: Default log format
+_DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
 
 # min 8 x 8 pixels in super obs
 DLENMIN = 4
@@ -159,9 +169,11 @@ if not os.path.exists(configfile):
     raise IOError('Config file %s does not exist!' % configfile)
 conf.read(configfile)
 
-options = {}
+OPTIONS = {}
 for option, value in conf.items(MODE, raw=True):
-    options[option] = value
+    OPTIONS[option] = value
+
+_MESAN_LOG_FILE = OPTIONS.get('mesan_log_file', None)
 
 
 def derive_sobs(ct_comp, ipar, npix, resultfile):
@@ -260,11 +272,41 @@ if __name__ == "__main__":
                         required=True)
     args = parser.parse_args()
 
+    from logging import handlers
+
+    if _MESAN_LOG_FILE:
+        ndays = int(OPTIONS["log_rotation_days"])
+        ncount = int(OPTIONS["log_rotation_backup"])
+        handler = handlers.TimedRotatingFileHandler(_MESAN_LOG_FILE,
+                                                    when='midnight',
+                                                    interval=ndays,
+                                                    backupCount=ncount,
+                                                    encoding=None,
+                                                    delay=False,
+                                                    utc=True)
+
+        # handler.doRollover()
+    else:
+        handler = logging.StreamHandler(sys.stderr)
+
+    handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter(fmt=_DEFAULT_LOG_FORMAT,
+                                  datefmt=_DEFAULT_TIME_FORMAT)
+    handler.setFormatter(formatter)
+    logging.getLogger('').addHandler(handler)
+    logging.getLogger('').setLevel(logging.DEBUG)
+    logging.getLogger('mpop').setLevel(logging.DEBUG)
+
+    LOG = logging.getLogger('prt_nwcsaf_cloudamount')
+
     obstime = datetime.strptime(args.datetime, '%Y%m%d%H')
     values = {"area": args.area_id, }
-    bname = obstime.strftime(options['ct_composite_filename']) % values
-    path = options['composite_output_dir']
-    filename = os.path.join(path, bname)
+    bname = obstime.strftime(OPTIONS['ct_composite_filename']) % values
+    path = OPTIONS['composite_output_dir']
+    filename = os.path.join(path, bname) + '.nc'
+    if not os.path.exists(filename):
+        LOG.error("File " + str(filename) + " does not exist!")
+        sys.exit(-1)
 
     # Load the Cloud Type composite from file
     comp = ncCloudTypeComposite()
@@ -273,7 +315,7 @@ if __name__ == "__main__":
     ipar = str(args.ipar)
     npix = int(args.size)
 
-    bname = obstime.strftime(options['cloudamount_filename']) % values
-    path = options['composite_output_dir']
+    bname = obstime.strftime(OPTIONS['cloudamount_filename']) % values
+    path = OPTIONS['composite_output_dir']
     filename = os.path.join(path, bname + '.dat')
     derive_sobs(comp, ipar, npix, filename)
