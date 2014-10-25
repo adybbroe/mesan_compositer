@@ -43,14 +43,14 @@ import ConfigParser
 CFG_DIR = os.environ.get('MESAN_COMPOSITE_CONFIG_DIR', './')
 MODE = os.environ.get("SMHI_MODE", 'offline')
 
-conf = ConfigParser.ConfigParser()
-configfile = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
-if not os.path.exists(configfile):
-    raise IOError('Config file %s does not exist!' % configfile)
-conf.read(configfile)
+CONF = ConfigParser.ConfigParser()
+CONFIGFILE = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
+if not os.path.exists(CONFIGFILE):
+    raise IOError('Config file %s does not exist!' % CONFIGFILE)
+CONF.read(CONFIGFILE)
 
 OPTIONS = {}
-for option, value in conf.items(MODE, raw=True):
+for option, value in CONF.items(MODE, raw=True):
     OPTIONS[option] = value
 
 _MESAN_LOG_FILE = OPTIONS.get('mesan_log_file', None)
@@ -79,7 +79,7 @@ if __name__ == "__main__":
                                                     delay=False,
                                                     utc=True)
 
-        handler.doRollover()
+        # handler.doRollover()
     else:
         handler = logging.StreamHandler(sys.stderr)
 
@@ -97,10 +97,13 @@ if __name__ == "__main__":
     values = {"area": args.area_id, }
     bname = obstime.strftime(OPTIONS['ct_composite_filename']) % values
     path = OPTIONS['composite_output_dir']
-    filename = os.path.join(path, bname)
+    filename = os.path.join(path, bname) + '.nc'
+    if not os.path.exists(filename):
+        LOG.error("File " + str(filename) + " does not exist!")
+        sys.exit(-1)
 
     comp = ncCloudTypeComposite()
-    comp.load(filename + '.nc')
+    comp.load(filename)
 
     import mpop.imageo.palettes
     palette = mpop.imageo.palettes.cms_modified()
