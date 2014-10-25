@@ -38,6 +38,8 @@ METEOSAT = {'MSG1': 'meteosat08',
             'MSG3': 'meteosat10',
             'MSG4': 'meteosat11'}
 
+from mesan_compositer.pps_msg_conversions import get_bit_from_flags
+
 
 class PpsMetaData(object):
 
@@ -163,19 +165,19 @@ def get_nwcsaf_files(basedir, file_ext):
     return glob(os.path.join(basedir, '*' + file_ext))
 
 
-def get_weight_cloudtype(ctype, ctype_flag, lat, tdiff, MSG):
+def get_weight_cloudtype(ctype, ctype_flag, lat, tdiff, is_msg):
     """Weights for given ctype, ctype flag, time diff and latitude (only MSG).
     """
     #
     import numpy as np
     #
     #  limits; linear lat dependence for MSG
-    LATMIN_MSG = 52.0  # weight factor is 1 if lat < LATMIN_MSG
-    LATMAX_MSG = 75.0  # weight factor is 0 if lat > LATMAX_MSG
+    latmin_msg = 52.0  # weight factor is 1 if lat < latmin_msg
+    latmax_msg = 75.0  # weight factor is 0 if lat > latmax_msg
     #
     # time diff in minutes when diff affects quality
-    # weight factor is 0.5 if diff > TDIFF
-    TDIFF = 30.0
+    # weight factor is 0.5 if diff > tdiff
+    tdiff = 30.0
     #
     # weight factors per ctype quality flag (MSG,PPS)
     # this is based on pps flags, msg flags are mapped to pps
@@ -220,49 +222,45 @@ def get_weight_cloudtype(ctype, ctype_flag, lat, tdiff, MSG):
     ])
     #
 
-    def get_bit_from_flags(arr, nbit):
-        """I don't know what this function does.
-        """
-        res = np.bitwise_and(np.right_shift(arr, nbit), 1)
-        return res.astype('b')
     #
     # default quality is 1.0
-    w = np.ones(np.shape(ctype_flag))
+    weight = np.ones(np.shape(ctype_flag))
     #
     # large time diff to analysis time - decrease weight
-    if abs(tdiff).seconds / 60 > TDIFF:
-        w *= 0.5
+    if abs(tdiff).seconds / 60 > tdiff:
+        weight *= 0.5
     #
-    # reduce quality according to ctype flag, MSG = 0 / 1
+    # reduce quality according to ctype flag, is_msg = 0 / 1
     for bit in range(len(wCTflg)):
-        b = get_bit_from_flags(ctype_flag, bit)
+        bit_is_set = get_bit_from_flags(ctype_flag, bit)
         # need integer for index to this array
-        w[np.nonzero(b)] *= wCTflg[bit, 1 * MSG[np.nonzero(b)]]
+        weight[np.nonzero(bit_is_set)] *= wCTflg[bit,
+                                                 1 * is_msg[np.nonzero(bit_is_set)]]
 
-    # linear lat dependence for MSG btw LATMIN_MSG and LATMAX_MSG
+    # linear lat dependence for MSG btw latmin_msg and latmax_msg
     # weight is 1.0 for lat < LATMIN and 0.0 for lat > LATMAX
-    if not np.all(MSG == False):
-        ii = (lat >= LATMIN_MSG) * (lat <= LATMAX_MSG) * MSG
-        w[ii] *= (LATMAX_MSG - lat[ii]) / (LATMAX_MSG - LATMIN_MSG)
-        ii = (lat > LATMAX_MSG) * MSG
-        w[ii] = 0.0
+    if not np.all(is_msg == False):
+        ii = (lat >= latmin_msg) * (lat <= latmax_msg) * is_msg
+        weight[ii] *= (latmax_msg - lat[ii]) / (latmax_msg - latmin_msg)
+        ii = (lat > latmax_msg) * is_msg
+        weight[ii] = 0.0
     #
     # special treatment of high clouds - medium to Cirrus
     # why? increase q to override ceilometers???
     #
     # if weight is very small: set to 0.0
-    ii = (ctype >= 9) * (ctype <= 18) * (w < 1e-6)
-    w[ii] = 0.0
+    ii = (ctype >= 9) * (ctype <= 18) * (weight < 1e-6)
+    weight[ii] = 0.0
     # if not low quality: set to 1.0
     b = get_bit_from_flags(ctype_flag, 9)
     ii = (ctype >= 9) * (ctype <= 18) * (b == 0)
-    w[ii] = 1.0
+    weight[ii] = 1.0
     #
     # all ctype above 20 are set to 20 (undefined with weight 0)
     # howto index with x_ctype.astype('int') from masked array ?
     ctype[ctype > 20] = 20
     #
     # dependence on cloud type
-    w *= weights_ctype_class[ctype.astype('int')]
+    weight *= weights_ctype_class[ctype.astype('int')]
     #
-    return w
+    return weight
