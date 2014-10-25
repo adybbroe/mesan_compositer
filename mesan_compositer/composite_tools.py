@@ -25,6 +25,9 @@
 import os
 from datetime import datetime
 
+import logging
+LOG = logging.getLogger(__name__)
+
 
 MSGSATS = {'meteosat09': 'MSG2',
            'meteosat08': 'MSG1',
@@ -36,7 +39,7 @@ METEOSAT = {'MSG1': 'meteosat08',
             'MSG4': 'meteosat11'}
 
 
-class ppsMetaData(object):
+class PpsMetaData(object):
 
     """Container for the metadata defining the pps scenes"""
 
@@ -57,7 +60,7 @@ class ppsMetaData(object):
                           'variant=' + str(self.variant)])
 
 
-class msgMetaData(object):
+class MsgMetaData(object):
 
     """Container for the metadata defining the msg scenes"""
 
@@ -105,7 +108,7 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
         if (timeslot > timewindow[0] and
                 timeslot < timewindow[1]):
 
-            plist.append(ppsMetaData(orbit=orbit, timeslot=timeslot,
+            plist.append(PpsMetaData(orbit=orbit, timeslot=timeslot,
                                      platform=platform, number=number,
                                      variant=variant))
 
@@ -134,9 +137,6 @@ def get_msglist(filelist, timewindow, area_id, satellites=None):
         number = (METEOSAT.get(sat, 'meteosat09')).split(platform)[1]
         areaid = bnsplit[-1].split('.')[0]
 
-        #import pdb
-        # pdb.set_trace()
-
         if areaid != area_id:
             continue
 
@@ -151,7 +151,7 @@ def get_msglist(filelist, timewindow, area_id, satellites=None):
         # Now filter out all passes outside time window:
         if (timeslot > timewindow[0] and
                 timeslot < timewindow[1]):
-            mlist.append(msgMetaData(areaid=areaid, timeslot=timeslot,
+            mlist.append(MsgMetaData(areaid=areaid, timeslot=timeslot,
                                      platform=platform, number=number))
 
     return mlist
@@ -238,9 +238,7 @@ def wCT(CT, CT_flag, lat, tdiff, MSG):
         b = get_bit_from_flags(CT_flag, bit)
         # need integer for index to this array
         w[np.nonzero(b)] *= wCTflg[bit, 1 * MSG[np.nonzero(b)]]
-    #
-    #    pdb.set_trace()
-    #
+
     # linear lat dependence for MSG btw LATMIN_MSG and LATMAX_MSG
     # weight is 1.0 for lat < LATMIN and 0.0 for lat > LATMAX
     if not np.all(MSG == False):

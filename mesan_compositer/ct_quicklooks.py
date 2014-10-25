@@ -43,14 +43,14 @@ import ConfigParser
 CFG_DIR = os.environ.get('MESAN_COMPOSITE_CONFIG_DIR', './')
 MODE = os.environ.get("SMHI_MODE", 'offline')
 
-conf = ConfigParser.ConfigParser()
-configfile = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
-if not os.path.exists(configfile):
-    raise IOError('Config file %s does not exist!' % configfile)
-conf.read(configfile)
+CONF = ConfigParser.ConfigParser()
+CONFIGFILE = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
+if not os.path.exists(CONFIGFILE):
+    raise IOError('Config file %s does not exist!' % CONFIGFILE)
+CONF.read(CONFIGFILE)
 
 OPTIONS = {}
-for option, value in conf.items(MODE, raw=True):
+for option, value in CONF.items(MODE, raw=True):
     OPTIONS[option] = value
 
 _MESAN_LOG_FILE = OPTIONS.get('mesan_log_file', None)
