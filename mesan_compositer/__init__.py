@@ -24,7 +24,7 @@
 """
 
 
-import version
+from mesan_compositor import version
 
 __version__ = version.__version__
 
