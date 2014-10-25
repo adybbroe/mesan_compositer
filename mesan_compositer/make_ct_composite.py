@@ -205,7 +205,7 @@ class ctCompositer(object):
         # for scene in self.pps_scenes + self.msg_scenes:
         for scene in self.msg_scenes + self.pps_scenes:
             x_CT = None
-            LOG.info(str(scene))
+            LOG.info("Scene:\n" + str(scene))
             if scene.platform == "meteosat" and not hasattr(scene, 'orbit'):
                 is_MSG = True
                 x_local = ctype_msg(scene)
@@ -220,7 +220,7 @@ class ctCompositer(object):
                 try:
                     x_local = ctype_pps(scene)
                 except (ProjectException, LoadException) as err:
-                    LOG.warning("Couldn't load pps scene: \n" + str(scene))
+                    LOG.warning("Couldn't load pps scene:\n" + str(scene))
                     LOG.warning("Exception was: " + str(err))
                     continue
 
