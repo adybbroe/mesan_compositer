@@ -295,7 +295,7 @@ if __name__ == "__main__":
                                                     delay=False,
                                                     utc=True)
 
-        handler.doRollover()
+        # handler.doRollover()
     else:
         handler = logging.StreamHandler(sys.stderr)
 
