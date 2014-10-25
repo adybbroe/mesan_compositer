@@ -60,12 +60,11 @@ setup(name='mesan-compositer',
       # installed or upgraded on the target machine
       install_requires=['docutils>=0.3',
                         'numpy>=1.5.1',
-                        'netCDF4',
                         'pyresample'],
       #'pyorbital >= v0.2.3'],
 
       test_requires=["mock"],
-      extras_require={},
+      extras_require={'netCDF4'},
       scripts=['mesan_compositer/make_ct_composite.py',
                'mesan_compositer/prt_nwcsaf_cloudamount.py',
                'mesan_compositer/ct_quicklooks.py'],
