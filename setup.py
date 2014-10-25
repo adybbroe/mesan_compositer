@@ -36,8 +36,8 @@ SHORT_DESC = ("Mesan satellite compositer")
 version = imp.load_source(
     'mesan_compositer.version', 'mesan_compositer/version.py')
 
-setup(name='SMHI-SAF-mesan-compositer',
-      version='v0.1.0',
+setup(name='mesan-compositer',
+      version='0.1.0',
       description=SHORT_DESC,
       author='Adam Dybbroe, Tomas Landelius',
       author_email='adam.dybbroe@smhi.se, tomas.landelius@smhi.se',
@@ -60,6 +60,7 @@ setup(name='SMHI-SAF-mesan-compositer',
       # installed or upgraded on the target machine
       install_requires=['docutils>=0.3',
                         'numpy>=1.5.1',
+                        'mpop>=v1.0',
                         'pyresample'],
       #'pyorbital >= v0.2.3'],
 
