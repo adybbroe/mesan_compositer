@@ -176,8 +176,8 @@ def get_weight_cloudtype(ctype, ctype_flag, lat, tdiff, is_msg):
     latmax_msg = 75.0  # weight factor is 0 if lat > latmax_msg
     #
     # time diff in minutes when diff affects quality
-    # weight factor is 0.5 if diff > tdiff
-    tdiff = 30.0
+    # weight factor is 0.5 if diff > tdiff_thr
+    tdiff_thr = 30.0
     #
     # weight factors per ctype quality flag (MSG,PPS)
     # this is based on pps flags, msg flags are mapped to pps
@@ -227,7 +227,7 @@ def get_weight_cloudtype(ctype, ctype_flag, lat, tdiff, is_msg):
     weight = np.ones(np.shape(ctype_flag))
     #
     # large time diff to analysis time - decrease weight
-    if abs(tdiff).seconds / 60 > tdiff:
+    if abs(tdiff).seconds / 60 > tdiff_thr:
         weight *= 0.5
     #
     # reduce quality according to ctype flag, is_msg = 0 / 1
