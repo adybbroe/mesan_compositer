@@ -24,8 +24,8 @@
 """
 
 from mesan_compositer.tests import (test_input,
-                                    test_pps_msg_converter)
-
+                                    test_pps_msg_converter,
+                                    test_compositer)
 
 import unittest
 import doctest
@@ -48,6 +48,7 @@ def suite():
     # Use the unittests also
     mysuite.addTests(test_input.suite())
     mysuite.addTests(test_pps_msg_converter.suite())
+    mysuite.addTests(test_compositer.suite())
 
     return mysuite
 

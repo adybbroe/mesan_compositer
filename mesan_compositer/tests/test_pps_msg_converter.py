@@ -382,7 +382,7 @@ class TestFlagConversions(unittest.TestCase):
 
 
 def suite():
-    """The suite for test_blackbody.
+    """The suite for test_pps_msg_converter.
     """
     loader = unittest.TestLoader()
     mysuite = unittest.TestSuite()

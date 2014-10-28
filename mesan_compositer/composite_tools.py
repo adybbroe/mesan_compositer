@@ -170,6 +170,9 @@ def get_weight_cloudtype(ctype, ctype_flag, lat, tdiff, is_msg):
     """
     #
     import numpy as np
+
+    #import pdb
+    # pdb.set_trace()
     #
     #  limits; linear lat dependence for MSG
     latmin_msg = 52.0  # weight factor is 1 if lat < latmin_msg
@@ -263,4 +266,12 @@ def get_weight_cloudtype(ctype, ctype_flag, lat, tdiff, is_msg):
     # dependence on cloud type
     weight *= weights_ctype_class[ctype.astype('int')]
     #
+    # pdb.set_trace()
+    # np.savez('input_output.npz',
+    #          CTYPE=ctype.data[1200:1210, 1000:1010],
+    #          CTYPE_FLAGS=ctype_flag.data[1200:1210, 1000:1010],
+    #          LAT=lat[1200:1210, 1000:1010],
+    #          IS_MSG=is_msg[1200:1210, 1000:1010],
+    #          WEIGHTS=weight[1200:1210, 1000:1010])
+
     return weight
