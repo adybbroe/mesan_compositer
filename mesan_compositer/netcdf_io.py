@@ -265,3 +265,145 @@ class ncCloudTypeComposite(object):
                 LOG.info("Grid mapping found and used")
             except AttributeError:
                 LOG.info("No grid mapping found")
+
+
+class ncCTTHComposite(ncCloudTypeComposite):
+
+    """netcdf ctth composite object"""
+
+    def __init__(self):
+        self.info = {}
+        #self.info["Conventions"] = "CF-1.6"
+        self.info["Conventions"] = "Undefined"
+
+        self.time = InfoObject()
+        self.temperature = InfoObject()
+        self.height = InfoObject()
+        self.pressure = InfoObject()
+        self.weight = InfoObject()
+        self.id = InfoObject()
+        self.area = InfoObject()
+        self.area_def = None
+
+    def store(self, comp_dict, area_obj, product_id='MSG/PPS CTTH composite'):
+        """Store the composite into the object"""
+
+        self.info["product"] = product_id
+
+        resolution = 1000  # FIXME!
+        str_res = '1000 m'
+        dim_names = ['y' + str_res, 'x' + str_res]
+
+        self.time.data = comp_dict["time"]
+        valid_min, valid_max = (self.time.data.min(), self.time.data.max())
+        self.time.info = {"var_name": "time",
+                          "var_data": self.time.data,
+                          "var_dim_names": dim_names,
+                          "long_name": "observation time of best ctth value",
+                          "standard_name": "time",
+                          "valid_range": np.array([valid_min, valid_max]),
+                          "units": TIME_UNITS}
+
+        # Temperature
+        self.temperature.data = comp_dict["temperature"]
+        valid_min, valid_max = (
+            self.temperature.data.min(), self.temperature.data.max())
+        self.temperature.info = {"var_name": "temperature",
+                                 "var_data": self.temperature.data,
+                                 'var_dim_names': dim_names,
+                                 "standard_name": "Temperature",
+                                 "_FillValue": 0.0,
+                                 "scale_factor": 1.0,
+                                 "add_offset": 0.0,
+                                 "valid_range": np.array([valid_min, valid_max]),
+                                 "resolution": resolution}
+        self.temperature.info["description"] = 'NWCSAF CTTH - temperature'
+
+        # Height
+        self.height.data = comp_dict["height"]
+        valid_min, valid_max = (
+            self.height.data.min(), self.height.data.max())
+        self.height.info = {"var_name": "height",
+                            "var_data": self.height.data,
+                            'var_dim_names': dim_names,
+                            "standard_name": "Height",
+                            "_FillValue": 0.0,
+                            "scale_factor": 1.0,
+                            "add_offset": 0.0,
+                            "valid_range": np.array([valid_min, valid_max]),
+                            "resolution": resolution}
+        self.height.info["description"] = 'NWCSAF CTTH - height'
+
+        # Pressure
+        self.pressure.data = comp_dict["pressure"]
+        valid_min, valid_max = (
+            self.pressure.data.min(), self.pressure.data.max())
+        self.pressure.info = {"var_name": "pressure",
+                              "var_data": self.pressure.data,
+                              'var_dim_names': dim_names,
+                              "standard_name": "Pressure",
+                              "_FillValue": 0.0,
+                              "scale_factor": 1.0,
+                              "add_offset": 0.0,
+                              "valid_range": np.array([valid_min, valid_max]),
+                              "resolution": resolution}
+        self.pressure.info["description"] = 'NWCSAF CTTH - pressure'
+
+        # Weight:
+        self.weight.data = comp_dict["weight"]
+        valid_min, valid_max = (self.weight.data.min(), self.weight.data.max())
+        self.weight.info = {"var_name": "weight",
+                            "var_data": self.weight.data,
+                            'var_dim_names': dim_names,
+                            "standard_name": "CTTH weight",
+                            "valid_range": np.array([valid_min, valid_max]),
+                            "resolution": 1000}
+        self.weight.info["description"] = "Weight of the best CTTH"
+
+        # Id:
+        self.id.data = comp_dict["id"]
+        valid_min, valid_max = (self.id.data.min(), self.id.data.max())
+        self.id.info = {"var_name": "id",
+                        "var_data": self.id.data,
+                        'var_dim_names': dim_names,
+                        "standard_name": "CTTH id",
+                        "valid_range": np.array([valid_min, valid_max]),
+                        "resolution": 1000}
+        self.id.info[
+            "description"] = "Id (pps=0 or msg=1) of the best CTTH estimate"
+
+        # Grid mapping:
+        self.area.data = 0
+        self.area.info = {"var_name": 'area',
+                          "var_data": self.area.data,
+                          "var_dim_names": ()}
+        self.area.info.update(proj2cf(area_obj.proj_dict))
+
+        setattr(self, self.area.info["var_name"], self.area)
+        x__ = InfoObject()
+        area_obj.get_proj_coords(cache=True)
+        x__.data = area_obj.projection_x_coords[0, :]
+        x__.info = {"var_name": "x" + str_res,
+                    "var_data": x__.data,
+                    "var_dim_names": ("x" + str_res,),
+                    "units": "m",
+                    "standard_name": "projection_x_coordinate",
+                    "long_name": "x coordinate of projection"}
+        setattr(self, x__.info["var_name"], x__)
+
+        y__ = InfoObject()
+        y__.data = area_obj.projection_y_coords[:, 0]
+        y__.info = {"var_name": "y" + str_res,
+                    "var_data": y__.data,
+                    "var_dim_names": ("y" + str_res,),
+                    "units": "m",
+                    "standard_name": "projection_y_coordinate",
+                    "long_name": "y coordinate of projection"}
+        setattr(self, y__.info["var_name"], y__)
+
+        self.temperature.info["grid_mapping"] = self.area.info["var_name"]
+        self.height.info["grid_mapping"] = self.area.info["var_name"]
+        self.pressure.info["grid_mapping"] = self.area.info["var_name"]
+        self.weight.info["grid_mapping"] = self.area.info["var_name"]
+        self.id.info["grid_mapping"] = self.area.info["var_name"]
+        self.time.info["grid_mapping"] = self.area.info["var_name"]
