@@ -165,6 +165,67 @@ def get_nwcsaf_files(basedir, file_ext):
     return glob(os.path.join(basedir, '*' + file_ext))
 
 
+def get_weight_ctth(ctth_flag, lat, tdiff, is_msg):
+    """Weights for given CTTH flag, time diff and latitude (only MSG).
+    """
+    #
+    import numpy as np
+    #
+    #  limits; linear lat dependence for MSG
+    latmin_msg = 52.0  # weight factor is 1 if lat < LATMIN_MSG
+    latmax_msg = 75.0  # weight factor is 0 if lat > LATMAX_MSG
+    #
+    # time diff in minutes when diff affects quality
+    # weight factor is 0.5 if diff > TDIFF
+    tdiff_thr = 30.0
+    #
+    # weight factors per CT quality flag (MSG,PPS)
+    # this is based on pps flags, msg flags are mapped to pps
+    wCTTHflg = np.array([
+        [0.0,  0.0],  # 00 Not processed
+        [1.0,  1.0],  # 01 Cloudy
+        [1.0,  1.0],  # 02 Opaque cloud
+        [1.0,  1.0],  # 03 RTTOV IR simulations available
+        [0.5,  0.5],  # 04 Missing NWP data
+        [0.5,  0.5],  # 05 Thermal inversion available
+        [1.0,  1.0],  # 06 Missing AVHRR data
+        [1.0,  1.0],  # 07 RTTOV IR simulation applied
+        [0.5,  0.5],  # 08 Windowing technique applied
+        [1.0,  1.0],  # 09 ???
+        [1.0,  1.0],  # 10 ???
+        [1.0,  1.0],  # 11 ???
+        [1.0,  1.0],  # 12 ??? prev used for PPS/MSG
+        [1.0,  1.0],  # 13 ??? prev used for large time diff
+        [1.0,  1.0],  # 14 Quality estimation available
+        [0.5,  0.5]   # 15 Low confidence
+    ])
+    #
+    #
+    # default quality is 1.0
+    weight = np.ones(np.shape(ctth_flag))
+    #
+    # large time diff to analysis time - decrease weight
+    if abs(tdiff).seconds / 60 > tdiff_thr:
+        weight *= 0.5
+    #
+    # reduce quality according to CT flag, MSG = 0 / 1
+    #
+    #
+    for bit in range(len(wCTTHflg)):
+        b = get_bit_from_flags(ctth_flag, bit)
+        # need integer for index to this array
+        weight[np.nonzero(b)] *= wCTTHflg[bit, 1 * is_msg[np.nonzero(b)]]
+    # linear lat dependence for MSG btw LATMIN_MSG and latmax_msg
+    # weight is 1.0 for lat < LATMIN and 0.0 for lat > LATMAX
+    if not np.all(is_msg == False):
+        ii = (lat >= latmin_msg) * (lat <= latmax_msg) * is_msg
+        weight[ii] *= (latmax_msg - lat[ii]) / (latmax_msg - latmin_msg)
+        ii = (lat > latmax_msg) * is_msg
+        weight[ii] = 0.0
+
+    return weight
+
+
 def get_weight_cloudtype(ctype, ctype_flag, lat, tdiff, is_msg):
     """Weights for given ctype, ctype flag, time diff and latitude (only MSG).
     """
