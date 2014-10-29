@@ -80,7 +80,7 @@ def ctype_pps(pps, areaid='mesanX'):
     try:
         global_data.load(['CloudType'])
     except AttributeError:
-        return LoadException('MPOP scene object fails to load!')
+        raise LoadException('MPOP scene object fails to load!')
     if global_data.area:
         return global_data.project(areaid)
     else:
