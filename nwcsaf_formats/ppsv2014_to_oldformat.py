@@ -135,6 +135,8 @@ def write_cloudtype(ppsobj, param, **kwargs):
     data = np.array(vnamelist, dtype=comp_type)
     cloudtype.attrs["output_value_namelist"] = data
 
+    # Map the flags from new to old:
+
     # quality_flag:
     qualityflags = h5f.create_dataset("quality_flag", shape, dtype='u2',
                                       compression="gzip", compression_opts=6)

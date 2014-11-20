@@ -72,8 +72,13 @@ def ctype_convert_flags(status_flag, conditions_flag, quality_flag):
     # Land, sea and coast:
     is_bit4_set = get_bit_from_flags(conditions_flag, 4)
     is_bit5_set = get_bit_from_flags(conditions_flag, 5)
-    arr = np.where(np.logical_and(is_bit4_set, is_bit5_set == 0),
+    # Land
+    arr = np.where(is_bit4_set,
                    np.left_shift(ones, 0), 0)
+    retv = np.add(retv, arr)
+    # Land and coast
+    arr = np.where(is_bit5_set,
+                   np.left_shift(ones, 1), 0)
     retv = np.add(retv, arr)
 
     return retv
