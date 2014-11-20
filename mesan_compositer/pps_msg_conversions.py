@@ -356,9 +356,8 @@ def ctth_procflags2pps(data):
 
 
 def ctype_procflags2pps(data):
-    """Converting cloud type processing flags to
-    the PPS format, in order to have consistency between
-    PPS and MSG cloud type contents.
+    """Converting cloud type processing flags to the PPS format, in order to
+    have consistency between PPS and MSG cloud type contents.
     """
 
     ones = np.ones(data.shape, "h")

@@ -53,7 +53,7 @@ setup(name='mesan-compositer',
       long_description=long_description,
       license='GPLv3',
 
-      packages=['mesan_compositer'],
+      packages=['mesan_compositer', 'nwcsaf_formats'],
       package_data={},
 
       # Project should use reStructuredText, so ensure that the docutils get
@@ -73,7 +73,7 @@ setup(name='mesan-compositer',
                'mesan_compositer/ctth_quicklooks.py'],
       data_files=[('etc', ['etc/mesan_sat_config.cfg_template']),
                   ],
-      test_suite='mesan_compositer.tests.suite',
+      test_suite='tests.suite',
       tests_require=[],
       zip_safe=False
       )
