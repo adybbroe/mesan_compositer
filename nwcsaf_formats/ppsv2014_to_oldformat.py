@@ -51,7 +51,7 @@ def write_cloudtype(ppsobj, filename):
     except KeyError:
         h5f.attrs['description'] = ppsobj.mda['description']
     h5f.attrs['orbit_number'] = np.int32(ppsobj.mda['orbit'])
-    h5f.attrs['satellite_id'] = ppsobj.mda['satellite']
+    h5f.attrs['satellite_id'] = str(ppsobj.mda['satellite'])
     h5f.attrs['sec_1970'] = time.mktime(ppsobj.mda['time_slot'].timetuple())
     try:
         h5f.attrs['version'] = str(ppsobj.mda['source'])
