@@ -33,7 +33,9 @@ import h5py
 import numpy as np
 import os.path
 
-from nwcsaf_formats.pps_conversions import map_cloudtypes
+from nwcsaf_formats.pps_conversions import (map_cloudtypes,
+                                            old_ctype_palette,
+                                            old_ctype_palette_data)
 
 
 def write_cloudtype(ppsobj, param, **kwargs):
@@ -43,8 +45,8 @@ def write_cloudtype(ppsobj, param, **kwargs):
     # noaa18_20141111_0639_48832.euron1.cloudtype.hdf
     # Make the old style PPS filename:
     filename = (ppsobj.satname + ppsobj.number +
-                ppsobj.time_slot.strftime('_%Y%m%d_%H%M_') + '_'
-                + ppsobj.orbit + '.' + ppsobj.area.area_id + '.cloudtype.hdf')
+                ppsobj.time_slot.strftime('_%Y%m%d_%H%M_') +
+                ppsobj.orbit + '.' + ppsobj.area.area_id + '.cloudtype.hdf')
 
     h5f = h5py.File(os.path.join(path, filename), 'w')
 
@@ -92,13 +94,13 @@ def write_cloudtype(ppsobj, param, **kwargs):
     # Make the palette:
     shape = (256, 3)
     palette = h5f.create_dataset("PALETTE", shape, dtype='u1')
-    # data = np.ones(shape) * 5
     try:
-        data = ppsobj[param]._md['ct_pal'].data
+        dummy = ppsobj[param]._md['ct_pal'].data
+        palette_data = old_ctype_palette_data()
     except KeyError:
-        data = ppsobj[param]._md['PALETTE']
+        palette_data = ppsobj[param]._md['PALETTE']
 
-    palette[...] = data
+    palette[...] = palette_data
     palette.attrs['CLASS'] = "PALETTE"
     palette.attrs['PAL_COLORMODEL'] = "RGB"
     palette.attrs['PAL_TYPE'] = "STANDARD8"
@@ -114,26 +116,26 @@ def write_cloudtype(ppsobj, param, **kwargs):
     cloudtype = h5f.create_dataset("cloudtype", shape, dtype='u1',
                                    compression="gzip", compression_opts=6)
     try:
+        print("Cloudtype categories mapped!")
         cloudtype[...] = map_cloudtypes(ppsobj[param].ct.data.filled(0))
+        palette = old_ctype_palette()
     except AttributeError:
+        print("Cloudtype categories *not* mapped!")
         cloudtype[...] = ppsobj[param].cloudtype.data.filled(0)
+        # Outputvaluenamelist:
+        comp_type = np.dtype([('outval_name', np.str, 128), ])
+        vnamelist = []
+        for i, item in zip(ppsobj[param].ct.info['flag_values'],
+                           str(ppsobj[param].ct.info['flag_meanings']).split(' ')):
+            vnamelist.append(str(i) + ":" + " " + item)
+        vnamelist.insert(0, '0: Not processed')
+        palette = np.array(vnamelist, dtype=comp_type)
 
-    # cloudtype[...] = np.ones(shape, 'u1') * 8
+    cloudtype.attrs["output_value_namelist"] = palette
     cloudtype.attrs['CLASS'] = "IMAGE"
     cloudtype.attrs['IMAGE_VERSION'] = "1.2"
     #cloudtype.attrs['PALETTE'] = h5f['PALETTE'].ref
     cloudtype.attrs['description'] = "Cloud type classification"
-
-    # Outputvaluenamelist:
-    comp_type = np.dtype([('outval_name', np.str, 128), ])
-    vnamelist = []
-    for i, item in zip(ppsobj[param].ct.info['flag_values'],
-                       str(ppsobj[param].ct.info['flag_meanings']).split(' ')):
-        vnamelist.append(str(i) + ":" + " " + item)
-    vnamelist.insert(0, '0: Not processed')
-
-    data = np.array(vnamelist, dtype=comp_type)
-    cloudtype.attrs["output_value_namelist"] = data
 
     # Map the flags from new to old:
 
@@ -152,8 +154,8 @@ def write_cloudtype(ppsobj, param, **kwargs):
     for i, item in zip(ppsobj[param].ct_quality.info['flag_values'],
                        str(ppsobj[param].ct_quality.info['flag_meanings']).split(' ')):
         vnamelist.append(str(i) + ":" + " " + item)
-    #vnamelist.insert(0, '0: Not processed')
 
+    comp_type = np.dtype([('outval_name', np.str, 128), ])
     data = np.array(vnamelist, dtype=comp_type)
     qualityflags.attrs["output_value_namelist"] = data
 
@@ -173,4 +175,4 @@ if __name__ == '__main__':
     gbd.load(['CT'])
 
     lcd = gbd.project('euron1')
-    #write_cloudtype(lcd, 'CT')
+    write_cloudtype(lcd, 'CT')
