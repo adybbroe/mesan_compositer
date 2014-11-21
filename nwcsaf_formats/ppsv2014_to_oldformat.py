@@ -23,46 +23,42 @@
 """Read new PPS netCDF formattet data on swath, and remap and store in old hdf5
 format. Start with Cloud Type, and extend to other products!
 """
-from mpop.utils import debug_on
-debug_on()
-
-from mpop.satellites import PolarFactory
-import datetime
 import time
 import h5py
 import numpy as np
-import os.path
+import logging
 
 from nwcsaf_formats.pps_conversions import map_cloudtypes
 
+LOG = logging.getLogger(__name__)
 
-def write_cloudtype(ppsobj, param, **kwargs):
+
+def write_cloudtype(ppsobj, filename):
     """Write the cloudtype data to hdf5"""
 
-    path = kwargs.get('path', './')
     # noaa18_20141111_0639_48832.euron1.cloudtype.hdf
     # Make the old style PPS filename:
-    filename = (ppsobj.satname + ppsobj.number +
-                ppsobj.time_slot.strftime('_%Y%m%d_%H%M_') + '_'
-                + ppsobj.orbit + '.' + ppsobj.area.area_id + '.cloudtype.hdf')
+    # filename = (ppsobj.satname + ppsobj.number +
+    #            ppsobj.time_slot.strftime('_%Y%m%d_%H%M_') + '_'
+    #            + ppsobj.orbit + '.' + ppsobj.area.area_id + '.cloudtype.hdf')
 
-    h5f = h5py.File(os.path.join(path, filename), 'w')
+    h5f = h5py.File(filename, 'w')
 
     try:
-        h5f.attrs['description'] = str(ppsobj[param]._md['title'])
+        h5f.attrs['description'] = str(ppsobj.mda['title'])
     except KeyError:
-        h5f.attrs['description'] = ppsobj[param]._md['description']
+        h5f.attrs['description'] = ppsobj.mda['description']
     h5f.attrs['orbit_number'] = np.int32(ppsobj.orbit)
     h5f.attrs['satellite_id'] = ppsobj.satname + ppsobj.number
     h5f.attrs['sec_1970'] = time.mktime(ppsobj.time_slot.timetuple())
     try:
-        h5f.attrs['version'] = str(ppsobj[param]._md['source'])
+        h5f.attrs['version'] = str(ppsobj.mda['source'])
     except KeyError:
-        h5f.attrs['version'] = ppsobj[param]._md['version']
+        h5f.attrs['version'] = ppsobj.mda['version']
 
     # Create the region data:
     blockSize = 4
-    dataArray = np.zeros(blockSize, dtype=np.float)
+
     comp_type = np.dtype([('area_extent', 'f8', (4,)),
                           ('xsize', 'i4'),
                           ('ysize', 'i4'),
@@ -94,9 +90,9 @@ def write_cloudtype(ppsobj, param, **kwargs):
     palette = h5f.create_dataset("PALETTE", shape, dtype='u1')
     # data = np.ones(shape) * 5
     try:
-        data = ppsobj[param]._md['ct_pal'].data
+        data = ppsobj.mda['ct_pal'].data
     except KeyError:
-        data = ppsobj[param]._md['PALETTE']
+        data = ppsobj.mda['PALETTE']
 
     palette[...] = data
     palette.attrs['CLASS'] = "PALETTE"
@@ -107,16 +103,16 @@ def write_cloudtype(ppsobj, param, **kwargs):
     # Make the cloudtype dataset:
     # shape = (2, 3)
     try:
-        shape = ppsobj[param].ct.data.shape
+        shape = ppsobj.ct.data.shape
     except AttributeError:
-        shape = ppsobj[param].cloudtype.data.shape
+        shape = ppsobj.cloudtype.data.shape
 
     cloudtype = h5f.create_dataset("cloudtype", shape, dtype='u1',
                                    compression="gzip", compression_opts=6)
     try:
-        cloudtype[...] = map_cloudtypes(ppsobj[param].ct.data.filled(0))
+        cloudtype[...] = map_cloudtypes(ppsobj.ct.data.filled(0))
     except AttributeError:
-        cloudtype[...] = ppsobj[param].cloudtype.data.filled(0)
+        cloudtype[...] = ppsobj.cloudtype.data.filled(0)
 
     # cloudtype[...] = np.ones(shape, 'u1') * 8
     cloudtype.attrs['CLASS'] = "IMAGE"
@@ -127,8 +123,8 @@ def write_cloudtype(ppsobj, param, **kwargs):
     # Outputvaluenamelist:
     comp_type = np.dtype([('outval_name', np.str, 128), ])
     vnamelist = []
-    for i, item in zip(ppsobj[param].ct.info['flag_values'],
-                       str(ppsobj[param].ct.info['flag_meanings']).split(' ')):
+    for i, item in zip(ppsobj.ct.info['flag_values'],
+                       str(ppsobj.ct.info['flag_meanings']).split(' ')):
         vnamelist.append(str(i) + ":" + " " + item)
     vnamelist.insert(0, '0: Not processed')
 
@@ -141,16 +137,16 @@ def write_cloudtype(ppsobj, param, **kwargs):
     qualityflags = h5f.create_dataset("quality_flag", shape, dtype='u2',
                                       compression="gzip", compression_opts=6)
     try:
-        qualityflags[...] = ppsobj[param].ct_quality.data.filled(0)
+        qualityflags[...] = ppsobj.ct_quality.data.filled(0)
     except AttributeError:
-        qualityflags[...] = ppsobj[param].quality_flag.data.filled(0)
+        qualityflags[...] = ppsobj.quality_flag.data.filled(0)
 
     qualityflags.attrs[
         'description'] = "Bitwise quality or AVHRR Processing flag"
 
     vnamelist = []
-    for i, item in zip(ppsobj[param].ct_quality.info['flag_values'],
-                       str(ppsobj[param].ct_quality.info['flag_meanings']).split(' ')):
+    for i, item in zip(ppsobj.ct_quality.info['flag_values'],
+                       str(ppsobj.ct_quality.info['flag_meanings']).split(' ')):
         vnamelist.append(str(i) + ":" + " " + item)
     #vnamelist.insert(0, '0: Not processed')
 
@@ -161,8 +157,12 @@ def write_cloudtype(ppsobj, param, **kwargs):
 
     return
 
-
 if __name__ == '__main__':
+    from mpop.satellites import PolarFactory
+    import datetime
+
+    from mpop.utils import debug_on
+    debug_on()
 
     time_slot = datetime.datetime(2014, 11, 11, 6, 39, 59)
     # time_slot = datetime.datetime(2014, 11, 11, 6, 39)
@@ -173,4 +173,7 @@ if __name__ == '__main__':
     gbd.load(['CT'])
 
     lcd = gbd.project('euron1')
-    #write_cloudtype(lcd, 'CT')
+    filename = (lcd.satname + lcd.number +
+                lcd.time_slot.strftime('_%Y%m%d_%H%M_') + '_'
+                + lcd.orbit + '.' + lcd.area.area_id + '.cloudtype.hdf')
+    #write_cloudtype(lcd["CT"], filename)
