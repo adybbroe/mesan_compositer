@@ -50,9 +50,9 @@ def write_cloudtype(ppsobj, filename):
         h5f.attrs['description'] = str(ppsobj.mda['title'])
     except KeyError:
         h5f.attrs['description'] = ppsobj.mda['description']
-    h5f.attrs['orbit_number'] = np.int32(ppsobj.orbit)
-    h5f.attrs['satellite_id'] = ppsobj.satname + ppsobj.number
-    h5f.attrs['sec_1970'] = time.mktime(ppsobj.time_slot.timetuple())
+    h5f.attrs['orbit_number'] = np.int32(ppsobj.mda['orbit'])
+    h5f.attrs['satellite_id'] = ppsobj.mda['satellite']
+    h5f.attrs['sec_1970'] = time.mktime(ppsobj.mda['time_slot'].timetuple())
     try:
         h5f.attrs['version'] = str(ppsobj.mda['source'])
     except KeyError:
@@ -91,10 +91,10 @@ def write_cloudtype(ppsobj, filename):
     shape = (256, 3)
     palette = h5f.create_dataset("PALETTE", shape, dtype='u1')
     try:
-        dummy = ppsobj[param]._md['ct_pal'].data
+        dummy = ppsobj.mda['ct_pal'].data
         palette_data = old_ctype_palette_data()
     except KeyError:
-        palette_data = ppsobj[param]._md['PALETTE']
+        palette_data = ppsobj.mda['PALETTE']
 
     palette[...] = palette_data
     palette.attrs['CLASS'] = "PALETTE"
@@ -113,16 +113,16 @@ def write_cloudtype(ppsobj, filename):
                                    compression="gzip", compression_opts=6)
     try:
         print("Cloudtype categories mapped!")
-        cloudtype[...] = map_cloudtypes(ppsobj[param].ct.data.filled(0))
+        cloudtype[...] = map_cloudtypes(ppsobj.ct.data.filled(0))
         palette = old_ctype_palette()
     except AttributeError:
         print("Cloudtype categories *not* mapped!")
-        cloudtype[...] = ppsobj[param].cloudtype.data.filled(0)
+        cloudtype[...] = ppsobj.cloudtype.data.filled(0)
         # Outputvaluenamelist:
         comp_type = np.dtype([('outval_name', np.str, 128), ])
         vnamelist = []
-        for i, item in zip(ppsobj[param].ct.info['flag_values'],
-                           str(ppsobj[param].ct.info['flag_meanings']).split(' ')):
+        for i, item in zip(ppsobj.ct.info['flag_values'],
+                           str(ppsobj.ct.info['flag_meanings']).split(' ')):
             vnamelist.append(str(i) + ":" + " " + item)
         vnamelist.insert(0, '0: Not processed')
         palette = np.array(vnamelist, dtype=comp_type)
