@@ -81,8 +81,9 @@ def write_cloudtype(ppsobj, filename):
     data = np.array([(aobj.area_extent,
                       aobj.x_size, aobj.y_size,
                       aobj.pixel_size_x, aobj.pixel_size_y,
-                      aobj.proj_dict['lat_0'], aobj.proj_dict['lon_0'],
-                      aobj.proj_dict['lat_ts'],
+                      aobj.proj_dict.get('lat_0', 0.0),
+                      aobj.proj_dict.get('lon_0', 0.0),
+                      aobj.proj_dict.get('lat_ts', 0.0),
                       aobj.area_id, aobj.name,
                       aobj.proj_id, pcs_def)], dtype=comp_type)
     region[...] = data
