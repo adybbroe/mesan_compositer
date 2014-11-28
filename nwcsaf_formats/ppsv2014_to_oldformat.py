@@ -340,13 +340,13 @@ if __name__ == '__main__':
 
     gbd = PolarFactory.create_scene("noaa", "18", "avhrr", time_slot, orbit)
     # gbd.load(['CMA', 'CT', 'CTTH', 'PC'])
-    gbd.load(['CT'])
+    # gbd.load(['CT'])
 
-    lcd = gbd.project('euron1')
-    filename = (lcd.satname + lcd.number +
-                lcd.time_slot.strftime('_%Y%m%d_%H%M_') +
-                lcd.orbit + '.' + lcd.area.area_id + '.cloudtype.hdf')
-    write_product(lcd["CT"], filename)
+    # lcd = gbd.project('euron1')
+    # filename = (lcd.satname + lcd.number +
+    #             lcd.time_slot.strftime('_%Y%m%d_%H%M_') +
+    #             lcd.orbit + '.' + lcd.area.area_id + '.cloudtype.hdf')
+    # write_product(lcd["CT"], filename)
 
     # gbd.load(['CTTH'])
     # lcd = gbd.project('euron1')
@@ -354,3 +354,10 @@ if __name__ == '__main__':
     #             lcd.time_slot.strftime('_%Y%m%d_%H%M_') +
     #             lcd.orbit + '.' + lcd.area.area_id + '.ctth.hdf')
     # write_product(lcd["CTTH"], filename)
+
+    gbd.load(['PC'])
+    lcd = gbd.project('euron1')
+    filename = (lcd.satname + lcd.number +
+                lcd.time_slot.strftime('_%Y%m%d_%H%M_') +
+                lcd.orbit + '.' + lcd.area.area_id + '.precipclouds.hdf')
+    write_product(lcd["PC"], filename)
