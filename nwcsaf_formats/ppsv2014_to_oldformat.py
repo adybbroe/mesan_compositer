@@ -34,6 +34,9 @@ from nwcsaf_formats.pps_conversions import (map_cloudtypes,
                                             old_ctth_press_palette_data,
                                             old_ctth_temp_palette_data,
                                             old_ctth_height_palette_data,
+                                            ctype_convert_flags,
+                                            ctth_convert_flags,
+                                            old_processing_flag_palette
                                             )
 
 LOG = logging.getLogger(__name__)
@@ -184,8 +187,6 @@ def write_product(ppsobj, filename):
         h5f.attrs['version'] = ppsobj.mda['version']
 
     # Create the region data:
-    blockSize = 4
-
     comp_type = np.dtype([('area_extent', 'f8', (4,)),
                           ('xsize', 'i4'),
                           ('ysize', 'i4'),
@@ -308,7 +309,7 @@ def make_dataset_ct(h5f, ppsobj):
     cloudtype.attrs["output_value_namelist"] = palette
     cloudtype.attrs['CLASS'] = np.string_("IMAGE")
     cloudtype.attrs['IMAGE_VERSION'] = np.string_("1.2")
-    cloudtype.attrs['PALETTE'] = h5f['PALETTE'].ref
+    #cloudtype.attrs['PALETTE'] = h5f['PALETTE'].ref
     cloudtype.attrs['description'] = "Cloud type classification"
 
 
@@ -353,7 +354,7 @@ def make_dataset_ctth(h5f, ppsobj):
     alti[...] = alti_data.astype(np.uint8)
     alti.attrs['CLASS'] = np.string_("IMAGE")
     alti.attrs['IMAGE_VERSION'] = np.string_("1.2")
-    alti.attrs['PALETTE'] = h5f['HEIGHT_PALETTE'].ref
+    #alti.attrs['PALETTE'] = h5f['HEIGHT_PALETTE'].ref
     alti.attrs['description'] = np.string_("scaled Height (m)")
     alti.attrs['gain'] = np.float32(200.0)
     alti.attrs['intercept'] = np.float32(0.0)
@@ -366,7 +367,7 @@ def make_dataset_ctth(h5f, ppsobj):
     tempe[...] = tempe_data.astype(np.uint8)
     tempe.attrs['CLASS'] = np.string_("IMAGE")
     tempe.attrs['IMAGE_VERSION'] = np.string_("1.2")
-    tempe.attrs['PALETTE'] = h5f['TEMPERATURE_PALETTE'].ref
+    #tempe.attrs['PALETTE'] = h5f['TEMPERATURE_PALETTE'].ref
     tempe.attrs['description'] = np.string_("scaled Temperature (K)")
     tempe.attrs['gain'] = np.float32(1.0)
     tempe.attrs['intercept'] = np.float32(100.0)
@@ -379,7 +380,7 @@ def make_dataset_ctth(h5f, ppsobj):
     pres[...] = pres_data.astype(np.uint8)
     pres.attrs['CLASS'] = np.string_("IMAGE")
     pres.attrs['IMAGE_VERSION'] = np.string_("1.2")
-    pres.attrs['PALETTE'] = h5f['PRESSURE_PALETTE'].ref
+    #pres.attrs['PALETTE'] = h5f['PRESSURE_PALETTE'].ref
     pres.attrs['description'] = np.string_("scaled Pressure (hPa)")
     pres.attrs['gain'] = np.float32(25.0)
     pres.attrs['intercept'] = np.float32(0.0)
@@ -387,36 +388,48 @@ def make_dataset_ctth(h5f, ppsobj):
 
 
 def make_flags_ct(h5f, ppsobj):
-    # Map the flags from new to old:
+    """Map the cloudtype quality flags from new to old"""
 
-    try:
-        shape = ppsobj.ct.data.shape
-    except AttributeError:
-        shape = ppsobj.cloudtype.data.shape
+    shape = ppsobj.ct.data.shape
 
     # quality_flag:
     qualityflags = h5f.create_dataset("quality_flag", shape, dtype='u2',
                                       compression="gzip", compression_opts=6)
-    try:
-        qualityflags[...] = ppsobj.ct_quality.data.filled(0)
-    except AttributeError:
-        qualityflags[...] = ppsobj.quality_flag.data.filled(0)
+
+    sflags = ppsobj.ct_status_flag.data.filled(0)
+    cflags = ppsobj.ct_conditions.data.filled(0)
+    qflags = ppsobj.ct_quality.data.filled(0)
+    oldflags = ctype_convert_flags(sflags, cflags, qflags)
+
+    qualityflags[...] = oldflags
 
     qualityflags.attrs[
         'description'] = "Bitwise quality or AVHRR Processing flag"
-
-    vnamelist = []
-    for i, item in zip(ppsobj.ct_quality.info['flag_values'],
-                       str(ppsobj.ct_quality.info['flag_meanings']).split(' ')):
-        vnamelist.append(str(i) + ":" + " " + item)
-
-    comp_type = np.dtype([('outval_name', np.str, 128), ])
-    data = np.array(vnamelist, dtype=comp_type)
-    qualityflags.attrs["output_value_namelist"] = data
+    qualityflags.attrs[
+        "output_value_namelist"] = old_processing_flag_palette('cloudtype')
 
 
 def make_flags_ctth(h5f, ppsobj):
-    pass
+    """Map the ctth flags from new to old"""
+
+    shape = ppsobj.ctth_tempe.data.shape
+
+    # processing_flag:
+    qualityflags = h5f.create_dataset("processing_flag", shape, dtype='u2',
+                                      compression="gzip", compression_opts=6)
+    sflags = ppsobj.ctth_status_flag.data.filled(0)
+    cflags = ppsobj.ctth_conditions.data.filled(0)
+    qflags = ppsobj.ctth_quality.data.filled(0)
+    oldflags = ctth_convert_flags(sflags, cflags, qflags)
+
+    qualityflags[...] = oldflags
+
+    qualityflags.attrs[
+        'description'] = "16 bit Processing flag"
+    qualityflags.attrs[
+        "output_value_namelist"] = old_processing_flag_palette('ctth')
+
+    return
 
 
 def make_flags_pc(h5f, ppsobj):
@@ -457,6 +470,13 @@ if __name__ == '__main__':
 
     lcd = gbd.project('euron1')
     filename = (lcd.satname + lcd.number +
-                lcd.time_slot.strftime('_%Y%m%d_%H%M_') + '_'
-                + lcd.orbit + '.' + lcd.area.area_id + '.cloudtype.hdf')
-    write_cloudtype(lcd["CT"], filename)
+                lcd.time_slot.strftime('_%Y%m%d_%H%M_') +
+                lcd.orbit + '.' + lcd.area.area_id + '.cloudtype.hdf')
+    write_product(lcd["CT"], filename)
+
+    # gbd.load(['CTTH'])
+    # lcd = gbd.project('euron1')
+    # filename = (lcd.satname + lcd.number +
+    #             lcd.time_slot.strftime('_%Y%m%d_%H%M_') +
+    #             lcd.orbit + '.' + lcd.area.area_id + '.ctth.hdf')
+    # write_product(lcd["CTTH"], filename)
