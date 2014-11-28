@@ -308,7 +308,7 @@ def make_dataset_ct(h5f, ppsobj):
     cloudtype.attrs["output_value_namelist"] = palette
     cloudtype.attrs['CLASS'] = np.string_("IMAGE")
     cloudtype.attrs['IMAGE_VERSION'] = np.string_("1.2")
-    cloudtype.attrs['PALETTE'] = h5f['PALETTE'].ref
+    #cloudtype.attrs['PALETTE'] = h5f['PALETTE'].ref
     cloudtype.attrs['description'] = "Cloud type classification"
 
 
@@ -353,7 +353,7 @@ def make_dataset_ctth(h5f, ppsobj):
     alti[...] = alti_data.astype(np.uint8)
     alti.attrs['CLASS'] = np.string_("IMAGE")
     alti.attrs['IMAGE_VERSION'] = np.string_("1.2")
-    alti.attrs['PALETTE'] = h5f['HEIGHT_PALETTE'].ref
+    #alti.attrs['PALETTE'] = h5f['HEIGHT_PALETTE'].ref
     alti.attrs['description'] = np.string_("scaled Height (m)")
     alti.attrs['gain'] = np.float32(200.0)
     alti.attrs['intercept'] = np.float32(0.0)
@@ -366,7 +366,7 @@ def make_dataset_ctth(h5f, ppsobj):
     tempe[...] = tempe_data.astype(np.uint8)
     tempe.attrs['CLASS'] = np.string_("IMAGE")
     tempe.attrs['IMAGE_VERSION'] = np.string_("1.2")
-    tempe.attrs['PALETTE'] = h5f['TEMPERATURE_PALETTE'].ref
+    #tempe.attrs['PALETTE'] = h5f['TEMPERATURE_PALETTE'].ref
     tempe.attrs['description'] = np.string_("scaled Temperature (K)")
     tempe.attrs['gain'] = np.float32(1.0)
     tempe.attrs['intercept'] = np.float32(100.0)
@@ -379,7 +379,7 @@ def make_dataset_ctth(h5f, ppsobj):
     pres[...] = pres_data.astype(np.uint8)
     pres.attrs['CLASS'] = np.string_("IMAGE")
     pres.attrs['IMAGE_VERSION'] = np.string_("1.2")
-    pres.attrs['PALETTE'] = h5f['PRESSURE_PALETTE'].ref
+    #pres.attrs['PALETTE'] = h5f['PRESSURE_PALETTE'].ref
     pres.attrs['description'] = np.string_("scaled Pressure (hPa)")
     pres.attrs['gain'] = np.float32(25.0)
     pres.attrs['intercept'] = np.float32(0.0)
