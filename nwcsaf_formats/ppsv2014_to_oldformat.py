@@ -74,7 +74,14 @@ def write_product(ppsobj, filename):
                           ('pcs_id', np.str_, 128),
                           ('pcs_def', np.str_, 128)])
 
+    # Save the datatype!
+    h5f['Region'] = comp_type
     region = h5f.create_dataset("region", (1,), comp_type)
+
+    # Outputvaluenamelist:
+    ov_comp_type = get_output_valuenamelist_compund_dtype()
+    # The datatype for the palette:
+    h5f['OutputValueNameList'] = ov_comp_type
 
     aobj = ppsobj.area
     pcs_def = aobj.proj4_string.replace(' +', ',').strip('+')
@@ -153,6 +160,14 @@ def make_palettes_ctth(h5f, ppsobj):
     palette.attrs['PAL_VERSION'] = np.string_("1.2")
 
 
+def get_output_valuenamelist_compund_dtype():
+    """Define the compound datatype for the Outputvaluenamelist and return the
+    numpy dtype"""
+
+    # Outputvaluenamelist:
+    return np.dtype([('outval_name', np.string_, 128), ])
+
+
 def make_dataset_ct(h5f, ppsobj):
 
     # Make the cloudtype dataset:
@@ -164,6 +179,10 @@ def make_dataset_ct(h5f, ppsobj):
 
     cloudtype = h5f.create_dataset("cloudtype", shape, dtype='u1',
                                    compression="gzip", compression_opts=6)
+
+    # Outputvaluenamelist:
+    ov_comp_type = get_output_valuenamelist_compund_dtype()
+
     try:
         cloudtype[...] = map_cloudtypes(ppsobj.ct.data.filled(0))
         print("Cloudtype categories mapped!")
@@ -171,14 +190,12 @@ def make_dataset_ct(h5f, ppsobj):
     except AttributeError:
         print("Cloudtype categories *not* mapped!")
         cloudtype[...] = ppsobj.cloudtype.data.filled(0)
-        # Outputvaluenamelist:
-        comp_type = np.dtype([('outval_name', np.string_, 128), ])
         vnamelist = []
         for i, item in zip(ppsobj.ct.info['flag_values'],
                            str(ppsobj.ct.info['flag_meanings']).split(' ')):
             vnamelist.append(str(i) + ":" + " " + item)
         vnamelist.insert(0, '0: Not processed')
-        palette = np.array(vnamelist, dtype=comp_type)
+        palette = np.array(vnamelist, dtype=ov_comp_type)
 
     cloudtype.attrs["output_value_namelist"] = palette
     cloudtype.attrs['CLASS'] = np.string_("IMAGE")
@@ -348,16 +365,16 @@ if __name__ == '__main__':
     #             lcd.orbit + '.' + lcd.area.area_id + '.cloudtype.hdf')
     # write_product(lcd["CT"], filename)
 
-    # gbd.load(['CTTH'])
-    # lcd = gbd.project('euron1')
-    # filename = (lcd.satname + lcd.number +
-    #             lcd.time_slot.strftime('_%Y%m%d_%H%M_') +
-    #             lcd.orbit + '.' + lcd.area.area_id + '.ctth.hdf')
-    # write_product(lcd["CTTH"], filename)
-
-    gbd.load(['PC'])
+    gbd.load(['CTTH'])
     lcd = gbd.project('euron1')
     filename = (lcd.satname + lcd.number +
                 lcd.time_slot.strftime('_%Y%m%d_%H%M_') +
-                lcd.orbit + '.' + lcd.area.area_id + '.precipclouds.hdf')
-    write_product(lcd["PC"], filename)
+                lcd.orbit + '.' + lcd.area.area_id + '.ctth.hdf')
+    write_product(lcd["CTTH"], filename)
+
+    # gbd.load(['PC'])
+    # lcd = gbd.project('euron1')
+    # filename = (lcd.satname + lcd.number +
+    #             lcd.time_slot.strftime('_%Y%m%d_%H%M_') +
+    #             lcd.orbit + '.' + lcd.area.area_id + '.precipclouds.hdf')
+    # write_product(lcd["PC"], filename)
