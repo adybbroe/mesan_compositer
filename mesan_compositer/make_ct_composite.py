@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 Adam.Dybbroe
+# Copyright (c) 2014, 2015 Adam.Dybbroe
 
 # Author(s):
 
@@ -180,9 +180,12 @@ class ctCompositer(object):
         # SAFNWC_MSG2_CT___201206252345_EuropeCanary.h5
         # What about EuropeCanary and possible other areas!? FIXME!
         msg_list = glob(os.path.join(msg_dir, '*_CT___*.PLAX.CTTH.0.h5'))
+        LOG.info(
+            "MSG files in directory " + str(msg_dir) + " : " + str(msg_list))
         self.msg_scenes = get_msglist(msg_list, self.time_window,
                                       self.msg_areaname,
                                       satellites=self.msg_satellites)
+        LOG.info("MSG scenes located: " + str(self.msg_scenes))
 
     def make_composite(self, areaid="mesanX"):
         """Make the Cloud Type composite"""
