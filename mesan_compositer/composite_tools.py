@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 Adam.Dybbroe
+# Copyright (c) 2014, 2015 Adam.Dybbroe
 
 # Author(s):
 
@@ -88,7 +88,7 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
     for filename in filelist:
         bname = os.path.basename(filename)
         bnsplit = bname.split('_')
-        sat = bnsplit[0]
+        sat = bnsplit[3]
         if satellites and sat not in satellites:
             continue
 
