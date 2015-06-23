@@ -94,8 +94,6 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
 
         orbit = bnsplit[3]
         timeslot = datetime.strptime(bnsplit[5], '%Y%m%dT%H%M%S%fZ')
-        import pdb
-        pdb.set_trace()
         if sat.find('npp') == 0:
             platform = 'npp'
             number = ''
