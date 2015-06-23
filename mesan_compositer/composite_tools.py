@@ -93,7 +93,7 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
             continue
 
         orbit = bnsplit[3]
-        timeslot = datetime.strptime(bnsplit[5], '%Y%m%dT%H%M%S%f')
+        timeslot = datetime.strptime(bnsplit[5], '%Y%m%dT%H%M%S%fZ')
         import pdb
         pdb.set_trace()
         if sat.find('npp') == 0:
