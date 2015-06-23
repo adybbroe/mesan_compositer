@@ -158,14 +158,18 @@ class ctCompositer(object):
 
         # Get all polar satellite scenes:
         pps_dr_dir = self._options['pps_direct_readout_dir']
+        LOG.debug('pps_dr_dir = ' + str(pps_dr_dir))
         pps_gds_dir = self._options['pps_metop_gds_dir']
 
-        dr_list = glob(os.path.join(pps_dr_dir, '*cloudtype.h5'))
+        # Example: S_NWC_CT_metopb_14320_20150622T1642261Z_20150622T1654354Z.h5
+        dr_list = glob(os.path.join(pps_dr_dir, 'S_NWC_CT_*h5'))
+        LOG.info("Number of direct readout pps cloudtype files in dir: " +
+                 str(len(dr_list)))
         ppsdr = get_ppslist(dr_list, self.time_window,
                             satellites=self.polar_satellites)
 
         now = datetime.utcnow()
-        gds_list = glob(os.path.join(pps_gds_dir, '*cloudtype.h5'))
+        gds_list = glob(os.path.join(pps_gds_dir, 'S_NWC_CT_*h5'))
         LOG.info("Number of Metop GDS files in dir: " + str(len(gds_list)))
         ppsgds = get_ppslist(gds_list, self.time_window,
                              satellites=METOPS, variant='global')

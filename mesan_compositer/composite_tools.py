@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 Adam.Dybbroe
+# Copyright (c) 2014, 2015 Adam.Dybbroe
 
 # Author(s):
 
@@ -88,12 +88,12 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
     for filename in filelist:
         bname = os.path.basename(filename)
         bnsplit = bname.split('_')
-        sat = bnsplit[0]
+        sat = bnsplit[3]
         if satellites and sat not in satellites:
             continue
 
         orbit = bnsplit[3]
-        timeslot = datetime.strptime(bnsplit[1] + bnsplit[2], '%Y%m%d%H%M')
+        timeslot = datetime.strptime(bnsplit[5], '%Y%m%dT%H%M%S%fZ')
         if sat.find('npp') == 0:
             platform = 'npp'
             number = ''
@@ -103,6 +103,9 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
         elif sat.find('metop') == 0:
             platform = 'metop'
             number = sat.split('metop')[1]
+        elif sat.find('eos') == 0:
+            platform = 'eos'
+            number = sat.split('eos')[1]
         else:
             raise IOError("Error: satellite %s not supported!" % sat)
 
