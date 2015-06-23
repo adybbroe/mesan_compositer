@@ -93,7 +93,9 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
             continue
 
         orbit = bnsplit[3]
-        timeslot = datetime.strptime(bnsplit[1] + bnsplit[2], '%Y%m%d%H%M')
+        timeslot = datetime.strptime(bnsplit[5], '%Y%m%dT%H%M%S%f')
+        import pdb
+        pdb.set_trace()
         if sat.find('npp') == 0:
             platform = 'npp'
             number = ''
@@ -103,6 +105,9 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
         elif sat.find('metop') == 0:
             platform = 'metop'
             number = sat.split('metop')[1]
+        elif sat.find('eos') == 0:
+            platform = 'eos'
+            number = sat.split('eos')[1]
         else:
             raise IOError("Error: satellite %s not supported!" % sat)
 
