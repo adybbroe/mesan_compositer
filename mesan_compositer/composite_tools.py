@@ -29,14 +29,17 @@ import logging
 LOG = logging.getLogger(__name__)
 
 
-MSGSATS = {'meteosat09': 'MSG2',
-           'meteosat08': 'MSG1',
-           'meteosat10': 'MSG3',
-           'meteosat11': 'MSG4'}
-METEOSAT = {'MSG1': 'meteosat08',
-            'MSG2': 'meteosat09',
-            'MSG3': 'meteosat10',
-            'MSG4': 'meteosat11'}
+MSGSATS = {'Meteosat-9': 'MSG2',
+           'Meteosat-8': 'MSG1',
+           'Meteosat-10': 'MSG3',
+           'Meteosat-11': 'MSG4'}
+METEOSAT = {'MSG1': 'Meteosat-8',
+            'MSG2': 'Meteosat-9',
+            'MSG3': 'Meteosat-10',
+            'MSG4': 'Meteosat-11'}
+
+TERRA_AQUA_NAMES = {'eos1': 'EOS-Terra',
+                    'eos2': 'EOS-Aqua'}
 
 from mesan_compositer.pps_msg_conversions import get_bit_from_flags
 
@@ -45,18 +48,16 @@ class PpsMetaData(object):
 
     """Container for the metadata defining the pps scenes"""
 
-    def __init__(self, platform=None, number=None,
+    def __init__(self, platform_name=None,
                  orbit="00000", timeslot=None,
                  variant=None):
-        self.platform = platform
-        self.number = number
+        self.platform_name = platform_name
         self.orbit = orbit
         self.timeslot = timeslot
         self.variant = variant
 
     def __str__(self):
-        return "\n".join(['platform=' + str(self.platform),
-                          'number=' + str(self.number),
+        return "\n".join(['platform_name=' + str(self.platform_name),
                           'orbit=' + self.orbit,
                           'timeslot=' + str(self.timeslot),
                           'variant=' + str(self.variant)])
@@ -66,16 +67,14 @@ class MsgMetaData(object):
 
     """Container for the metadata defining the msg scenes"""
 
-    def __init__(self, platform=None, number=None,
+    def __init__(self, platform_name=None,
                  areaid=None, timeslot=None):
         self.timeslot = timeslot
         self.areaid = areaid
-        self.platform = platform
-        self.number = number
+        self.platform_name = platform_name
 
     def __str__(self):
-        return "\n".join(['platform=' + str(self.platform),
-                          'number=' + str(self.number),
+        return "\n".join(['platform_name=' + str(self.platform_name),
                           'areaid=' + self.areaid,
                           'timeslot=' + str(self.timeslot)])
 
@@ -92,20 +91,17 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
         if satellites and sat not in satellites:
             continue
 
-        orbit = bnsplit[3]
+        orbit = bnsplit[4]
         timeslot = datetime.strptime(bnsplit[5], '%Y%m%dT%H%M%S%fZ')
-        if sat.find('npp') == 0:
-            platform = 'npp'
-            number = ''
-        elif sat.find('noaa') == 0:
-            platform = 'noaa'
-            number = sat.split('noaa')[1]
-        elif sat.find('metop') == 0:
-            platform = 'metop'
-            number = sat.split('metop')[1]
-        elif sat.find('eos') == 0:
-            platform = 'eos'
-            number = sat.split('eos')[1]
+        if sat.startswith('npp'):
+            platform_name = 'Suomi-NPP'
+        elif sat.startswith('noaa'):
+            platform_name = 'NOAA-' + sat.split('noaa')[1]
+        elif sat.startswith('metop'):
+            platform_name = 'Metop-' + sat.split('metop')[1].upper()
+        elif sat.startswith('eos'):
+            satid = 'eos' + sat.split('eos')[1]
+            platform_name = TERRA_AQUA_NAMES.get(satid, satid)
         else:
             raise IOError("Error: satellite %s not supported!" % sat)
 
@@ -114,7 +110,7 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
                 timeslot < timewindow[1]):
 
             plist.append(PpsMetaData(orbit=orbit, timeslot=timeslot,
-                                     platform=platform, number=number,
+                                     platform_name=platform_name,
                                      variant=variant))
 
     return plist
@@ -126,8 +122,8 @@ def get_msglist(filelist, timewindow, area_id, satellites=None):
     if given"""
 
     if not satellites:
-        satellites = ['meteosat08', 'meteosat09',
-                      'meteosat10', 'meteosat11']
+        satellites = ['Meteosat-8', 'Meteosat-9',
+                      'Meteosat-10', 'Meteosat-11']
     metsats = [MSGSATS.get(s, 'MSGx') for s in satellites]
 
     mlist = []
@@ -138,8 +134,7 @@ def get_msglist(filelist, timewindow, area_id, satellites=None):
         if sat not in metsats:
             continue
 
-        platform = 'meteosat'
-        number = (METEOSAT.get(sat, 'meteosat09')).split(platform)[1]
+        platform_name = METEOSAT[sat]
         areaid = bnsplit[-1].split('.')[0]
 
         if areaid != area_id:
@@ -157,7 +152,7 @@ def get_msglist(filelist, timewindow, area_id, satellites=None):
         if (timeslot > timewindow[0] and
                 timeslot < timewindow[1]):
             mlist.append(MsgMetaData(areaid=areaid, timeslot=timeslot,
-                                     platform=platform, number=number))
+                                     platform_name=platform_name))
 
     return mlist
 
