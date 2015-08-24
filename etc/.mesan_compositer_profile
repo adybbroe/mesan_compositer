@@ -25,8 +25,25 @@ export MESAN_COMPOSITE_CONFIG_DIR
 PPP_CONFIG_DIR=/data/proj/safutv/dev/mesan
 export PPP_CONFIG_DIR
 
-PYTHONPATH=/usr/local/lib/python2.6/site-packages:/usr/local/lib64/python2.6/site-packages
+PYTHONPATH=/usr/local/lib/python2.7/site-packages:/usr/local/lib64/python2.7/site-packages
 export PYTHONPATH
+
+  ;;
+
+###################################################################$
+### Jenkins
+
+ci)
+
+CENTRAL=/usr/local/lib64/python2.7/site-packages:/usr/local/lib/python2.7/site-packages
+
+PYTHONPATH=$CENTRAL:$MPOP_ETC:${PYTHONPATH}
+export PYTHONPATH
+
+MESAN_COMPOSITE_CONFIG_DIR=/usr/local/etc
+export MESAN_COMPOSITE_CONFIG_DIR
+PPP_CONFIG_DIR=/data/proj/safutv/mesan_etc
+export PPP_CONFIG_DIR
 
   ;;
 
@@ -51,9 +68,6 @@ PYCOAST=/data/proj/safutv/opt/PYCOAST/
 
 PYTHONPATH=$CENTRAL:$PYCOAST:$MPOP_ETC:${PYTHONPATH}
 export PYTHONPATH
-
-##### for scipy
-#PYTHONPATH=${PYTHONPATH}:/data/proj/safutv/usr/lib/python2.6/site-packages:/data/proj/safutv/usr/lib64/python2.6/site-packages
 
 MESAN_COMPOSITE_CONFIG_DIR=/usr/local/etc
 export MESAN_COMPOSITE_CONFIG_DIR
