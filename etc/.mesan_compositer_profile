@@ -4,16 +4,19 @@ then
 . /etc/profile.d/smhi.sh
 fi
 
-case $SMHI_MODE in
-offline)
+case $SMHI_DIST in
+linda4)
 
-MESAN_COMPOSITE_CONFIG_DIR=/local_disk/laptop/Satsa/Mesan/mesan-sat-preproc/etc
+MESAN_COMPOSITE_CONFIG_DIR=/home/a000680/laptop/Satsa/Mesan/etc
 export MESAN_COMPOSITE_CONFIG_DIR
-PPP_CONFIG_DIR=/local_disk/laptop/Satsa/Mesan/mesan-sat-preproc/etc
+PPP_CONFIG_DIR=/home/a000680/laptop/Satsa/Mesan/etc
 export PPP_CONFIG_DIR
 
   ;;
 
+elin4)
+
+case $SMHI_MODE in
 utv)
 
 
@@ -27,9 +30,19 @@ export PYTHONPATH
 
   ;;
 
+*)
+echo "No SMHI_MODE set..."
+   ;;
+
+esac;;
+
+elin3)
+
+
 ###################################################################$
 ### Jenkins
 
+case $SMHI_MODE in
 ci)
 
 CENTRAL=/usr/local/lib64/python2.6/site-packages:/usr/local/lib/python2.6/site-packages
@@ -48,6 +61,13 @@ PPP_CONFIG_DIR=/data/proj/safutv/mesan_etc
 export PPP_CONFIG_DIR
 
   ;;
+
+*)
+echo "No SMHI_MODE set..."
+   ;;
+
+esac;;
+
 
 *)
 echo "No SMHI_DIST set..."

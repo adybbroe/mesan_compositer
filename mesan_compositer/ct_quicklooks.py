@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 Adam.Dybbroe
+# Copyright (c) 2014, 2015 Adam.Dybbroe
 
 # Author(s):
 
@@ -41,7 +41,12 @@ _DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
 import ConfigParser
 
 CFG_DIR = os.environ.get('MESAN_COMPOSITE_CONFIG_DIR', './')
-MODE = os.environ.get("SMHI_MODE", 'offline')
+DIST = os.environ.get("SMHI_DIST", None)
+if not DIST or DIST == 'linda4':
+    MODE = 'offline'
+else:
+    MODE = os.environ.get("SMHI_MODE", 'offline')
+
 
 CONF = ConfigParser.ConfigParser()
 CONFIGFILE = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
@@ -59,7 +64,8 @@ _MESAN_LOG_FILE = OPTIONS.get('mesan_log_file', None)
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--datetime', '-d', help='Date and time of observation - yyyymmddhh',
+    parser.add_argument('--datetime', '-d',
+                        help='Date and time of observation - yyyymmddhh',
                         required=True)
     parser.add_argument('--area_id', '-a', help='Area id',
                         required=True)
@@ -112,8 +118,8 @@ if __name__ == "__main__":
                              args.area_id,
                              None,
                              fill_value=(0),
-                             mode = "P",
-                             palette = palette)
+                             mode="P",
+                             palette=palette)
     img.save(filename.strip('.nc') + '_cloudtype.png')
 
     comp_id = comp.id.data * 13
@@ -121,8 +127,8 @@ if __name__ == "__main__":
                                args.area_id,
                                None,
                                fill_value=(0),
-                               mode = "P",
-                               palette = palette)
+                               mode="P",
+                               palette=palette)
     idimg.save(filename.strip('.nc') + '_id.png')
 
     comp_w = comp.weight.data * 20
@@ -130,6 +136,6 @@ if __name__ == "__main__":
                               args.area_id,
                               None,
                               fill_value=(0),
-                              mode = "P",
-                              palette = palette)
+                              mode="P",
+                              palette=palette)
     wimg.save(filename.strip('.nc') + '_weight.png')

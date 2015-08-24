@@ -35,17 +35,36 @@ from mesan_compositer.composite_tools import (get_msglist,
                                               get_weight_cloudtype)
 from mesan_compositer.netcdf_io import ncCloudTypeComposite
 
+from nwcsaf_formats.pps_conversions import (map_cloudtypes,
+                                            ctype_convert_flags,
+                                            ctth_convert_flags,
+                                            old_processing_flag_palette
+                                            )
+
 import sys
 import os
 
 CFG_DIR = os.environ.get('MESAN_COMPOSITE_CONFIG_DIR', './')
-MODE = os.environ.get("SMHI_MODE", 'offline')
+DIST = os.environ.get("SMHI_DIST", None)
+if not DIST or DIST == 'linda4':
+    MODE = 'offline'
+else:
+    MODE = os.environ.get("SMHI_MODE", 'offline')
 
 METOPS = ['metop02', 'metop01']
 
-SENSOR = {'noaa': 'avhrr',
-          'metop': 'avhrr',
-          'npp': 'viirs'}
+SENSOR = {'NOAA-19': 'avhrr',
+          'NOAA-18': 'avhrr',
+          'NOAA-15': 'avhrr',
+          'Metop-A': 'avhrr',
+          'Metop-B': 'avhrr',
+          'Metop-C': 'avhrr',
+          'EOS-Terra': 'modis',
+          'EOS-Aqua': 'modis',
+          'Suomi-NPP': 'viirs',
+          'JPSS-1': 'viirs'}
+
+PLATFORM_NAMES_FROM_PPS = {}
 
 import logging
 LOG = logging.getLogger(__name__)
@@ -74,14 +93,16 @@ _MESAN_LOG_FILE = OPTIONS.get('mesan_log_file', None)
 def ctype_pps(pps, areaid='mesanX'):
     """Load PPS Cloudtype and reproject"""
     from mpop.satellites import PolarFactory
-    global_data = PolarFactory.create_scene(pps.platform, str(pps.number),
-                                            SENSOR.get(pps.platform, 'avhrr'),
+    global_data = PolarFactory.create_scene(pps.platform_name, '',
+                                            SENSOR.get(
+                                                pps.platform_name, 'avhrr'),
                                             pps.timeslot, pps.orbit)
     try:
-        global_data.load(['CloudType'])
+        global_data.load(['CT'])
     except AttributeError:
         raise LoadException('MPOP scene object fails to load!')
-    if global_data.area:
+
+    if global_data.area or global_data['CT'].area:
         return global_data.project(areaid)
     else:
         raise ProjectException('MPOP Scene object has no area instance' +
@@ -92,8 +113,8 @@ def ctype_msg(msg, areaid='mesanX'):
     """Load MSG paralax corrected cloud type and reproject"""
     from mpop.satellites import GeostationaryFactory
 
-    global_geo = GeostationaryFactory.create_scene(msg.platform,
-                                                   msg.number, "seviri",
+    global_geo = GeostationaryFactory.create_scene(msg.platform_name, '',
+                                                   "seviri",
                                                    time_slot=msg.timeslot)
     global_geo.load(['CloudType_plax'])
     return global_geo.project(areaid)
@@ -180,7 +201,7 @@ class ctCompositer(object):
 
         # Get all geostationary satellite scenes:
         msg_dir = self._options['msg_dir']
-        ext = self._options['msg_cty_file_ext']
+        #ext = self._options['msg_cty_file_ext']
         # SAFNWC_MSG2_CT___201206252345_EuropeCanary.h5
         # What about EuropeCanary and possible other areas!? FIXME!
         msg_list = glob(os.path.join(msg_dir, '*_CT___*.PLAX.CTTH.0.h5'))
@@ -191,7 +212,7 @@ class ctCompositer(object):
                                       satellites=self.msg_satellites)
         LOG.info("MSG scenes located: " + str(self.msg_scenes))
 
-    def make_composite(self, areaid="mesanX"):
+    def make_composite(self):
         """Make the Cloud Type composite"""
 
         # Reference time for time stamp in composite file
@@ -206,7 +227,8 @@ class ctCompositer(object):
         for scene in self.msg_scenes + self.pps_scenes:
             x_CT = None
             LOG.info("Scene:\n" + str(scene))
-            if scene.platform == "meteosat" and not hasattr(scene, 'orbit'):
+            if (scene.platform_name.startswith("Meteosat") and
+                    not hasattr(scene, 'orbit')):
                 is_MSG = True
                 x_local = ctype_msg(scene)
                 dummy, lat = x_local.area.get_lonlats()
@@ -224,8 +246,14 @@ class ctCompositer(object):
                     LOG.warning("Exception was: " + str(err))
                     continue
 
-                x_CT = x_local['CloudType'].cloudtype.data
-                x_flag = x_local['CloudType'].quality_flag.data
+                #x_CT = x_local['CT'].ct.data
+                #x_flag = x_local['CT'].ct_quality.data
+                # Convert to old format:
+                x_CT = map_cloudtypes(x_local['CT'].ct.data.filled(0))
+                sflags = x_local['CT'].ct_status_flag.data.filled(0)
+                cflags = x_local['CT'].ct_conditions.data.filled(0)
+                qflags = x_local['CT'].ct_quality.data.filled(0)
+                x_flag = ctype_convert_flags(sflags, cflags, qflags)
                 x_id = 0 * np.ones(np.shape(x_CT))
                 lat = 0 * np.ones(np.shape(x_CT))
 
