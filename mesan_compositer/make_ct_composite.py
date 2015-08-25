@@ -157,7 +157,7 @@ class ctCompositer(object):
         self.time_window = (obstime - tdiff, obstime + tdiff)
         self.polar_satellites = options['polar_satellites'].split(',')
         self.msg_satellites = options['msg_satellites'].split(',')
-        self.msg_areaname = options['msg_areaname'].split(',')
+        self.msg_areaname = options['msg_areaname']
         self.longitude = None
         self.latitude = None
         # An mpop-scene area object:
