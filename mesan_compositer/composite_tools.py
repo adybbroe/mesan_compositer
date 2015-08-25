@@ -140,7 +140,8 @@ def get_msglist(filelist, timewindow, area_id, satellites=None):
         areaid = bnsplit[-1].split('.')[0]
 
         if areaid != area_id:
-            LOG.debug("Area id " + str(areaid) + " not requested")
+            LOG.debug("Area id " + str(areaid) +
+                      " not requested (" + str(area_id) + ")")
             continue
 
         # Hardcoded the filenaming convention! FIXME!
