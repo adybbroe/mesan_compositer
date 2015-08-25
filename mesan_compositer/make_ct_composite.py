@@ -28,7 +28,6 @@ from datetime import datetime, timedelta
 import numpy as np
 
 from mpop.satin.msg_hdf import ctype_procflags2pps
-import json
 
 from mesan_compositer import (ProjectException, LoadException)
 from mesan_compositer.composite_tools import (get_msglist,
@@ -37,10 +36,8 @@ from mesan_compositer.composite_tools import (get_msglist,
 from mesan_compositer.netcdf_io import ncCloudTypeComposite
 
 from nwcsaf_formats.pps_conversions import (map_cloudtypes,
-                                            ctype_convert_flags,
-                                            ctth_convert_flags,
-                                            old_processing_flag_palette
-                                            )
+                                            ctype_convert_flags)
+
 
 import sys
 import os
@@ -119,8 +116,6 @@ def ctype_msg(msg, areaid='mesanX'):
                                                    time_slot=msg.timeslot)
     global_geo.load(['CloudType_plax'])
     return global_geo.project(areaid)
-
-# ---------------------------------------------------------------------------
 
 
 class ctCompositer(object):
