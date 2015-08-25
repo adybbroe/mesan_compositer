@@ -28,6 +28,7 @@ from datetime import datetime, timedelta
 import numpy as np
 
 from mpop.satin.msg_hdf import ctype_procflags2pps
+import json
 
 from mesan_compositer import (ProjectException, LoadException)
 from mesan_compositer.composite_tools import (get_msglist,
@@ -154,9 +155,9 @@ class ctCompositer(object):
         self.obstime = obstime
         self.timediff = tdiff
         self.time_window = (obstime - tdiff, obstime + tdiff)
-        self.polar_satellites = eval(options['polar_satellites'])
-        self.msg_satellites = eval(options['msg_satellites'])
-        self.msg_areaname = eval(options['msg_areaname'])
+        self.polar_satellites = options['polar_satellites'].split(',')
+        self.msg_satellites = options['msg_satellites'].split(',')
+        self.msg_areaname = options['msg_areaname'].split(',')
         self.longitude = None
         self.latitude = None
         # An mpop-scene area object:

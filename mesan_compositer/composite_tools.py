@@ -132,12 +132,15 @@ def get_msglist(filelist, timewindow, area_id, satellites=None):
         bnsplit = bname.split('_')
         sat = bnsplit[1]
         if sat not in metsats:
+            LOG.warning('Satellite ' + str(sat) +
+                        ' not in list: ' + str(metsats))
             continue
 
         platform_name = METEOSAT[sat]
         areaid = bnsplit[-1].split('.')[0]
 
         if areaid != area_id:
+            LOG.debug("Area id " + str(areaid) + " not requested")
             continue
 
         # Hardcoded the filenaming convention! FIXME!
