@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 Adam.Dybbroe
+# Copyright (c) 2014, 2015 Adam.Dybbroe
 
 # Author(s):
 
@@ -205,7 +205,7 @@ def derive_sobs(ct_comp, ipar, npix, resultfile):
 
     # indices to super obs "midpoints"
     lx = np.arange(dlen, nx - dlen + 1, dx)
-    ly = np.arange(ny - dlen, dlen, -dy)
+    ly = np.arange(ny - dlen - 1, dlen + 1, -dy)
 
     so_lon = lon[np.ix_(ly, lx)]
     so_lat = lat[np.ix_(ly, lx)]
