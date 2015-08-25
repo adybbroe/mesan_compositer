@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 Adam.Dybbroe
+# Copyright (c) 2014, 2015 Adam.Dybbroe
 
 # Author(s):
 
@@ -23,18 +23,20 @@
 """
 """
 
+from datetime import datetime, timedelta
+import unittest
 
 from mesan_compositer.composite_tools import (get_ppslist,
                                               get_msglist,
                                               MSGSATS)
 
-PPS_CTYPES = ['noaa16_20120625_1133_60621_satproj_00000_04059_cloudtype.h5',
-              'noaa19_20120625_1222_17419_satproj_00000_05500_cloudtype.h5',
-              'npp_20120625_1148_03421_satproj_00000_09215_cloudtype.h5'
-              ]
-PPS_CTYPES2 = ['noaa19_20120625_1222_17419_satproj_00000_05500_cloudtype.h5',
-               'npp_20120625_1148_03421_satproj_00000_09215_cloudtype.h5'
-               ]
+# PPS_CTYPES = ['noaa16_20120625_1133_60621_satproj_00000_04059_cloudtype.h5',
+#               'noaa19_20120625_1222_17419_satproj_00000_05500_cloudtype.h5',
+#               'npp_20120625_1148_03421_satproj_00000_09215_cloudtype.h5'
+#               ]
+PPS_CTYPES = ['S_NWC_CT_npp_18920_20150623T0030123Z_20150623T0044251Z.nc',
+              'S_NWC_CT_noaa19_32830_20150622T2354597Z_20150623T0008100Z.nc',
+              'S_NWC_CT_noaa20_00001_20150622T2324597Z_20150622T2338100Z.nc']
 
 MSG_CTYPES = ['SAFNWC_MSG2_CT___201206251130_EuropeCanary.PLAX.CTTH.0.h5',
               'SAFNWC_MSG2_CT___201206251200_EuropeCanary.PLAX.CTTH.0.h5',
@@ -45,14 +47,12 @@ MSG_CTYPES = ['SAFNWC_MSG2_CT___201206251130_EuropeCanary.PLAX.CTTH.0.h5',
 
 PPS_BASEDIR = "/media/satdata/mesan/satin/pps/"
 PPS_CT_FILES = [PPS_BASEDIR + s for s in PPS_CTYPES]
+
 MSG_BASEDIR = "/media/satdata/mesan/satin/msg/"
 MSG_CT_FILES = [MSG_BASEDIR + s for s in MSG_CTYPES]
 
-from datetime import datetime, timedelta
-OBS_TIME1 = datetime(2012, 6, 25, 12, 0)
-
-import unittest
-import numpy as np
+OBS_TIME1 = datetime(2015, 6, 23, 0, 0)
+OBS_TIME_MSG = datetime(2012, 6, 25, 12, 0)
 
 
 class TestGetCloudtypes(unittest.TestCase):
@@ -70,37 +70,17 @@ class TestGetCloudtypes(unittest.TestCase):
         twindow = OBS_TIME1 - delta_t, OBS_TIME1 + delta_t
         ppslist = get_ppslist(PPS_CT_FILES, twindow)
         self.assertEqual(len(ppslist), 3)
-        prenames = []
-        for item in ppslist:
-            fname = ('%s%s_' % (item.platform, item.number) +
-                     item.timeslot.strftime('%Y%m%d_%H%M') + '_%s' % str(item.orbit))
-            prenames.append(fname)
-
-        nlist = [s.split('_satproj')[0] for s in PPS_CTYPES]
-        for item in prenames:
-            self.assertTrue(item in nlist)
 
         delta_t = timedelta(minutes=25)
         twindow = OBS_TIME1 - delta_t, OBS_TIME1 + delta_t
         ppslist = get_ppslist(PPS_CT_FILES, twindow)
-        self.assertEqual(len(ppslist), 2)
-        prenames = []
-        for item in ppslist:
-            fname = ('%s%s_' % (item.platform, item.number) +
-                     item.timeslot.strftime('%Y%m%d_%H%M') + '_%s' % str(item.orbit))
-            prenames.append(fname)
-
-        nlist = [s.split('_satproj')[0] for s in PPS_CTYPES2]
-        for item in prenames:
-            self.assertTrue(item in nlist)
-
-        self.assertFalse('noaa16_20120625_1133_60621' in prenames)
+        self.assertEqual(len(ppslist), 1)
 
     def test_msg_ctypes(self):
         """Test get the msg cloud type metadata from a list of files"""
 
         delta_t = timedelta(minutes=40)
-        twindow = OBS_TIME1 - delta_t, OBS_TIME1 + delta_t
+        twindow = OBS_TIME_MSG - delta_t, OBS_TIME_MSG + delta_t
         msglist = get_msglist(MSG_CT_FILES, twindow, 'EuroCanary')
         self.assertEqual(len(msglist), 0)
         msglist = get_msglist(MSG_CT_FILES, twindow, 'EuropeCanary')
@@ -109,7 +89,7 @@ class TestGetCloudtypes(unittest.TestCase):
 
         # SAFNWC_MSG2_CT___201206251130_EuropeCanary
         for item in msglist:
-            fname = ('SAFNWC_%s_CT___' % MSGSATS.get(str(item.platform) + str(item.number), 'MSGx') +
+            fname = ('SAFNWC_%s_CT___' % MSGSATS.get(str(item.platform_name), 'MSGx') +
                      item.timeslot.strftime('%Y%m%d%H%M') + '_%s' % str(item.areaid))
             prenames.append(fname)
 

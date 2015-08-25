@@ -106,8 +106,6 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
             continue
 
         orbit = bnsplit[4]
-        import pdb
-        pdb.set_trace()
         timeslot = datetime.strptime(bnsplit[5], '%Y%m%dT%H%M%S%fZ')
         if sat.startswith('npp'):
             platform_name = 'Suomi-NPP'
