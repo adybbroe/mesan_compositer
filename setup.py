@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2013, 2014 Adam Dybbroe
+# Copyright (c) 2013, 2014, 2015 Adam Dybbroe
 
 # Author(s):
 
@@ -70,7 +70,8 @@ setup(name='mesan-compositer',
                'mesan_compositer/make_ctth_composite.py',
                'mesan_compositer/prt_nwcsaf_cloudamount.py',
                'mesan_compositer/ct_quicklooks.py',
-               'mesan_compositer/ctth_quicklooks.py'],
+               'mesan_compositer/ctth_quicklooks.py',
+               'mesan_compositer/mesan_composite_runner.py'],
       data_files=[('etc', ['etc/mesan_sat_config.cfg_template']),
                   ],
       test_suite='tests.suite',

@@ -1,7 +1,8 @@
+
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 Adam.Dybbroe
+# Copyright (c) 2014, 2015 Adam.Dybbroe
 
 # Author(s):
 
@@ -26,6 +27,8 @@
 import unittest
 import numpy as np
 from mesan_compositer.composite_tools import get_weight_cloudtype
+from mesan_compositer.composite_tools import get_analysis_time
+
 from datetime import datetime, timedelta
 
 CTYPE_MSG = np.array([[6, 6, 6, 6, 6, 6, 6, 6, 6, 6],
@@ -138,11 +141,52 @@ class TestCloudTypeWeights(unittest.TestCase):
         return
 
 
+class TestTimeTools(unittest.TestCase):
+
+    """Unit testing the determination of the analysis time from two times 
+    defining a time-window (interval)"""
+
+    def setUp(self):
+        """Set it up"""
+        return
+
+    def test_get_analysis_time(self):
+        """Unit testing the determination of the analysis time from two times 
+        defining a time-window (interval)"""
+
+        dtime_eps = timedelta(seconds=1)
+
+        t1_ = datetime(2015, 6, 23, 12, 22)
+        t2_ = datetime(2015, 6, 23, 12, 35)
+        res = get_analysis_time(t1_, t2_)
+        self.assertTrue(res - datetime(2015, 6, 23, 12, 0) < dtime_eps)
+
+        t1_ = datetime(2015, 6, 23, 12, 42)
+        t2_ = datetime(2015, 6, 23, 12, 55)
+        res = get_analysis_time(t1_, t2_)
+        self.assertTrue(res - datetime(2015, 6, 23, 13, 0) < dtime_eps)
+
+        t1_ = datetime(2015, 6, 23, 12, 48)
+        t2_ = datetime(2015, 6, 23, 13, 1)
+        res = get_analysis_time(t1_, t2_)
+        self.assertTrue(res - datetime(2015, 6, 23, 13, 0) < dtime_eps)
+
+        t1_ = datetime(2015, 6, 23, 13, 10)
+        t2_ = datetime(2015, 6, 23, 13, 25)
+        res = get_analysis_time(t1_, t2_)
+        self.assertTrue(res - datetime(2015, 6, 23, 13, 0) < dtime_eps)
+
+    def tearDown(self):
+        """Clean up"""
+        return
+
+
 def suite():
     """The suite for test_compositer.
     """
     loader = unittest.TestLoader()
     mysuite = unittest.TestSuite()
     mysuite.addTest(loader.loadTestsFromTestCase(TestCloudTypeWeights))
+    mysuite.addTest(loader.loadTestsFromTestCase(TestTimeTools))
 
     return mysuite

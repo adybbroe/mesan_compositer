@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 Adam.Dybbroe
+# Copyright (c) 2014, 2015 Adam.Dybbroe
 
 # Author(s):
 
@@ -27,7 +27,6 @@ import test_input
 import test_pps_msg_converter
 import test_compositer
 import test_pps_conversions
-
 import unittest
 import doctest
 

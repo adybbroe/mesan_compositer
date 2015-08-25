@@ -23,7 +23,7 @@
 """Collection of minor helper tools for the generation of Mesan composites"""
 
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import logging
 LOG = logging.getLogger(__name__)
@@ -79,6 +79,20 @@ class MsgMetaData(object):
                           'timeslot=' + str(self.timeslot)])
 
 
+def get_analysis_time(start_t, end_t):
+    """From two times defining an interval, determine the closest hour (zero
+    minutes past) and return as a datetime object"""
+
+    if start_t > end_t:
+        raise IOError("Start time greater than end time!")
+
+    mean_time = (end_t - start_t) / 2 + start_t
+    mean_time = mean_time + timedelta(seconds=1800)
+
+    return datetime(
+        mean_time.year, mean_time.month, mean_time.day, mean_time.hour, 0, 0)
+
+
 def get_ppslist(filelist, timewindow, satellites=None, variant=None):
     """Get the full list of metadata keys for all pps passes in the *filelist*,
     but only for the satellites specified in the list *satellites* if given"""
@@ -92,6 +106,8 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
             continue
 
         orbit = bnsplit[4]
+        import pdb
+        pdb.set_trace()
         timeslot = datetime.strptime(bnsplit[5], '%Y%m%dT%H%M%S%fZ')
         if sat.startswith('npp'):
             platform_name = 'Suomi-NPP'
