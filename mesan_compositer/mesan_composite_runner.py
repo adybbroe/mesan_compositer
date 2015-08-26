@@ -130,13 +130,13 @@ def make_composite(mcomps,
         end_time = None
 
     if (message.data['platform_name'] in SATELLITES and
-            message.data['instruments'] == SATELLITES.get(message.data['platform_name'],
-                                                          'avhrr')):
+        message.data['sensor'] == SATELLITES.get(message.data['platform_name'],
+                                                 'avhrr')):
 
         path, fname = os.path.split(urlobj.path)
         LOG.debug("path " + str(path) + " filename = " + str(fname))
 
-        instrument = str(message.data['instruments'])
+        instrument = str(message.data['sensor'])
         platform_name = message.data['platform_name']
         mcomps[scene_id] = os.path.join(path, fname)
 
@@ -144,7 +144,7 @@ def make_composite(mcomps,
         LOG.debug("Scene is not supported")
         LOG.debug("platform and instrument: " +
                   str(message.data['platform_name']) + " " +
-                  str(message.data['instruments']))
+                  str(message.data['sensor']))
         return mcomps
 
     LOG.info("Sat and Instrument: " + platform_name + " " + instrument)
