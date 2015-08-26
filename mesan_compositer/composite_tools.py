@@ -48,16 +48,21 @@ class PpsMetaData(object):
 
     """Container for the metadata defining the pps scenes"""
 
-    def __init__(self, platform_name=None,
+    def __init__(self, filename=None, geofilename=None,
+                 platform_name=None,
                  orbit="00000", timeslot=None,
                  variant=None):
         self.platform_name = platform_name
         self.orbit = orbit
         self.timeslot = timeslot
         self.variant = variant
+        self.uri = filename
+        self.geofilename = geofilename
 
     def __str__(self):
-        return "\n".join(['platform_name=' + str(self.platform_name),
+        return "\n".join(['filename=' + str(self.uri),
+                          'geofilename=' + str(self.geofilename),
+                          'platform_name=' + str(self.platform_name),
                           'orbit=' + self.orbit,
                           'timeslot=' + str(self.timeslot),
                           'variant=' + str(self.variant)])
@@ -95,7 +100,7 @@ def get_analysis_time(start_t, end_t):
         mean_time.year, mean_time.month, mean_time.day, mean_time.hour, 0, 0)
 
 
-def get_ppslist(filelist, timewindow, satellites=None, variant=None):
+def get_ppslist(filelist, timewindow, product="CT", satellites=None, variant=None):
     """Get the full list of metadata keys for all pps passes in the *filelist*,
     but only for the satellites specified in the list *satellites* if given"""
 
@@ -107,6 +112,7 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
         if satellites and sat not in satellites:
             continue
 
+        geofilename = filename.replace(product, 'CMA')
         orbit = bnsplit[4]
         timeslot = datetime.strptime(bnsplit[5], '%Y%m%dT%H%M%S%fZ')
         if sat.startswith('npp'):
@@ -125,7 +131,9 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
         if (timeslot > timewindow[0] and
                 timeslot < timewindow[1]):
 
-            plist.append(PpsMetaData(orbit=orbit, timeslot=timeslot,
+            plist.append(PpsMetaData(filename=filename,
+                                     geofilename=geofilename,
+                                     orbit=orbit, timeslot=timeslot,
                                      platform_name=platform_name,
                                      variant=variant))
 

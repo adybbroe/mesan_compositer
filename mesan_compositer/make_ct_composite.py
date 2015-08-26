@@ -96,7 +96,8 @@ def ctype_pps(pps, areaid='mesanX'):
                                                 pps.platform_name, 'avhrr'),
                                             pps.timeslot, pps.orbit)
     try:
-        global_data.load(['CT'])
+        global_data.load(['CT'], filename=pps.uri,
+                         geofilename=pps.geofilename)
     except AttributeError:
         raise LoadException('MPOP scene object fails to load!')
 
@@ -178,15 +179,15 @@ class ctCompositer(object):
         LOG.debug('pps_dr_dir = ' + str(pps_dr_dir))
         pps_gds_dir = self._options['pps_metop_gds_dir']
 
-        # Example: S_NWC_CT_metopb_14320_20150622T1642261Z_20150622T1654354Z.h5
-        dr_list = glob(os.path.join(pps_dr_dir, 'S_NWC_CT_*h5'))
+        # Example: S_NWC_CT_metopb_14320_20150622T1642261Z_20150622T1654354Z.nc
+        dr_list = glob(os.path.join(pps_dr_dir, 'S_NWC_CT_*nc'))
         LOG.info("Number of direct readout pps cloudtype files in dir: " +
                  str(len(dr_list)))
-        ppsdr = get_ppslist(dr_list, self.time_window,
+        ppsdr = get_ppslist(dr_list, self.time_window, product="CT",
                             satellites=self.polar_satellites)
 
         now = datetime.utcnow()
-        gds_list = glob(os.path.join(pps_gds_dir, 'S_NWC_CT_*h5'))
+        gds_list = glob(os.path.join(pps_gds_dir, 'S_NWC_CT_*nc'))
         LOG.info("Number of Metop GDS files in dir: " + str(len(gds_list)))
         ppsgds = get_ppslist(gds_list, self.time_window,
                              satellites=METOPS, variant='global')
