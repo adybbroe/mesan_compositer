@@ -130,7 +130,7 @@ def make_composite(mcomps,
         end_time = None
 
     if (message.data['platform_name'] in SATELLITES and
-        message.data['sensor'] == sensor.get(message.data['platform_name'],
+        message.data['sensor'] == SENSOR.get(message.data['platform_name'],
                                              'avhrr/3')):
 
         path, fname = os.path.split(urlobj.path)
