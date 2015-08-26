@@ -114,7 +114,7 @@ def ctype_msg(msg, areaid='mesanX'):
     global_geo = GeostationaryFactory.create_scene(msg.platform_name, '',
                                                    "seviri",
                                                    time_slot=msg.timeslot)
-    global_geo.load(['CloudType_plax'])
+    global_geo.load(['CloudType_plax'], filename=msg.uri)
     return global_geo.project(areaid)
 
 
@@ -196,7 +196,7 @@ class ctCompositer(object):
         self.pps_scenes = ppsdr + ppsgds
 
         # Get all geostationary satellite scenes:
-        msg_dir = self._options['msg_dir']
+        msg_dir = self._options['msg_dir'] % {"number": "02"}
         #ext = self._options['msg_cty_file_ext']
         # SAFNWC_MSG2_CT___201206252345_EuropeCanary.h5
         # What about EuropeCanary and possible other areas!? FIXME!

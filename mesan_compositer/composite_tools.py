@@ -67,14 +67,16 @@ class MsgMetaData(object):
 
     """Container for the metadata defining the msg scenes"""
 
-    def __init__(self, platform_name=None,
+    def __init__(self, filename=None, platform_name=None,
                  areaid=None, timeslot=None):
         self.timeslot = timeslot
         self.areaid = areaid
         self.platform_name = platform_name
+        self.uri = filename
 
     def __str__(self):
-        return "\n".join(['platform_name=' + str(self.platform_name),
+        return "\n".join(['filename=' + str(self.uri),
+                          'platform_name=' + str(self.platform_name),
                           'areaid=' + self.areaid,
                           'timeslot=' + str(self.timeslot)])
 
@@ -169,7 +171,8 @@ def get_msglist(filelist, timewindow, area_id, satellites=None):
         # Now filter out all passes outside time window:
         if (timeslot > timewindow[0] and
                 timeslot < timewindow[1]):
-            mlist.append(MsgMetaData(areaid=areaid, timeslot=timeslot,
+            mlist.append(MsgMetaData(filename=filename,
+                                     areaid=areaid, timeslot=timeslot,
                                      platform_name=platform_name))
 
     return mlist
