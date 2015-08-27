@@ -282,6 +282,7 @@ def ctype_composite_worker(semaphore_obj, scene, job_id, publish_q):
             to_send['platform_name'] = scene['platform_name']
             to_send['orbit_number'] = scene.get('orbit_number')
             to_send['type'] = 'netCDF'
+            to_send['format'] = 'MESAN'
             to_send['data_processing_level'] = '3'
             environment = MODE
             to_send['start_time'], to_send['end_time'] = scene[
