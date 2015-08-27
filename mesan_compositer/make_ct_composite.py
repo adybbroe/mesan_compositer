@@ -75,15 +75,15 @@ _DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
 
 import ConfigParser
 
-conf = ConfigParser.ConfigParser()
-configfile = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
-if not os.path.exists(configfile):
-    raise IOError('Config file %s does not exist!' % configfile)
-conf.read(configfile)
+CONF = ConfigParser.ConfigParser()
+CONFIGFILE = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
+if not os.path.exists(CONFIGFILE):
+    raise IOError('Config file %s does not exist!' % CONFIGFILE)
+CONF.read(CONFIGFILE)
 
 OPTIONS = {}
-for option, value in conf.items(MODE, raw=True):
-    OPTIONS[option] = value
+for opt, val in CONF.items(MODE, raw=True):
+    OPTIONS[opt] = val
 
 _MESAN_LOG_FILE = OPTIONS.get('mesan_log_file', None)
 
@@ -124,7 +124,6 @@ class ctCompositer(object):
     """The Cloud Type Composite generator class"""
 
     def __init__(self, obstime, tdiff, areaid, **kwargs):
-        import ConfigParser
 
         conf = ConfigParser.ConfigParser()
         configfile = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
@@ -143,9 +142,13 @@ class ctCompositer(object):
         else:
             # Generate the filename from the observation time and the
             # specifcations in the config file:
+            LOG.info("Output file name is generated from observation " +
+                     "time and info in config file:")
             bname = obstime.strftime(options['ct_composite_filename']) % values
             path = options['composite_output_dir']
             self.filename = os.path.join(path, bname)
+
+        LOG.info('Filename = ' + str(self.filename))
 
         self.description = "Cloud Type composite for Mesan"
         self.obstime = obstime

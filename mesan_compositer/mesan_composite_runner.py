@@ -55,6 +55,7 @@ DEFAULT_AREA = "mesanX"
 if not MESAN_AREA_ID:
     LOG.warning("No area id specified in config file. Using default = " +
                 str(DEFAULT_AREA))
+    MESAN_AREA_ID = DEFAULT_AREA
 
 servername = None
 import socket
@@ -154,6 +155,7 @@ def make_composite(mcomps,
     time_of_analysis = get_analysis_time(start_time, end_time)
     delta_t = timedelta(minutes=TIME_WINDOW)
 
+    LOG.info("Make composite for area id = " + str(MESAN_AREA_ID))
     ctcomp = mcc.ctCompositer(time_of_analysis, delta_t, MESAN_AREA_ID)
     ctcomp.get_catalogue()
     ctcomp.make_composite()
