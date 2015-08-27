@@ -90,9 +90,12 @@ def get_analysis_time(start_t, end_t):
     """From two times defining an interval, determine the closest hour (zero
     minutes past) and return as a datetime object"""
 
-    if start_t > end_t:
+    if end_t and start_t > end_t:
         raise IOError("Start time greater than end time!")
-
+    elif not end_t:
+        end_t = start_t + timedelta(seconds=300)
+        LOG.warning(
+            "No end time, so assuming equal to start time + 5 minutes!")
     mean_time = (end_t - start_t) / 2 + start_t
     mean_time = mean_time + timedelta(seconds=1800)
 
