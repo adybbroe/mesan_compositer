@@ -131,8 +131,9 @@ def make_composite(mcomps,
         end_time = None
 
     if (message.data['platform_name'] in SATELLITES and
-        message.data['sensor'] == SENSOR.get(message.data['platform_name'],
-                                             'avhrr/3')):
+            message.data['sensor'] == SENSOR.get(message.data['platform_name'],
+                                                 'avhrr/3') and
+            message.data['uid'].startswith('S_NWC_CT_')):
 
         path, fname = os.path.split(urlobj.path)
         LOG.debug("path " + str(path) + " filename = " + str(fname))
@@ -142,7 +143,7 @@ def make_composite(mcomps,
         mcomps[scene_id] = os.path.join(path, fname)
 
     else:
-        LOG.debug("Scene is not supported")
+        LOG.debug("Scene and file is not supported")
         LOG.debug("platform and instrument: " +
                   str(message.data['platform_name']) + " " +
                   str(message.data['sensor']))
@@ -151,7 +152,7 @@ def make_composite(mcomps,
     LOG.info("Sat and Instrument: " + platform_name + " " + instrument)
     # prfx = platform_name.lower() + start_time.strftime("_%Y%m%d_%H")
 
-    # Get the time if analysis from start and end times:
+    # Get the time of analysis from start and end times:
     time_of_analysis = get_analysis_time(start_time, end_time)
     delta_t = timedelta(minutes=TIME_WINDOW)
 
