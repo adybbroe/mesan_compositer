@@ -157,6 +157,7 @@ class ctCompositer(object):
         self.polar_satellites = options['polar_satellites'].split(',')
         self.msg_satellites = options['msg_satellites'].split(',')
         self.msg_areaname = options['msg_areaname']
+        self.areaid = areaid
         self.longitude = None
         self.latitude = None
         # An mpop-scene area object:
@@ -221,7 +222,7 @@ class ctCompositer(object):
 
         comp_CT = []
 
-        # Loop over all polar scenes:
+        # Loop over all polar and geostationary satellite scenes:
         is_MSG = False
         # for scene in self.pps_scenes + self.msg_scenes:
         for scene in self.msg_scenes + self.pps_scenes:
@@ -300,6 +301,39 @@ class ctCompositer(object):
 
         return
 
+    def make_quicklooks(self):
+        """Make quicklook images"""
+
+        import mpop.imageo.palettes
+        palette = mpop.imageo.palettes.cms_modified()
+        from mpop.imageo import geo_image
+
+        img = geo_image.GeoImage(self.composite.cloudtype.data,
+                                 self.areaid,
+                                 None,
+                                 fill_value=(0),
+                                 mode="P",
+                                 palette=palette)
+        img.save(self.filename.strip('.nc') + '_cloudtype.png')
+
+        comp_id = self.composite.id.data * 13
+        idimg = geo_image.GeoImage(comp_id,
+                                   self.areaid,
+                                   None,
+                                   fill_value=(0),
+                                   mode="P",
+                                   palette=palette)
+        idimg.save(self.filename.strip('.nc') + '_id.png')
+
+        comp_w = self.composite.weight.data * 20
+        wimg = geo_image.GeoImage(comp_w,
+                                  self.areaid,
+                                  None,
+                                  fill_value=(0),
+                                  mode="P",
+                                  palette=palette)
+        wimg.save(self.filename.strip('.nc') + '_weight.png')
+
 
 if __name__ == "__main__":
 
@@ -351,3 +385,4 @@ if __name__ == "__main__":
     ctcomp.get_catalogue()
     ctcomp.make_composite()
     ctcomp.write()
+    ctcomp.make_quicklooks()

@@ -30,6 +30,7 @@ import os
 import ConfigParser
 import logging
 LOG = logging.getLogger(__name__)
+import threading
 
 
 CFG_DIR = os.environ.get('MESAN_COMPOSITE_CONFIG_DIR', './')
@@ -106,6 +107,18 @@ class MesanCompRunError(Exception):
     pass
 
 
+def reset_job_registry(objdict, key):
+    """Remove job key from registry"""
+    LOG.debug("Release/reset job-key " + str(key) + " from job registry")
+    if key in objdict:
+        objdict.pop(key)
+    else:
+        LOG.warning("Nothing to reset/release - " +
+                    "Register didn't contain any entry matching: " +
+                    str(key))
+    return
+
+
 def make_composite(mcomps,
                    mypublisher, message):
     """From a posttroll message start the modis lvl1 processing"""
@@ -161,6 +174,7 @@ def make_composite(mcomps,
     ctcomp.get_catalogue()
     ctcomp.make_composite()
     ctcomp.write()
+    ctcomp.make_quicklooks()
 
     return mcomps
 
@@ -178,6 +192,12 @@ def mesan_live_runner():
 
                 # Clean the registry composites at some point...
                 # FIXME!
+
+                # # Block any future run on this scene for x minutes from now
+                # # x = 20
+                # thread_job_registry = threading.Timer(
+                #     20 * 60.0, reset_job_registry, args=(composites, keyname))
+                # thread_job_registry.start()
 
 
 if __name__ == "__main__":
