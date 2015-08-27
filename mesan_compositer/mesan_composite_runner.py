@@ -137,7 +137,7 @@ class FilePublisher(threading.Thread):
 
     def run(self):
 
-        with Publish('mesan_composite_runner', 0, ['netCDF', ]) as publisher:
+        with Publish('mesan_composite_runner', 0, ['netCDF/3', ]) as publisher:
 
             while self.loop:
                 retv = self.queue.get()
@@ -356,8 +356,10 @@ def mesan_live_runner():
                    str(orbit_number) + '_' +
                    str(start_time.strftime('%Y%m%d%H%M')))
 
+        product = 'CT'
+        keyname = str(product) + '_' + keyname
         status = ready2run(msg, composite_files,
-                           jobs_dict, keyname, 'CT')
+                           jobs_dict, keyname, product)
 
         if status:
             # Start Cloudtype composite generation:
