@@ -51,12 +51,12 @@ else:
 
 METOPS = ['metop02', 'metop01']
 
-SENSOR = {'NOAA-19': 'avhrr',
-          'NOAA-18': 'avhrr',
-          'NOAA-15': 'avhrr',
-          'Metop-A': 'avhrr',
-          'Metop-B': 'avhrr',
-          'Metop-C': 'avhrr',
+SENSOR = {'NOAA-19': 'avhrr/3',
+          'NOAA-18': 'avhrr/3',
+          'NOAA-15': 'avhrr/3',
+          'Metop-A': 'avhrr/3',
+          'Metop-B': 'avhrr/3',
+          'Metop-C': 'avhrr/3',
           'EOS-Terra': 'modis',
           'EOS-Aqua': 'modis',
           'Suomi-NPP': 'viirs',
@@ -93,7 +93,7 @@ def ctype_pps(pps, areaid='mesanX'):
     from mpop.satellites import PolarFactory
     global_data = PolarFactory.create_scene(pps.platform_name, '',
                                             SENSOR.get(
-                                                pps.platform_name, 'avhrr'),
+                                                pps.platform_name, 'avhrr/3'),
                                             pps.timeslot, pps.orbit)
     try:
         global_data.load(['CT'], filename=pps.uri,
