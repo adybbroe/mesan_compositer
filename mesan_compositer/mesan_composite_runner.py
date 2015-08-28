@@ -225,6 +225,11 @@ def ready2run(msg, files4comp, job_register, sceneid, product='CT'):
         return False
 
     platform_name = msg.data['platform_name']
+
+    sensors = msg.data['sensor']
+    if not isinstance(sensors, (list, tuple, set)):
+        sensors = [sensors]
+
     if 'start_time' not in msg.data:
         LOG.warning("No start time in message!")
         return False
@@ -233,10 +238,7 @@ def ready2run(msg, files4comp, job_register, sceneid, product='CT'):
         LOG.info("Platform not supported: " + str(platform_name))
         return False
 
-    sensors = msg.data['sensor']
-    if (sensors != SENSOR.get(platform_name, 'avhrr/3') or
-        (isinstance(sensors, (list, tuple, set)) and
-         SENSOR.get(platform_name, 'avhrr/3') not in sensors)):
+    if SENSOR.get(platform_name, 'avhrr/3') not in sensors:
         LOG.debug("Scene not applicable. platform and instrument: " +
                   str(msg.data['platform_name']) + " " +
                   str(msg.data['sensor']))
