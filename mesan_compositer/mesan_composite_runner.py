@@ -296,7 +296,7 @@ def ctype_composite_worker(semaphore_obj, scene, job_id, publish_q):
                 OPTIONS['cloudamount_filename']) % values
             path = OPTIONS['composite_output_dir']
             filename = os.path.join(path, bname + '.dat')
-            derive_sobs(ctcomp, IPAR, NPIX, filename)
+            derive_sobs(ctcomp.composite, IPAR, NPIX, filename)
 
             result_file = ctcomp.filename
             to_send = {}
