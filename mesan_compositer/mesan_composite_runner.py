@@ -58,7 +58,9 @@ if not MESAN_AREA_ID:
 
 
 IPAR = OPTIONS.get('cloud_amount_ipar')
-NPIX = int(OPTIONS.get('number_of_pixels'))
+if not IPAR:
+    raise IOError("No ipar value in config file!")
+NPIX = int(OPTIONS.get('number_of_pixels'), 32)
 
 servername = None
 import socket
@@ -222,20 +224,27 @@ def ready2run(msg, files4comp, job_register, sceneid, product='CT'):
         LOG.info('Requested file not present on this host!')
         return False
 
+    platform_name = msg.data['platform_name']
     if 'start_time' not in msg.data:
         LOG.warning("No start time in message!")
         return False
 
-    if (msg.data['platform_name'] not in SATELLITES or
-            msg.data['sensor'] != SENSOR.get(msg.data['platform_name'],
-                                             'avhrr/3') or
-            not msg.data['uid'].startswith('S_NWC_' + product + '_')):
+    if platform_name not in SATELLITES:
+        LOG.info("Platform not supported: " + str(platform_name))
+        return False
 
-        LOG.debug("Scene and file is not applicable")
-        LOG.debug("platform and instrument: " +
+    sensors = msg.data['sensor']
+    if (sensors != SENSOR.get(platform_name, 'avhrr/3') or
+        (isinstance(sensors, (list, tuple, set)) and
+         SENSOR.get(platform_name, 'avhrr/3') not in sensors)):
+        LOG.debug("Scene not applicable. platform and instrument: " +
                   str(msg.data['platform_name']) + " " +
                   str(msg.data['sensor']))
-        LOG.debug("Product requested: " + str(product))
+        return False
+
+    if not msg.data['uid'].startswith('S_NWC_' + product + '_'):
+        LOG.debug("File is not applicable. " +
+                  "Product requested: " + str(product))
         return False
 
     LOG.debug("Scene identifier = " + str(sceneid))
