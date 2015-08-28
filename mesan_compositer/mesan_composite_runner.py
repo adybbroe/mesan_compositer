@@ -56,6 +56,10 @@ if not MESAN_AREA_ID:
                 str(DEFAULT_AREA))
     MESAN_AREA_ID = DEFAULT_AREA
 
+
+IPAR = OPTIONS.get('cloud_amount_ipar')
+NPIX = int(OPTIONS.get('number_of_pixels'))
+
 servername = None
 import socket
 servername = socket.gethostname()
@@ -77,6 +81,8 @@ import Queue
 from datetime import timedelta, datetime
 from mesan_compositer.composite_tools import get_analysis_time
 from mesan_compositer import make_ct_composite as mcc
+from mesan_compositer.prt_nwcsaf_cloudamount import derive_sobs
+
 
 CFG_DIR = os.environ.get('MESAN_COMPOSITE_CONFIG_DIR', './')
 DIST = os.environ.get("SMHI_DIST", None)
@@ -271,6 +277,16 @@ def ctype_composite_worker(semaphore_obj, scene, job_id, publish_q):
             ctcomp.write()
             ctcomp.make_quicklooks()
 
+            # Make Super observations:
+            LOG.info("Make Cloud Type super observations")
+
+            values = {"area": MESAN_AREA_ID, }
+            bname = time_of_analysis.strftime(
+                OPTIONS['cloudamount_filename']) % values
+            path = OPTIONS['composite_output_dir']
+            filename = os.path.join(path, bname + '.dat')
+            derive_sobs(ctcomp, IPAR, NPIX, filename)
+
             result_file = ctcomp.filename
             to_send = {}
             to_send['uri'] = ('ssh://%s/%s' % (SERVERNAME, result_file))
@@ -387,20 +403,11 @@ def mesan_live_runner():
             threads.append(t__)
             t__.start()
 
-        # with Publish('mesan_composite_runner', 0) as publisher:
-        #     composites = {}
-        #     for msg in subscr.recv():
-        #         composites = make_composite(composites,
-        #                                     publisher, msg)
-
-        #         # Clean the registry composites at some point...
-        #         # FIXME!
-
-        #         # # Block any future run on this scene for x minutes from now
-        #         # # x = 20
-        #         # thread_job_registry = threading.Timer(
-        #         #     20 * 60.0, reset_job_registry, args=(composites, keyname))
-        #         # thread_job_registry.start()
+            # Block any future run on this scene for x minutes from now
+            # x = 5
+            thread_job_registry = threading.Timer(
+                5 * 60.0, reset_job_registry, args=(jobs_dict, keyname))
+            thread_job_registry.start()
 
     LOG.info("Wait till all threads are dead...")
     while True:

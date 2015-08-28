@@ -26,6 +26,8 @@
 import argparse
 from datetime import datetime, timedelta
 import numpy as np
+import tempfile
+import shutil
 
 from mpop.satin.msg_hdf import ctype_procflags2pps
 
@@ -297,9 +299,15 @@ class ctCompositer(object):
 
     def write(self):
         """Write the composite to a netcdf file"""
-        self.composite.write(self.filename + '.nc')
-
-        return
+        tmpfname = tempfile.mktemp(suffix=os.path.basename(self.filename),
+                                   dir=os.path.dirname(self.filename))
+        #self.composite.write(self.filename + '.nc')
+        self.composite.write(tmpfname)
+        now = datetime.utcnow()
+        fname_with_timestamp = str(
+            self.filename) + now.strftime('_%Y%m%d%H%M%S.nc')
+        shutil.copy(tmpfname, fname_with_timestamp)
+        os.rename(tmpfname, self.filename + '.nc')
 
     def make_quicklooks(self):
         """Make quicklook images"""

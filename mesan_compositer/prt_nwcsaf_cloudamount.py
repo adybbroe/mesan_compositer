@@ -179,6 +179,12 @@ _MESAN_LOG_FILE = OPTIONS.get('mesan_log_file', None)
 def derive_sobs(ct_comp, ipar, npix, resultfile):
     """Derive the super observations and print data to file"""
 
+    import tempfile
+    import shutil
+
+    tmpfname = tempfile.mktemp(suffix=('_' + os.path.basename(resultfile)),
+                               dir=os.path.dirname(resultfile))
+
     # Get the lon,lat:
     # from pyresample import utils
     # area = utils.load_area(
@@ -197,7 +203,8 @@ def derive_sobs(ct_comp, ipar, npix, resultfile):
     dlen = int(np.ceil(float(npix) / 2.0))
     dx = int(max(2 * DLENMIN, 2 * dlen))
     dy = dx
-    fpt = open(resultfile, 'w')
+    #fpt = open(resultfile, 'w')
+    fpt = open(tmpfname, 'w')
     print('\tUsing %d x %d pixels in a superobservation' % (dx, dy))
 
     # initialize superobs data */
@@ -256,6 +263,11 @@ def derive_sobs(ct_comp, ipar, npix, resultfile):
 
     print('\tCreated %d superobservations' % (so_tot))
     fpt.close()
+
+    now = datetime.utcnow()
+    fname_with_timestamp = str(resultfile) + now.strftime('_%Y%m%d%H%M%S')
+    shutil.copy(tmpfname, fname_with_timestamp)
+    os.rename(tmpfname, resultfile)
 
     return
 
