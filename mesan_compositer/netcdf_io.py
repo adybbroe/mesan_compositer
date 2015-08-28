@@ -91,6 +91,7 @@ class ncCloudTypeComposite(object):
         """Store the composite into the object"""
 
         self.info["product"] = product_id
+        self.area_def = area_obj
 
         resolution = 1000  # FIXME!
         str_res = '1000 m'
