@@ -380,7 +380,6 @@ def mesan_live_runner():
             LOG.info("Geostationary satellite: " + str(platform_name))
 
         keyname = (str(platform_name) + '_' +
-                   str(sensor) + '_' +
                    str(orbit_number) + '_' +
                    str(start_time.strftime('%Y%m%d%H%M')))
 
