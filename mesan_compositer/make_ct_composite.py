@@ -218,7 +218,9 @@ class ctCompositer(object):
         self.msg_scenes = get_msglist(msg_list, self.time_window,
                                       self.msg_areaname,
                                       satellites=self.msg_satellites)
-        LOG.info("MSG scenes located: " + str(self.msg_scenes))
+        LOG.info(str(len(self.msg_scenes)) + " MSG scenes located")
+        for scene in self.msg_scenes:
+            LOG.debug("Scene:\n" + str(scene))
 
     def make_composite(self):
         """Make the Cloud Type composite"""
@@ -232,6 +234,7 @@ class ctCompositer(object):
         # Loop over all polar and geostationary satellite scenes:
         is_MSG = False
         # for scene in self.pps_scenes + self.msg_scenes:
+        LOG.info("Loop over all polar and geostationary scenes:")
         for scene in self.msg_scenes + self.pps_scenes:
             x_CT = None
             LOG.info("Scene:\n" + str(scene))
