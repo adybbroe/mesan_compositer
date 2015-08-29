@@ -156,6 +156,8 @@ class ctCompositer(object):
         self.obstime = obstime
         self.timediff = tdiff
         self.time_window = (obstime - tdiff, obstime + tdiff)
+        LOG.debug("Time window: " + str(self.time_window[0]) +
+                  " - " + str(self.time_window[1]))
         self.polar_satellites = options['polar_satellites'].split(',')
         self.msg_satellites = options['msg_satellites'].split(',')
         self.msg_areaname = options['msg_areaname']
@@ -208,8 +210,11 @@ class ctCompositer(object):
         # SAFNWC_MSG2_CT___201206252345_EuropeCanary.h5
         # What about EuropeCanary and possible other areas!? FIXME!
         msg_list = glob(os.path.join(msg_dir, '*_CT___*.PLAX.CTTH.0.h5'))
-        LOG.info(
+        LOG.debug(
             "MSG files in directory " + str(msg_dir) + " : " + str(msg_list))
+        LOG.info("Get files inside time window: " +
+                 str(self.time_window[0]) + " - " +
+                 str(self.time_window[1]))
         self.msg_scenes = get_msglist(msg_list, self.time_window,
                                       self.msg_areaname,
                                       satellites=self.msg_satellites)
