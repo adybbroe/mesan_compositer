@@ -178,7 +178,7 @@ class ncCloudTypeComposite(object):
         """Write the data to netCDF file"""
 
         from mpop.satout import netcdf4
-        netcdf4.netcdf_cf_writer(filename, self)
+        netcdf4.netcdf_cf_writer(filename, self, compression=6)
 
         return
 
