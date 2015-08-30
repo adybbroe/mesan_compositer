@@ -74,6 +74,8 @@ _DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 _DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
 
 import sys
+import socket
+import netifaces
 from urlparse import urlparse
 import posttroll.subscriber
 from posttroll.publisher import Publish
@@ -111,6 +113,17 @@ GEO_SATS = ['Meteosat-10', 'Meteosat-9', 'Meteosat-8', 'Meteosat-11', ]
 
 class MesanCompRunError(Exception):
     pass
+
+
+def get_local_ips():
+    inet_addrs = [netifaces.ifaddresses(iface).get(netifaces.AF_INET)
+                  for iface in netifaces.interfaces()]
+    ips = []
+    for addr in inet_addrs:
+        if addr is not None:
+            for add in addr:
+                ips.append(add['addr'])
+    return ips
 
 
 def reset_job_registry(objdict, key):
@@ -187,6 +200,14 @@ class FileListener(threading.Thread):
     def check_message(self, msg):
 
         if not msg:
+            return False
+
+        urlobj = urlparse(msg.data['uri'])
+        server = urlobj.netloc
+        url_ip = socket.gethostbyname(urlobj.netloc)
+        if urlobj.netloc and (url_ip not in get_local_ips()):
+            LOG.warning("Server %s not the current one: %s" % (str(urlobj.netloc),
+                                                               socket.gethostname()))
             return False
 
         if ('platform_name' not in msg.data or
