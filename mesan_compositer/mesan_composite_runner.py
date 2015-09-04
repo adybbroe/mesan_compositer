@@ -85,7 +85,9 @@ import Queue
 from datetime import timedelta, datetime
 from mesan_compositer.composite_tools import get_analysis_time
 from mesan_compositer import make_ct_composite as mcc
-from mesan_compositer.prt_nwcsaf_cloudamount import derive_sobs
+from mesan_compositer import make_ctth_composite
+from mesan_compositer.prt_nwcsaf_cloudamount import derive_sobs_clamount
+from mesan_compositer.prt_nwcsaf_cloudheight import derive_sobs_clheight
 
 
 CFG_DIR = os.environ.get('MESAN_COMPOSITE_CONFIG_DIR', './')
@@ -224,6 +226,33 @@ class FileListener(threading.Thread):
         return True
 
 
+def create_message(resultfile, scene):
+    """Create the posttroll message"""
+
+    to_send = {}
+    to_send['uri'] = ('ssh://%s/%s' % (SERVERNAME, resultfile))
+    to_send['uid'] = resultfile
+    to_send['sensor'] = scene.get('instrument')
+    if not to_send['sensor']:
+        to_send['sensor'] = scene.get('sensor')
+
+    to_send['platform_name'] = scene['platform_name']
+    to_send['orbit_number'] = scene.get('orbit_number')
+    to_send['type'] = 'netCDF'
+    to_send['format'] = 'MESAN'
+    to_send['data_processing_level'] = '3'
+    environment = MODE
+    to_send['start_time'], to_send['end_time'] = scene[
+        'starttime'], scene['endtime']
+    # Hardcoded station! Norrkoping. FIXME!
+    pub_message = Message('/' + to_send['format'] + '/' + to_send['data_processing_level'] +
+                          '/norrköping/' + environment +
+                          '/polar/direct_readout/',
+                          "file", to_send).encode()
+
+    return pub_message
+
+
 def ready2run(msg, files4comp, job_register, sceneid, product='CT'):
     """Check whether we can start a composite generation on scene"""
 
@@ -317,36 +346,17 @@ def ctype_composite_worker(semaphore_obj, scene, job_id, publish_q):
                 OPTIONS['cloudamount_filename']) % values
             path = OPTIONS['composite_output_dir']
             filename = os.path.join(path, bname + '.dat')
-            derive_sobs(ctcomp.composite, IPAR, NPIX, filename)
+            derive_sobs_clamount(ctcomp.composite, IPAR, NPIX, filename)
 
             result_file = ctcomp.filename
-            to_send = {}
-            to_send['uri'] = ('ssh://%s/%s' % (SERVERNAME, result_file))
-            to_send['uid'] = ctcomp.filename
-            to_send['sensor'] = scene.get('instrument')
-            if not to_send['sensor']:
-                to_send['sensor'] = scene.get('sensor')
 
-            to_send['platform_name'] = scene['platform_name']
-            to_send['orbit_number'] = scene.get('orbit_number')
-            to_send['type'] = 'netCDF'
-            to_send['format'] = 'MESAN'
-            to_send['data_processing_level'] = '3'
-            environment = MODE
-            to_send['start_time'], to_send['end_time'] = scene[
-                'starttime'], scene['endtime']
-            # Hardcoded station! Norrkoping. FIXME!
-            pubmsg = Message('/' + to_send['format'] + '/' + to_send['data_processing_level'] +
-                             '/norrköping/' + environment +
-                             '/polar/direct_readout/',
-                             "file", to_send).encode()
-            LOG.debug("sending: " + str(pubmsg))
+            pubmsg = create_message(result_file, scene)
             LOG.info("Sending: " + str(pubmsg))
             publish_q.put(pubmsg)
 
             if isinstance(job_id, datetime):
                 dt_ = datetime.utcnow() - job_id
-                LOG.info("PPS on scene " + str(job_id) +
+                LOG.info("Ctype composite scene " + str(job_id) +
                          " finished. It took: " + str(dt_))
             else:
                 LOG.warning(
@@ -354,6 +364,57 @@ def ctype_composite_worker(semaphore_obj, scene, job_id, publish_q):
 
     except:
         LOG.exception('Failed in ctype_composite_worker...')
+        raise
+
+
+def ctth_composite_worker(semaphore_obj, scene, job_id, publish_q):
+    """Spawn/Start a Mesan cloud height composite generation on a new thread if
+    available"""
+
+    try:
+        LOG.debug("Waiting for acquired semaphore...")
+        with semaphore_obj:
+            LOG.debug("Acquired semaphore")
+
+            # Get the time of analysis from start and end times:
+            time_of_analysis = get_analysis_time(
+                scene['starttime'], scene['endtime'])
+            delta_t = timedelta(minutes=TIME_WINDOW)
+
+            LOG.info(
+                "Make cloud height composite for area id = " + str(MESAN_AREA_ID))
+            ctth_comp = make_ctth_composite.ctthComposite(
+                time_of_analysis, delta_t, MESAN_AREA_ID)
+            ctth_comp.get_catalogue()
+            ctth_comp.make_composite()
+            ctth_comp.write()
+
+            # Make Super observations:
+            LOG.info("Make Cloud Height super observations")
+
+            values = {"area": MESAN_AREA_ID, }
+            bname = time_of_analysis.strftime(
+                OPTIONS['cloudheight_filename']) % values
+            path = OPTIONS['composite_output_dir']
+            filename = os.path.join(path, bname + '.dat')
+            derive_sobs_clheight(ctth_comp.composite, NPIX, filename)
+
+            result_file = ctth_comp.filename
+
+            pubmsg = create_message(result_file, scene)
+            LOG.info("Sending: " + str(pubmsg))
+            publish_q.put(pubmsg)
+
+            if isinstance(job_id, datetime):
+                dt_ = datetime.utcnow() - job_id
+                LOG.info("Cloud Height composite scene " + str(job_id) +
+                         " finished. It took: " + str(dt_))
+            else:
+                LOG.warning(
+                    "Job entry is not a datetime instance: " + str(job_id))
+
+    except:
+        LOG.exception('Failed in ctth_composite_worker...')
         raise
 
 
@@ -433,6 +494,13 @@ def mesan_live_runner():
                                                                         publisher_q))
             threads.append(t__)
             t__.start()
+
+            t_clheight = threading.Thread(target=ctth_composite_worker, args=(sema, scene,
+                                                                              jobs_dict[
+                                                                                  keyname],
+                                                                              publisher_q))
+            threads.append(t_clheight)
+            t_clheight.start()
 
             # Block any future run on this scene for x minutes from now
             # x = 5

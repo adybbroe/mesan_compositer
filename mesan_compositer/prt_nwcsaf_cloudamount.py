@@ -205,14 +205,14 @@ def derive_sobs(ct_comp, ipar, npix, resultfile):
     dy = dx
     #fpt = open(resultfile, 'w')
     fpt = open(tmpfname, 'w')
-    print('\tUsing %d x %d pixels in a superobservation' % (dx, dy))
+    LOG.info('\tUsing %d x %d pixels in a superobservation', dx, dy)
 
     # initialize superobs data */
     ny, nx = np.shape(ctype)
 
     # indices to super obs "midpoints"
     lx = np.arange(dlen, nx - dlen + 1, dx)
-    ly = np.arange(ny - dlen - 1, dlen + 1, -dy)
+    ly = np.arange(ny - dlen, dlen - 1, -dy)
 
     so_lon = lon[np.ix_(ly, lx)]
     so_lat = lat[np.ix_(ly, lx)]
@@ -261,7 +261,7 @@ def derive_sobs(ct_comp, ipar, npix, resultfile):
                 fpt.write(result)
                 so_tot += 1
 
-    print('\tCreated %d superobservations' % (so_tot))
+    LOG.info('\tCreated %d superobservations', so_tot)
     fpt.close()
 
     now = datetime.utcnow()

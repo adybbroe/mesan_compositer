@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 Adam.Dybbroe
+# Copyright (c) 2014, 2015 Adam.Dybbroe
 
 # Author(s):
 
@@ -109,6 +109,6 @@ if __name__ == "__main__":
                              args.area_id,
                              None,
                              fill_value=(0),
-                             mode = "P",
-                             palette = palette)
+                             mode="P",
+                             palette=palette)
     img.save(filename.strip('.nc') + '_height.png')

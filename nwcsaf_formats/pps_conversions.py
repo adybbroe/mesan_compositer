@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 Adam.Dybbroe
+# Copyright (c) 2014, 2015 Adam.Dybbroe
 
 # Author(s):
 
@@ -134,7 +134,7 @@ def ctth_convert_flags(status_flag, conditions_flag, quality_flag):
     # Not Cloudfree and not non-proc = Cloudy
     arr = np.where(np.logical_and(is_bit_nonproc_set == False,
                                   is_bit0_set == False),
-                   np.left_shift(ones, 1), 0)
+                   np.left_shift(ones, 1), arr)
     retv = np.add(retv, arr)
     # Opaque clouds?
     is_bit2_set = get_bit_from_flags(status_flag, 2)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 Adam.Dybbroe
+# Copyright (c) 2014, 2015 Adam.Dybbroe
 
 # Author(s):
 
@@ -30,6 +30,8 @@ import numpy as np
 
 from mesan_compositer import (ProjectException, LoadException)
 from mesan_compositer.pps_msg_conversions import ctth_procflags2pps
+from nwcsaf_formats.pps_conversions import ctth_convert_flags
+
 
 from mesan_compositer.netcdf_io import ncCTTHComposite
 
@@ -44,9 +46,16 @@ MODE = os.environ.get("SMHI_MODE", 'offline')
 
 METOPS = ['metop02', 'metop01']
 
-SENSOR = {'noaa': 'avhrr',
-          'metop': 'avhrr',
-          'npp': 'viirs'}
+SENSOR = {'NOAA-19': 'avhrr/3',
+          'NOAA-18': 'avhrr/3',
+          'NOAA-15': 'avhrr/3',
+          'Metop-A': 'avhrr/3',
+          'Metop-B': 'avhrr/3',
+          'Metop-C': 'avhrr/3',
+          'EOS-Terra': 'modis',
+          'EOS-Aqua': 'modis',
+          'Suomi-NPP': 'viirs',
+          'JPSS-1': 'viirs'}
 
 import logging
 LOG = logging.getLogger(__name__)
@@ -75,14 +84,16 @@ _MESAN_LOG_FILE = OPTIONS.get('mesan_log_file', None)
 def ctth_pps(pps, areaid='mesanX'):
     """Load PPS CTTH and reproject"""
     from mpop.satellites import PolarFactory
-    global_data = PolarFactory.create_scene(pps.platform, str(pps.number),
-                                            SENSOR.get(pps.platform, 'avhrr'),
+    global_data = PolarFactory.create_scene(pps.platform_name, "",
+                                            SENSOR.get(
+                                                pps.platform_name, 'avhrr'),
                                             pps.timeslot, pps.orbit)
     try:
-        global_data.load(['CTTH'])
+        global_data.load(['CTTH'], filename=pps.uri,
+                         geofilename=pps.geofilename)
     except AttributeError:
-        return LoadException('MPOP scene object fails to load!')
-    if global_data.area:
+        raise LoadException('MPOP scene object fails to load!')
+    if global_data.area or global_data['CTTH'].area:
         return global_data.project(areaid)
     else:
         raise ProjectException('MPOP Scene object has no area instance' +
@@ -93,13 +104,11 @@ def ctth_msg(msg, areaid='mesanX'):
     """Load MSG paralax corrected ctth and reproject"""
     from mpop.satellites import GeostationaryFactory
 
-    global_geo = GeostationaryFactory.create_scene(msg.platform,
-                                                   msg.number, "seviri",
+    global_geo = GeostationaryFactory.create_scene(msg.platform_name,
+                                                   "", "seviri",
                                                    time_slot=msg.timeslot)
-    global_geo.load(['CTTH'])
+    global_geo.load(['CTTH'], filename=msg.uri)
     return global_geo.project(areaid)
-
-# --------------------------------------------------------------------------
 
 
 class mesanComposite(object):
@@ -112,6 +121,8 @@ class mesanComposite(object):
         self.obstime = obstime
         self.timediff = tdiff
         self.time_window = (obstime - tdiff, obstime + tdiff)
+        LOG.debug("Time window: " + str(self.time_window[0]) +
+                  " - " + str(self.time_window[1]))
         self.polar_satellites = []
         self.msg_satellites = []
         self.msg_areaname = 'unknown'
@@ -142,10 +153,12 @@ class mesanComposite(object):
 
         # Get all polar satellite scenes:
         pps_dr_dir = self._options.get('pps_direct_readout_dir', None)
+        LOG.debug('pps_dr_dir = ' + str(pps_dr_dir))
         pps_gds_dir = self._options.get('pps_metop_gds_dir', None)
         prodn = self.product_names['pps']
-        dr_list = glob(os.path.join(pps_dr_dir, '*' + str(prodn) + '*.h5'))
-        ppsdr = get_ppslist(dr_list, self.time_window,
+        dr_list = glob(
+            os.path.join(pps_dr_dir, 'S_NWC_' + str(prodn) + '*.nc'))
+        ppsdr = get_ppslist(dr_list, self.time_window, product=prodn,
                             satellites=self.polar_satellites)
 
         now = datetime.utcnow()
@@ -208,16 +221,17 @@ class ctthComposite(mesanComposite):
             self.filename = os.path.join(path, bname)
 
         self.description = "Cloud Top Temperature and Height composite for Mesan"
-        self.polar_satellites = eval(options['polar_satellites'])
-        self.msg_satellites = eval(options['msg_satellites'])
-        self.msg_areaname = eval(options['msg_areaname'])
 
         self._options = options
 
         self.pps_scenes = []
         self.msg_scenes = []
 
-        self.product_names = {'msg': 'CTTH', 'pps': 'ctth'}
+        self.polar_satellites = options['polar_satellites'].split(',')
+        self.msg_satellites = options['msg_satellites'].split(',')
+        self.msg_areaname = options['msg_areaname']
+
+        self.product_names = {'msg': 'CTTH', 'pps': 'CTTH'}
         self.composite = ncCTTHComposite()
 
     def get_catalogue(self, product='ctth'):
@@ -236,10 +250,10 @@ class ctthComposite(mesanComposite):
 
         # Loop over all polar scenes:
         is_MSG = False
-        # for scene in self.pps_scenes + self.msg_scenes:
         for scene in self.msg_scenes + self.pps_scenes:
             LOG.info("Scene:\n" + str(scene))
-            if scene.platform == "meteosat" and not hasattr(scene, 'orbit'):
+            if (scene.platform_name.startswith("Meteosat") and
+                    not hasattr(scene, 'orbit')):
                 is_MSG = True
                 x_local = ctth_msg(scene)
                 dummy, lat = x_local.area.get_lonlats()
@@ -250,7 +264,7 @@ class ctthComposite(mesanComposite):
                 # convert msg flags to pps
                 # fill_value = 0, fill with 65535 (same as pps flag fill value)
                 # so that bit 0 is set -> unprocessed -> w=0
-                # !!!! This is not working -> apply fix for height==0 and mask=False
+                # The weight for masked data is set further down
                 x_flag = np.ma.filled(ctth_procflags2pps(x_local['CTTH'].processing_flags),
                                       fill_value=65535)
                 x_id = 1 * np.ones(np.shape(x_temperature))
@@ -265,17 +279,29 @@ class ctthComposite(mesanComposite):
 
                 # Temperature (K)', u'no_data_value': 255, u'intercept': 100.0,
                 # u'gain': 1.0
-                x_temperature = x_local['CTTH'].temperature.data + 100.0
+                x_temperature = (x_local['CTTH'].ctth_tempe.data *
+                                 x_local['CTTH'].ctth_tempe.info['scale_factor'][0] +
+                                 x_local['CTTH'].ctth_tempe.info['add_offset'][0])
+
                 # Pressure (hPa)', u'no_data_value': 255, u'intercept': 0.0,
                 # u'gain': 25.0
-                x_pressure = x_local['CTTH'].pressure.data * 25.0
+                x_pressure = (x_local['CTTH'].ctth_pres.data * x_local[
+                    'CTTH'].ctth_pres.info['scale_factor'][0] +
+                    x_local['CTTH'].ctth_pres.info['add_offset'][0])
                 # Height (m)', u'no_data_value': 255, u'intercept': 0.0,
                 # u'gain': 200.0
-                x_height = x_local['CTTH'].height.data * 200.0
+                x_height = (x_local['CTTH'].ctth_alti.data * x_local[
+                    'CTTH'].ctth_alti.info['scale_factor'][0] +
+                    x_local['CTTH'].ctth_alti.info['add_offset'][0])
+
+                sflags = x_local['CTTH'].ctth_status_flag.data.filled(0)
+                cflags = x_local['CTTH'].ctth_conditions.data.filled(0)
+                qflags = x_local['CTTH'].ctth_quality.data.filled(0)
+                oldflags = ctth_convert_flags(sflags, cflags, qflags)
 
                 # fill_value = 65535 i.e bit 0 is set -> unprocessed -> w=0
-                x_flag = np.ma.filled(
-                    x_local['CTTH'].processing_flag.data, fill_value=65535)
+                x_flag = np.ma.filled(oldflags, fill_value=65535)
+
                 x_id = 0 * np.ones(np.shape(x_temperature))
                 lat = 0 * np.ones(np.shape(x_temperature))
 

@@ -282,6 +282,7 @@ class ncCTTHComposite(ncCloudTypeComposite):
         self.height = InfoObject()
         self.pressure = InfoObject()
         self.weight = InfoObject()
+        self.flags = InfoObject()
         self.id = InfoObject()
         self.area = InfoObject()
         self.area_def = None
@@ -360,6 +361,17 @@ class ncCTTHComposite(ncCloudTypeComposite):
                             "valid_range": np.array([valid_min, valid_max]),
                             "resolution": 1000}
         self.weight.info["description"] = "Weight of the best CTTH"
+
+        # Processing flags:
+        self.flags.data = comp_dict["flag"]
+        valid_min, valid_max = (self.flags.data.min(), self.flags.data.max())
+        self.flags.info = {"var_name": "flags",
+                           "var_data": self.flags.data,
+                           'var_dim_names': dim_names,
+                           "standard_name": "CTTH processing flags",
+                           "valid_range": np.array([valid_min, valid_max]),
+                           "resolution": 1000}
+        self.flags.info["description"] = "CTTH processing flags"
 
         # Id:
         self.id.data = comp_dict["id"]
