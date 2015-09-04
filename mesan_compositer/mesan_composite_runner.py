@@ -86,8 +86,8 @@ from datetime import timedelta, datetime
 from mesan_compositer.composite_tools import get_analysis_time
 from mesan_compositer import make_ct_composite as mcc
 from mesan_compositer import make_ctth_composite
-from mesan_compositer.prt_nwcsaf_cloudamount import derive_sobs_clamount
-from mesan_compositer.prt_nwcsaf_cloudheight import derive_sobs_clheight
+from mesan_compositer.prt_nwcsaf_cloudamount import derive_sobs as derive_sobs_clamount
+from mesan_compositer.prt_nwcsaf_cloudheight import derive_sobs as derive_sobs_clheight
 
 
 CFG_DIR = os.environ.get('MESAN_COMPOSITE_CONFIG_DIR', './')
