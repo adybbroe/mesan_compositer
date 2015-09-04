@@ -372,9 +372,9 @@ def ctth_composite_worker(semaphore_obj, scene, job_id, publish_q):
     available"""
 
     try:
-        LOG.debug("Waiting for acquired semaphore...")
+        LOG.debug("CTTH compositer: Waiting for acquired semaphore...")
         with semaphore_obj:
-            LOG.debug("Acquired semaphore")
+            LOG.debug("CTTH compositer: Acquired semaphore")
 
             # Get the time of analysis from start and end times:
             time_of_analysis = get_analysis_time(
@@ -390,13 +390,13 @@ def ctth_composite_worker(semaphore_obj, scene, job_id, publish_q):
             ctth_comp.write()
 
             # Make Super observations:
-            LOG.info("Make Cloud Height super observations")
-
             values = {"area": MESAN_AREA_ID, }
             bname = time_of_analysis.strftime(
                 OPTIONS['cloudheight_filename']) % values
             path = OPTIONS['composite_output_dir']
             filename = os.path.join(path, bname + '.dat')
+            LOG.info("Make Cloud Height super observations. Output file = %s",
+                     str(filename))
             derive_sobs_clheight(ctth_comp.composite, NPIX, filename)
 
             result_file = ctth_comp.filename
