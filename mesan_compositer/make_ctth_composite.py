@@ -237,7 +237,7 @@ class ctthComposite(mesanComposite):
     def get_catalogue(self, product='ctth'):
         super(ctthComposite, self).get_catalogue(product)
 
-    def make_composite(self, areaid="mesanX"):
+    def make_composite(self):
         """Make the Cloud Type composite"""
 
         # Reference time for time stamp in composite file
