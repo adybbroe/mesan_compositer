@@ -40,6 +40,8 @@ from mesan_compositer.composite_tools import (get_msglist,
                                               get_weight_ctth)
 import sys
 import os
+import tempfile
+import shutil
 
 CFG_DIR = os.environ.get('MESAN_COMPOSITE_CONFIG_DIR', './')
 MODE = os.environ.get("SMHI_MODE", 'offline')
@@ -359,7 +361,14 @@ class ctthComposite(mesanComposite):
 
     def write(self):
         """Write the composite to a netcdf file"""
-        self.composite.write(self.filename + '.nc')
+        tmpfname = tempfile.mktemp(suffix=os.path.basename(self.filename),
+                                   dir=os.path.dirname(self.filename))
+        self.composite.write(tmpfname)
+        now = datetime.utcnow()
+        fname_with_timestamp = str(
+            self.filename) + now.strftime('_%Y%m%d%H%M%S.nc')
+        shutil.copy(tmpfname, fname_with_timestamp)
+        os.rename(tmpfname, self.filename + '.nc')
 
         return
 
