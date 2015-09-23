@@ -122,9 +122,8 @@ def cloudtop(so_CTH, so_w, so_flg, num_of_datapoints):
     if (ntop != (nopaque + nwindow)):
         LOG.warning("Inconsistency in opaque and window flags: " +
                     "ntop=%d, nopaque=%d nwindow=%d", ntop, nopaque, nwindow)
-        LOG.info("Assume all points are non-opaque")
-        fopaque = 0.0
-        #raise cthError('CTH is neither opaque nor use window tech!')
+        LOG.info("No super obs will be generated...")
+        return 0, 0
     else:
         fopaque = nopaque / np.float(ntop)
 

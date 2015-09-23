@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 Adam.Dybbroe
+# Copyright (c) 2014, 2015 Adam.Dybbroe
 
 # Author(s):
 
@@ -47,7 +47,6 @@ def write_product(ppsobj, filename):
     """
 
     h5f = h5py.File(filename, 'w')
-
     try:
         h5f.attrs['description'] = str(ppsobj.mda['title'])
     except KeyError:
