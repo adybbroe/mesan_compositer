@@ -27,6 +27,7 @@ import time
 import h5py
 import numpy as np
 import logging
+from datetime import datetime
 
 from nwcsaf_formats.pps_conversions import (map_cloudtypes,
                                             old_ctype_palette,
@@ -51,9 +52,23 @@ def write_product(ppsobj, filename):
         h5f.attrs['description'] = str(ppsobj.mda['title'])
     except KeyError:
         h5f.attrs['description'] = ppsobj.mda['description']
-    h5f.attrs['orbit_number'] = np.int32(ppsobj.mda['orbit'])
-    h5f.attrs['satellite_id'] = str(ppsobj.mda['satellite'])
-    h5f.attrs['sec_1970'] = time.mktime(ppsobj.mda['time_slot'].timetuple())
+    try:
+        h5f.attrs['orbit_number'] = np.int32(ppsobj.mda['orbit_number'])
+    except KeyError:
+        h5f.attrs['orbit_number'] = np.int32(ppsobj.mda['orbit'])
+
+    try:
+        h5f.attrs['satellite_id'] = str(ppsobj.mda['platform'])
+    except KeyError:
+        h5f.attrs['satellite_id'] = str(ppsobj.mda['satellite'])
+
+    try:
+        dtobj = datetime.strptime(ppsobj.mda['time_coverage_start'][:-2],
+                                  '%Y%m%dT%H%M%S')
+    except KeyError:
+        dtobj = ppsobj.mda['time_slot']
+    h5f.attrs['sec_1970'] = time.mktime(dtobj.timetuple())
+
     try:
         h5f.attrs['version'] = str(ppsobj.mda['source'])
     except KeyError:
