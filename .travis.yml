@@ -3,18 +3,10 @@ python:
   - "2.7"
 # command to install dependencies, e.g. 
 install: 
-  - pip install -r requirements.txt
   - pip install .
   - pip install coveralls
 # command to run tests, e.g. python setup.py test
-#script:  python setup.py test
 script: coverage run --source=mesan_compositer setup.py test
-virtualenv:
-  system_site_packages: true
-before_install:
-  - sudo apt-get install -qq python-numpy
-  - sudo apt-get install -qq libhdf5-serial-dev
-  - sudo apt-get install -qq libhdf5-serial-1.8.4
 after_success: coveralls
 deploy:
   provider: pypi
