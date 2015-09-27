@@ -286,20 +286,36 @@ class ctthComposite(mesanComposite):
                           str(x_local['CTTH'].ctth_tempe.info['scale_factor']),
                           str(x_local['CTTH'].ctth_tempe.info['add_offset']))
 
-                x_temperature = (x_local['CTTH'].ctth_tempe.data *
-                                 x_local['CTTH'].ctth_tempe.info['scale_factor'][0] +
-                                 x_local['CTTH'].ctth_tempe.info['add_offset'][0])
+                try:
+                    x_temperature = (x_local['CTTH'].ctth_tempe.data *
+                                     x_local['CTTH'].ctth_tempe.info['scale_factor'][0] +
+                                     x_local['CTTH'].ctth_tempe.info['add_offset'][0])
+                except IndexError:
+                    x_temperature = (x_local['CTTH'].ctth_tempe.data *
+                                     x_local['CTTH'].ctth_tempe.info['scale_factor'] +
+                                     x_local['CTTH'].ctth_tempe.info['add_offset'])
 
                 # Pressure (hPa)', u'no_data_value': 255, u'intercept': 0.0,
                 # u'gain': 25.0
-                x_pressure = (x_local['CTTH'].ctth_pres.data * x_local[
-                    'CTTH'].ctth_pres.info['scale_factor'][0] +
-                    x_local['CTTH'].ctth_pres.info['add_offset'][0])
+                try:
+                    x_pressure = (x_local['CTTH'].ctth_pres.data * x_local[
+                        'CTTH'].ctth_pres.info['scale_factor'][0] +
+                        x_local['CTTH'].ctth_pres.info['add_offset'][0])
+                except IndexError:
+                    x_pressure = (x_local['CTTH'].ctth_pres.data * x_local[
+                        'CTTH'].ctth_pres.info['scale_factor'] +
+                        x_local['CTTH'].ctth_pres.info['add_offset'])
+
                 # Height (m)', u'no_data_value': 255, u'intercept': 0.0,
                 # u'gain': 200.0
-                x_height = (x_local['CTTH'].ctth_alti.data * x_local[
-                    'CTTH'].ctth_alti.info['scale_factor'][0] +
-                    x_local['CTTH'].ctth_alti.info['add_offset'][0])
+                try:
+                    x_height = (x_local['CTTH'].ctth_alti.data * x_local[
+                        'CTTH'].ctth_alti.info['scale_factor'][0] +
+                        x_local['CTTH'].ctth_alti.info['add_offset'][0])
+                except IndexError:
+                    x_height = (x_local['CTTH'].ctth_alti.data * x_local[
+                        'CTTH'].ctth_alti.info['scale_factor'] +
+                        x_local['CTTH'].ctth_alti.info['add_offset'])
 
                 sflags = x_local['CTTH'].ctth_status_flag.data.filled(0)
                 cflags = x_local['CTTH'].ctth_conditions.data.filled(0)
