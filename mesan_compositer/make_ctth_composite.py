@@ -281,6 +281,12 @@ class ctthComposite(mesanComposite):
 
                 # Temperature (K)', u'no_data_value': 255, u'intercept': 100.0,
                 # u'gain': 1.0
+                LOG.debug(
+                    "Info dict (ctth_tempe) = %s", str(x_local['CTTH'].ctth_tempe.info))
+                LOG.debug("scale and offset: %s %s",
+                          str(x_local['CTTH'].ctth_tempe.info['scale_factor']),
+                          str(x_local['CTTH'].ctth_tempe.info['add_offset']))
+
                 x_temperature = (x_local['CTTH'].ctth_tempe.data *
                                  x_local['CTTH'].ctth_tempe.info['scale_factor'][0] +
                                  x_local['CTTH'].ctth_tempe.info['add_offset'][0])
