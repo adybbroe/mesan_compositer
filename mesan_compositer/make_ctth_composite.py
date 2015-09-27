@@ -91,8 +91,7 @@ def ctth_pps(pps, areaid='mesanX'):
                                                 pps.platform_name, 'avhrr'),
                                             pps.timeslot, pps.orbit)
     try:
-        global_data.load(['CTTH'], filename=pps.uri,
-                         geofilename=pps.geofilename)
+        global_data.load(['CTTH'], filename=pps.uri)
     except AttributeError:
         raise LoadException('MPOP scene object fails to load!')
     if global_data.area or global_data['CTTH'].area:

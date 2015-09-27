@@ -98,8 +98,7 @@ def ctype_pps(pps, areaid='mesanX'):
                                                 pps.platform_name, 'avhrr/3'),
                                             pps.timeslot, pps.orbit)
     try:
-        global_data.load(['CT'], filename=pps.uri,
-                         geofilename=pps.geofilename)
+        global_data.load(['CT'], filename=pps.uri)
     except AttributeError:
         raise LoadException('MPOP scene object fails to load!')
 
