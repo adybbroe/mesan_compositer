@@ -292,7 +292,7 @@ def ready2run(msg, files4comp, job_register, sceneid, product='CT'):
         LOG.warning("No start time in message!")
         return False
 
-    if platform_name not in POLAR_SATELLITES or platform_name not in GEO_SATS:
+    if platform_name not in POLAR_SATELLITES and platform_name not in GEO_SATS:
         LOG.info("Platform not supported: " + str(platform_name))
         return False
 
@@ -301,7 +301,7 @@ def ready2run(msg, files4comp, job_register, sceneid, product='CT'):
                   str(msg.data['platform_name']) + " " +
                   str(msg.data['sensor']))
         return False
-    if platform_name in GEO_SATS and 'seviri' not in sensors:
+    elif platform_name in GEO_SATS and 'seviri' not in sensors:
         LOG.debug("Scene not applicable. platform and instrument: " +
                   str(msg.data['platform_name']) + " " +
                   str(msg.data['sensor']))
