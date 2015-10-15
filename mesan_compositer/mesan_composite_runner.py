@@ -108,9 +108,11 @@ SENSOR = {'NOAA-19': 'avhrr/3',
           'Suomi-NPP': 'viirs',
           'JPSS-1': 'viirs'}
 
-SATELLITES = SENSOR.keys()
+POLAR_SATELLITES = SENSOR.keys()
 
 GEO_SATS = ['Meteosat-10', 'Meteosat-9', 'Meteosat-8', 'Meteosat-11', ]
+
+PRODUCT_NAMES = ['CMA', 'CT', 'CTTH', 'PC', 'CPP']
 
 
 class MesanCompRunError(Exception):
@@ -187,7 +189,7 @@ class FileListener(threading.Thread):
 
     def run(self):
 
-        with posttroll.subscriber.Subscribe('', ['CF/2', ], True) as subscr:
+        with posttroll.subscriber.Subscribe('', ['CF/2', 'NWCSAF/2/HDF5'], True) as subscr:
 
             for msg in subscr.recv(timeout=90):
                 if not self.loop:
@@ -215,10 +217,16 @@ class FileListener(threading.Thread):
         if ('platform_name' not in msg.data or
                 'orbit_number' not in msg.data or
                 'start_time' not in msg.data):
+            LOG.info(
+                "Message is lacking crucial fields, check if it is a MSG scene...")
+        elif ('platform_name' not in msg.data or
+              'nominal_time' not in msg.data or
+              'pge' not in msg.data):
             LOG.warning("Message is lacking crucial fields...")
+
             return False
 
-        if (msg.data['platform_name'] not in SATELLITES):
+        if (msg.data['platform_name'] not in POLAR_SATELLITES):
             LOG.info(str(msg.data['platform_name']) + ": " +
                      "Not a NOAA/Metop/S-NPP/Terra/Aqua scene. Continue...")
             return False
@@ -280,21 +288,34 @@ def ready2run(msg, files4comp, job_register, sceneid, product='CT'):
     if not isinstance(sensors, (list, tuple, set)):
         sensors = [sensors]
 
-    if 'start_time' not in msg.data:
+    if 'start_time' not in msg.data and 'nominal_time' not in msg.data:
         LOG.warning("No start time in message!")
         return False
 
-    if platform_name not in SATELLITES:
+    if platform_name not in POLAR_SATELLITES or platform_name not in GEO_SATS:
         LOG.info("Platform not supported: " + str(platform_name))
         return False
 
-    if SENSOR.get(platform_name, 'avhrr/3') not in sensors:
+    if platform_name in POLAR_SATELLITES and SENSOR.get(platform_name, 'avhrr/3') not in sensors:
+        LOG.debug("Scene not applicable. platform and instrument: " +
+                  str(msg.data['platform_name']) + " " +
+                  str(msg.data['sensor']))
+        return False
+    if platform_name in GEO_SATS and 'seviri' not in sensors:
         LOG.debug("Scene not applicable. platform and instrument: " +
                   str(msg.data['platform_name']) + " " +
                   str(msg.data['sensor']))
         return False
 
-    if not msg.data['uid'].startswith('S_NWC_' + product + '_'):
+    if 'uid' not in msg.data:
+        if 'url' not in msg.data:
+            raise IOError("No uri or url in message!")
+        # Get uid from uri:
+        url = urlparse(msg.data['url'])
+        uid = os.path.basename(url.path)
+    else:
+        uid = msg.data['uid']
+    if not uid.startswith('S_NWC_' + product + '_'):
         LOG.debug("File is not applicable. " +
                   "Product requested: " + str(product))
         return False
@@ -445,11 +466,18 @@ def mesan_live_runner():
         LOG.debug(
             "Number of threads currently alive: " + str(threading.active_count()))
 
-        start_time = msg.data['start_time']
+        if 'start_time' in msg.data:
+            start_time = msg.data['start_time']
+        elif 'nominal_time' in msg.data:
+            start_time = msg.data['nominal_time']
+        else:
+            LOG.warning("Neither start_time nor nominal_time in message!")
+            start_time = None
+
         if 'end_time' in msg.data:
             end_time = msg.data['end_time']
         else:
-            LOG.warning("No end time in message!")
+            LOG.warning("No end_time in message!")
             end_time = None
 
         sensor = str(msg.data['sensor'])
@@ -465,13 +493,23 @@ def mesan_live_runner():
                    str(orbit_number) + '_' +
                    str(start_time.strftime('%Y%m%d%H%M')))
 
-        product = 'CT'
+        product = 'UNKNOWN'
+        if 'pge' in msg.data:
+            product = msg.data['pge']
+        elif 'uid' in msg.data:
+            uid = msg.data['uid']
+            for pge in PRODUCT_NAMES:
+                match = '_' + pge + '_'
+                if match in uid:
+                    product = pge
+                    break
+
         keyname = str(product) + '_' + keyname
         status = ready2run(msg, composite_files,
                            jobs_dict, keyname, product)
 
         if status:
-            # Start Cloudtype composite generation:
+            # Start composite generation:
 
             urlobj = urlparse(msg.data['uri'])
             path, fname = os.path.split(urlobj.path)
@@ -482,25 +520,27 @@ def mesan_live_runner():
                      'starttime': start_time, 'endtime': end_time,
                      'sensor': sensor,
                      'filename': urlobj.path,
-                     'product': 'CT'}
+                     'product': product}
 
             if keyname not in jobs_dict:
                 LOG.warning("Scene-run seems unregistered! Forget it...")
                 continue
 
-            t__ = threading.Thread(target=ctype_composite_worker, args=(sema, scene,
-                                                                        jobs_dict[
-                                                                            keyname],
-                                                                        publisher_q))
-            threads.append(t__)
-            t__.start()
+            if product == 'CT':
+                t__ = threading.Thread(target=ctype_composite_worker, args=(sema, scene,
+                                                                            jobs_dict[
+                                                                                keyname],
+                                                                            publisher_q))
+                threads.append(t__)
+                t__.start()
 
-            t_clheight = threading.Thread(target=ctth_composite_worker, args=(sema, scene,
-                                                                              jobs_dict[
-                                                                                  keyname],
-                                                                              publisher_q))
-            threads.append(t_clheight)
-            t_clheight.start()
+            if product == 'CTTH':
+                t_clheight = threading.Thread(target=ctth_composite_worker, args=(sema, scene,
+                                                                                  jobs_dict[
+                                                                                      keyname],
+                                                                                  publisher_q))
+                threads.append(t_clheight)
+                t_clheight.start()
 
             # Block any future run on this scene for x minutes from now
             # x = 5
