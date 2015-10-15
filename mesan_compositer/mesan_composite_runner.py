@@ -226,9 +226,9 @@ class FileListener(threading.Thread):
 
             return False
 
-        if (msg.data['platform_name'] not in POLAR_SATELLITES):
+        if msg.data['platform_name'] not in (GEO_SATS + POLAR_SATELLITES):
             LOG.info(str(msg.data['platform_name']) + ": " +
-                     "Not a NOAA/Metop/S-NPP/Terra/Aqua scene. Continue...")
+                     "Not a MSG or a NOAA/Metop/S-NPP/Terra/Aqua scene. Continue...")
             return False
 
         return True
