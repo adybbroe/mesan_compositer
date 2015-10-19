@@ -198,7 +198,7 @@ class FileListener(threading.Thread):
                 # Check if it is a relevant message:
                 if self.check_message(msg):
                     LOG.info("Put the message on the queue...")
-                    LOG.debug("Message = " + str(msg))
+                    LOG.debug("Message = %s", str(msg))
                     self.queue.put(msg)
 
     def check_message(self, msg):
@@ -219,18 +219,18 @@ class FileListener(threading.Thread):
                 'start_time' not in msg.data):
             LOG.info(
                 "Message is lacking crucial fields, check if it is a MSG scene...")
-        elif ('platform_name' not in msg.data or
-              'nominal_time' not in msg.data or
-              'pge' not in msg.data):
-            LOG.warning("Message is lacking crucial fields...")
-
-            return False
+            if ('platform_name' not in msg.data or
+                    'nominal_time' not in msg.data or
+                    'pge' not in msg.data):
+                LOG.warning("Message is lacking crucial fields...")
+                return False
 
         if msg.data['platform_name'] not in (GEO_SATS + POLAR_SATELLITES):
             LOG.info(str(msg.data['platform_name']) + ": " +
                      "Not a MSG or a NOAA/Metop/S-NPP/Terra/Aqua scene. Continue...")
             return False
 
+        LOG.debug("Ok: message = %s", str(msg))
         return True
 
 
@@ -527,6 +527,7 @@ def mesan_live_runner():
                 continue
 
             if product == 'CT':
+                LOG.debug("Product is CT")
                 t__ = threading.Thread(target=ctype_composite_worker, args=(sema, scene,
                                                                             jobs_dict[
                                                                                 keyname],
@@ -534,13 +535,17 @@ def mesan_live_runner():
                 threads.append(t__)
                 t__.start()
 
-            if product == 'CTTH':
+            elif product == 'CTTH':
+                LOG.debug("Product is CTTH")
                 t_clheight = threading.Thread(target=ctth_composite_worker, args=(sema, scene,
                                                                                   jobs_dict[
                                                                                       keyname],
                                                                                   publisher_q))
                 threads.append(t_clheight)
                 t_clheight.start()
+
+            else:
+                LOG.warning("Product %s not supported!", str(product))
 
             # Block any future run on this scene for x minutes from now
             # x = 5
