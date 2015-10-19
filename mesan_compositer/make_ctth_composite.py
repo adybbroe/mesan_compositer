@@ -173,7 +173,7 @@ class mesanComposite(object):
         self.pps_scenes = ppsdr + ppsgds
 
         # Get all geostationary satellite scenes:
-        msg_dir = self._options['msg_dir']
+        msg_dir = self._options['msg_dir'] % {"number": "03"}
         if product == 'cloudtype':
             ext = self._options['msg_cty_file_ext']
             # SAFNWC_MSG2_CT___201206252345_EuropeCanary.h5
