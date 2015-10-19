@@ -111,6 +111,8 @@ SENSOR = {'NOAA-19': 'avhrr/3',
 POLAR_SATELLITES = SENSOR.keys()
 
 GEO_SATS = ['Meteosat-10', 'Meteosat-9', 'Meteosat-8', 'Meteosat-11', ]
+MSG_NAME = {'Meteosat-10': 'MSG3', 'Meteosat-9': 'MSG2',
+            'Meteosat-8': 'MSG1', 'Meteosat-11': 'MSG4'}
 
 PRODUCT_NAMES = ['CMA', 'CT', 'CTTH', 'PC', 'CPP']
 
@@ -315,7 +317,11 @@ def ready2run(msg, files4comp, job_register, sceneid, product='CT'):
         uid = os.path.basename(uri.path)
     else:
         uid = msg.data['uid']
-    if not uid.startswith('S_NWC_' + product + '_'):
+    if (uid.startswith('S_NWC_' + product + '_') or
+        uid.startswith('SAFNWC_' + MSG_NAME.get(msg.data['platform_name'], 'MSG4') +
+                       '_' + product + '_')):
+        LOG.debug("File uid ok: %s", str(uid))
+    else:
         LOG.debug("File is not applicable. " +
                   "Product requested: " + str(product))
         return False
