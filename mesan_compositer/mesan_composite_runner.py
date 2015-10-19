@@ -317,11 +317,18 @@ def ready2run(msg, files4comp, job_register, sceneid, product='CT'):
         uid = os.path.basename(uri.path)
     else:
         uid = msg.data['uid']
-    if (uid.startswith('S_NWC_' + product + '_') or
-        uid.startswith('SAFNWC_' + MSG_NAME.get(msg.data['platform_name'], 'MSG4') +
-                       '_' + product + '_')):
-        LOG.debug("File uid ok: %s", str(uid))
-    else:
+    prefixes = ['S_NWC_' + product + '_',
+                'SAFNWC_' + MSG_NAME.get(str(msg.data['platform_name']), 'MSG4') +
+                '_' + product + '_']
+    file_ok = False
+    for prfx in prefixes:
+        LOG.debug("File prefix to check for: %s", prfx)
+        if uid.startswith(prfx):
+            LOG.debug("File uid ok: %s", str(uid))
+            file_ok = True
+            break
+    if not file_ok:
+        LOG.debug("File uid not ok: %s", str(uid))
         LOG.debug("File is not applicable. " +
                   "Product requested: " + str(product))
         return False
