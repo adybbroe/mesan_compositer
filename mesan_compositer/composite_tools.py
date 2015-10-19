@@ -156,6 +156,8 @@ def get_msglist(filelist, timewindow, area_id, satellites=None):
     mlist = []
     for filename in filelist:
         bname = os.path.basename(filename)
+        LOG.debug("Filename: %s", str(bname))
+
         bnsplit = bname.split('_')
         sat = bnsplit[1]
         if sat not in metsats:
@@ -165,10 +167,10 @@ def get_msglist(filelist, timewindow, area_id, satellites=None):
 
         platform_name = METEOSAT[sat]
         areaid = bnsplit[4].split('.')[0]
-
         if areaid != area_id:
             LOG.debug("Area id " + str(areaid) +
                       " not requested (" + str(area_id) + ")")
+            LOG.debug("bnsplit = %s", str(bnsplit))
             continue
 
         # Hardcoded the filenaming convention! FIXME!
