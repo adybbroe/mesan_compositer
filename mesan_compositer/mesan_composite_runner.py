@@ -308,11 +308,11 @@ def ready2run(msg, files4comp, job_register, sceneid, product='CT'):
         return False
 
     if 'uid' not in msg.data:
-        if 'url' not in msg.data:
+        if 'uri' not in msg.data:
             raise IOError("No uri or url in message!")
         # Get uid from uri:
-        url = urlparse(msg.data['url'])
-        uid = os.path.basename(url.path)
+        uri = urlparse(msg.data['uri'])
+        uid = os.path.basename(uri.path)
     else:
         uid = msg.data['uid']
     if not uid.startswith('S_NWC_' + product + '_'):
