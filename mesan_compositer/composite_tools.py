@@ -166,7 +166,7 @@ def get_msglist(filelist, timewindow, area_id, satellites=None):
             continue
 
         platform_name = METEOSAT[sat]
-        bnsplit = bname[17:]
+        bnsplit = bname[17:].split('_')
         areaid = bnsplit[1].split('.')[0]
         if areaid != area_id:
             LOG.debug("Area id " + str(areaid) +
