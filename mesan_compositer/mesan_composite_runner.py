@@ -197,8 +197,8 @@ class FileListener(threading.Thread):
 
                 # Check if it is a relevant message:
                 if self.check_message(msg):
-                    LOG.info("Put the message on the queue...")
-                    LOG.debug("Message = %s", str(msg))
+                    LOG.debug("Put the message on the queue...")
+                    #LOG.debug("Message = %s", str(msg))
                     self.queue.put(msg)
 
     def check_message(self, msg):
@@ -218,7 +218,7 @@ class FileListener(threading.Thread):
                 'orbit_number' not in msg.data or
                 'start_time' not in msg.data):
             LOG.info(
-                "Message is lacking crucial fields, check if it is a MSG scene...")
+                "Message is lacking crucial fields, probably an MSG scene...")
             if ('platform_name' not in msg.data or
                     'nominal_time' not in msg.data or
                     'pge' not in msg.data):
@@ -444,7 +444,7 @@ def mesan_live_runner():
 
     LOG.info("*** Start the runner for the Mesan composite generator:")
 
-    sema = threading.Semaphore(5)
+    sema = threading.Semaphore(8)
     listener_q = Queue.Queue()
     publisher_q = Queue.Queue()
 
@@ -461,6 +461,7 @@ def mesan_live_runner():
         try:
             msg = listener_q.get()
         except Queue.Empty:
+            LOG.debug("Empty listener queue...")
             continue
 
         LOG.debug(
