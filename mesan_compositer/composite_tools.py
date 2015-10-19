@@ -164,7 +164,7 @@ def get_msglist(filelist, timewindow, area_id, satellites=None):
             continue
 
         platform_name = METEOSAT[sat]
-        areaid = bnsplit[-1].split('.')[0]
+        areaid = bnsplit[4]
 
         if areaid != area_id:
             LOG.debug("Area id " + str(areaid) +
@@ -173,7 +173,8 @@ def get_msglist(filelist, timewindow, area_id, satellites=None):
 
         # Hardcoded the filenaming convention! FIXME!
         try:
-            timeslot = datetime.strptime(bname[17:17 + 12], '%Y%m%d%H%M')
+            #timeslot = datetime.strptime(bname[17:17 + 12], '%Y%m%d%H%M')
+            timeslot = datetime.strptime(bnslpit[3], '%Y%m%d%H%M')
         except ValueError:
             LOG.error("Failure: Can't get the time of the msg scene! " +
                       str(bname))
