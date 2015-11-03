@@ -42,6 +42,9 @@ CONF = ConfigParser.ConfigParser()
 CFG_FILE = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
 if not os.path.exists(CFG_FILE):
     raise IOError('Config file %s does not exist!' % CFG_FILE)
+else:
+    LOG.debug("Config file = " + str(CFG_FILE))
+
 CONF.read(CFG_FILE)
 
 OPTIONS = {}
@@ -49,6 +52,9 @@ for option, value in CONF.items(MODE, raw=True):
     OPTIONS[option] = value
 
 TIME_WINDOW = int(OPTIONS.get('absolute_time_threshold_minutes', '30'))
+LOG.debug("Time window = " + str(TIME_WINDOW))
+
+
 MESAN_AREA_ID = OPTIONS.get('mesan_area_id', None)
 DEFAULT_AREA = "mesanX"
 if not MESAN_AREA_ID:
@@ -56,11 +62,13 @@ if not MESAN_AREA_ID:
                 str(DEFAULT_AREA))
     MESAN_AREA_ID = DEFAULT_AREA
 
+NPIX = int(OPTIONS.get('number_of_pixels'), 32)
+LOG.debug("Number of pixels = " + str(NPIX))
+LOG.debug("OPTIONS = " + str(OPTIONS))
 
 IPAR = OPTIONS.get('cloud_amount_ipar')
 if not IPAR:
     raise IOError("No ipar value in config file!")
-NPIX = int(OPTIONS.get('number_of_pixels'), 32)
 
 servername = None
 import socket
@@ -74,7 +82,6 @@ _DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 _DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
 
 import sys
-import socket
 import netifaces
 from urlparse import urlparse
 import posttroll.subscriber
