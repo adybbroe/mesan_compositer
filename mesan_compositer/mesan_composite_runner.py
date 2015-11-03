@@ -40,10 +40,11 @@ else:
 
 CONF = ConfigParser.ConfigParser()
 CFG_FILE = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
+print("Config file = " + str(CFG_FILE))
+LOG.debug("Config file = " + str(CFG_FILE))
 if not os.path.exists(CFG_FILE):
     raise IOError('Config file %s does not exist!' % CFG_FILE)
-else:
-    LOG.debug("Config file = " + str(CFG_FILE))
+
 
 CONF.read(CFG_FILE)
 
@@ -53,6 +54,7 @@ for option, value in CONF.items(MODE, raw=True):
 
 TIME_WINDOW = int(OPTIONS.get('absolute_time_threshold_minutes', '30'))
 LOG.debug("Time window = " + str(TIME_WINDOW))
+print("Time window = " + str(TIME_WINDOW))
 
 
 MESAN_AREA_ID = OPTIONS.get('mesan_area_id', None)
