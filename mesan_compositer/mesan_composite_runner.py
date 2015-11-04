@@ -33,6 +33,8 @@ LOG = logging.getLogger(__name__)
 
 CFG_DIR = os.environ.get('MESAN_COMPOSITE_CONFIG_DIR', './')
 DIST = os.environ.get("SMHI_DIST", None)
+print("os.environ = " + str(os.environ))
+
 if not DIST or DIST == 'linda4':
     MODE = 'offline'
 else:
