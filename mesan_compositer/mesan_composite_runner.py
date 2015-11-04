@@ -377,36 +377,35 @@ def ctype_composite_worker(semaphore_obj, scene, job_id, publish_q):
             LOG.info("Make composite for area id = " + str(MESAN_AREA_ID))
             ctcomp = mcc.ctCompositer(time_of_analysis, delta_t, MESAN_AREA_ID)
             ctcomp.get_catalogue()
-            if ctcomp.make_composite():
+            if not ctcomp.make_composite():
+                LOG.error("Failed creating composite...")
+            else:
                 ctcomp.write()
                 ctcomp.make_quicklooks()
-            else:
-                LOG.error("Failed creating composite...")
-                break
 
-            # Make Super observations:
-            LOG.info("Make Cloud Type super observations")
+                # Make Super observations:
+                LOG.info("Make Cloud Type super observations")
 
-            values = {"area": MESAN_AREA_ID, }
-            bname = time_of_analysis.strftime(
-                OPTIONS['cloudamount_filename']) % values
-            path = OPTIONS['composite_output_dir']
-            filename = os.path.join(path, bname + '.dat')
-            derive_sobs_clamount(ctcomp.composite, IPAR, NPIX, filename)
+                values = {"area": MESAN_AREA_ID, }
+                bname = time_of_analysis.strftime(
+                    OPTIONS['cloudamount_filename']) % values
+                path = OPTIONS['composite_output_dir']
+                filename = os.path.join(path, bname + '.dat')
+                derive_sobs_clamount(ctcomp.composite, IPAR, NPIX, filename)
 
-            result_file = ctcomp.filename
+                result_file = ctcomp.filename
 
-            pubmsg = create_message(result_file, scene)
-            LOG.info("Sending: " + str(pubmsg))
-            publish_q.put(pubmsg)
+                pubmsg = create_message(result_file, scene)
+                LOG.info("Sending: " + str(pubmsg))
+                publish_q.put(pubmsg)
 
-            if isinstance(job_id, datetime):
-                dt_ = datetime.utcnow() - job_id
-                LOG.info("Ctype composite scene " + str(job_id) +
-                         " finished. It took: " + str(dt_))
-            else:
-                LOG.warning(
-                    "Job entry is not a datetime instance: " + str(job_id))
+                if isinstance(job_id, datetime):
+                    dt_ = datetime.utcnow() - job_id
+                    LOG.info("Ctype composite scene " + str(job_id) +
+                             " finished. It took: " + str(dt_))
+                else:
+                    LOG.warning(
+                        "Job entry is not a datetime instance: " + str(job_id))
 
     except:
         LOG.exception('Failed in ctype_composite_worker...')
