@@ -47,6 +47,7 @@ if not os.path.exists(CFG_FILE):
 
 
 CONF.read(CFG_FILE)
+print("CONF.items = " + str(CONF.items(MODE, raw=True)))
 
 OPTIONS = {}
 for option, value in CONF.items(MODE, raw=True):
