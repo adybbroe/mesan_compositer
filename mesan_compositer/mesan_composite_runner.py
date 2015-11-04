@@ -32,9 +32,8 @@ import logging
 LOG = logging.getLogger(__name__)
 
 CFG_DIR = os.environ.get('MESAN_COMPOSITE_CONFIG_DIR', './')
-DIST = os.environ.get("SMHI_DIST", None)
-print("os.environ = " + str(os.environ))
-
+DIST = os.environ.get("SMHI_DIST", 'elin4')
+#print("os.environ = " + str(os.environ))
 if not DIST or DIST == 'linda4':
     MODE = 'offline'
 else:
@@ -42,14 +41,14 @@ else:
 
 CONF = ConfigParser.ConfigParser()
 CFG_FILE = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
-print("Config file = " + str(CFG_FILE))
+#print("Config file = " + str(CFG_FILE))
 LOG.debug("Config file = " + str(CFG_FILE))
 if not os.path.exists(CFG_FILE):
     raise IOError('Config file %s does not exist!' % CFG_FILE)
 
 
 CONF.read(CFG_FILE)
-print("CONF.items = " + str(CONF.items(MODE, raw=True)))
+#print("CONF.items = " + str(CONF.items(MODE, raw=True)))
 
 OPTIONS = {}
 for option, value in CONF.items(MODE, raw=True):
@@ -59,7 +58,6 @@ TIME_WINDOW = int(OPTIONS.get('absolute_time_threshold_minutes', '30'))
 LOG.debug("Time window = " + str(TIME_WINDOW))
 print("Time window = " + str(TIME_WINDOW))
 
-
 MESAN_AREA_ID = OPTIONS.get('mesan_area_id', None)
 DEFAULT_AREA = "mesanX"
 if not MESAN_AREA_ID:
@@ -68,8 +66,7 @@ if not MESAN_AREA_ID:
     MESAN_AREA_ID = DEFAULT_AREA
 
 NPIX = int(OPTIONS.get('number_of_pixels'), 32)
-LOG.debug("Number of pixels = " + str(NPIX))
-LOG.debug("OPTIONS = " + str(OPTIONS))
+print("Number of pixels = " + str(NPIX))
 
 IPAR = OPTIONS.get('cloud_amount_ipar')
 if not IPAR:
