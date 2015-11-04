@@ -232,6 +232,11 @@ class ctCompositer(object):
 
         # Loop over all polar and geostationary satellite scenes:
         is_MSG = False
+
+        if len(self.msg_scenes + self.pps_scenes) == 0:
+            LOG.error("Cannot make composite when no Scenes have been found!")
+            return False
+
         # for scene in self.pps_scenes + self.msg_scenes:
         LOG.info("Loop over all polar and geostationary scenes:")
         for scene in self.msg_scenes + self.pps_scenes:
@@ -303,6 +308,8 @@ class ctCompositer(object):
                      "time": comp_time,
                      "id": comp_id.astype(np.uint8)}
         self.composite.store(composite, self.area)
+
+        return True
 
     def write(self):
         """Write the composite to a netcdf file"""

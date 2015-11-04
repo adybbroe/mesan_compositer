@@ -377,9 +377,12 @@ def ctype_composite_worker(semaphore_obj, scene, job_id, publish_q):
             LOG.info("Make composite for area id = " + str(MESAN_AREA_ID))
             ctcomp = mcc.ctCompositer(time_of_analysis, delta_t, MESAN_AREA_ID)
             ctcomp.get_catalogue()
-            ctcomp.make_composite()
-            ctcomp.write()
-            ctcomp.make_quicklooks()
+            if ctcomp.make_composite():
+                ctcomp.write()
+                ctcomp.make_quicklooks()
+            else:
+                LOG.error("Failed creating composite...")
+                break
 
             # Make Super observations:
             LOG.info("Make Cloud Type super observations")
