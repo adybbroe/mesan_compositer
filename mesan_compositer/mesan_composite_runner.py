@@ -466,6 +466,7 @@ def mesan_live_runner():
     LOG.debug("os.environ = " + str(os.environ))
     LOG.debug("DIST = " + str(DIST))
     LOG.debug("MODE = " + str(MODE))
+    LOG.debug("Number of pixels = " + str(NPIX))
 
     sema = threading.Semaphore(8)
     listener_q = Queue.Queue()

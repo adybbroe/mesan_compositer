@@ -324,10 +324,10 @@ if __name__ == "__main__":
     comp = ncCloudTypeComposite()
     comp.load(filename)
 
-    ipar = str(args.ipar)
-    npix = int(args.size)
+    IPAR = str(args.ipar)
+    NPIX = int(args.size)
 
     bname = obstime.strftime(OPTIONS['cloudamount_filename']) % values
     path = OPTIONS['composite_output_dir']
     filename = os.path.join(path, bname + '.dat')
-    derive_sobs(comp, ipar, npix, filename)
+    derive_sobs(comp, IPAR, NPIX, filename)
