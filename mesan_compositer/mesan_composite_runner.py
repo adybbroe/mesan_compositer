@@ -99,13 +99,6 @@ from mesan_compositer.prt_nwcsaf_cloudamount import derive_sobs as derive_sobs_c
 from mesan_compositer.prt_nwcsaf_cloudheight import derive_sobs as derive_sobs_clheight
 
 
-CFG_DIR = os.environ.get('MESAN_COMPOSITE_CONFIG_DIR', './')
-DIST = os.environ.get("SMHI_DIST", None)
-if not DIST or DIST == 'linda4':
-    MODE = 'offline'
-else:
-    MODE = os.environ.get("SMHI_MODE", 'offline')
-
 SENSOR = {'NOAA-19': 'avhrr/3',
           'NOAA-18': 'avhrr/3',
           'NOAA-15': 'avhrr/3',
@@ -470,6 +463,9 @@ def mesan_live_runner():
     """Listens and triggers processing"""
 
     LOG.info("*** Start the runner for the Mesan composite generator:")
+    LOG.debug("os.environ = " + str(os.environ))
+    LOG.debug("DIST = " + str(DIST))
+    LOG.debug("MODE = " + str(MODE))
 
     sema = threading.Semaphore(8)
     listener_q = Queue.Queue()
