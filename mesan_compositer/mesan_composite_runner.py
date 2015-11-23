@@ -200,7 +200,7 @@ class FileListener(threading.Thread):
 
     def run(self):
 
-        with posttroll.subscriber.Subscribe('', ['CF/2', 'NWCSAF/2/HDF5'], True) as subscr:
+        with posttroll.subscriber.Subscribe('', ['CF/2', '2/nwcsaf-msg/0deg/ctth-plax-corrected'], True) as subscr:
 
             for msg in subscr.recv(timeout=90):
                 if not self.loop:
@@ -553,19 +553,21 @@ def mesan_live_runner():
 
             if product == 'CT':
                 LOG.debug("Product is CT")
-                t__ = threading.Thread(target=ctype_composite_worker, args=(sema, scene,
-                                                                            jobs_dict[
-                                                                                keyname],
-                                                                            publisher_q))
+                t__ = threading.Thread(target=ctype_composite_worker,
+                                       args=(sema, scene,
+                                             jobs_dict[
+                                                 keyname],
+                                             publisher_q))
                 threads.append(t__)
                 t__.start()
 
             elif product == 'CTTH':
                 LOG.debug("Product is CTTH")
-                t_clheight = threading.Thread(target=ctth_composite_worker, args=(sema, scene,
-                                                                                  jobs_dict[
-                                                                                      keyname],
-                                                                                  publisher_q))
+                t_clheight = threading.Thread(target=ctth_composite_worker,
+                                              args=(sema, scene,
+                                                    jobs_dict[
+                                                        keyname],
+                                                    publisher_q))
                 threads.append(t_clheight)
                 t_clheight.start()
 
