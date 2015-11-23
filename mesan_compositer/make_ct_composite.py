@@ -45,11 +45,12 @@ import sys
 import os
 
 CFG_DIR = os.environ.get('MESAN_COMPOSITE_CONFIG_DIR', './')
-DIST = os.environ.get("SMHI_DIST", None)
+DIST = os.environ.get("SMHI_DIST", 'elin4')
 if not DIST or DIST == 'linda4':
     MODE = 'offline'
 else:
     MODE = os.environ.get("SMHI_MODE", 'offline')
+
 
 METOPS = ['metop02', 'metop01']
 
