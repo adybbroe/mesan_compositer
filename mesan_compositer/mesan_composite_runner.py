@@ -33,7 +33,7 @@ LOG = logging.getLogger(__name__)
 
 CFG_DIR = os.environ.get('MESAN_COMPOSITE_CONFIG_DIR', './')
 DIST = os.environ.get("SMHI_DIST", 'elin4')
-#print("os.environ = " + str(os.environ))
+print("os.environ = " + str(os.environ))
 if not DIST or DIST == 'linda4':
     MODE = 'offline'
 else:
@@ -41,14 +41,14 @@ else:
 
 CONF = ConfigParser.ConfigParser()
 CFG_FILE = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
-#print("Config file = " + str(CFG_FILE))
+print("Config file = " + str(CFG_FILE))
 LOG.debug("Config file = " + str(CFG_FILE))
 if not os.path.exists(CFG_FILE):
     raise IOError('Config file %s does not exist!' % CFG_FILE)
 
 
 CONF.read(CFG_FILE)
-#print("CONF.items = " + str(CONF.items(MODE, raw=True)))
+print("CONF.items = " + str(CONF.items(MODE, raw=True)))
 
 OPTIONS = {}
 for option, value in CONF.items(MODE, raw=True):
@@ -200,7 +200,9 @@ class FileListener(threading.Thread):
 
     def run(self):
 
-        with posttroll.subscriber.Subscribe('', ['CF/2', '2/nwcsaf-msg/0deg/ctth-plax-corrected', '2/nwcsaf-msg/0deg/ct-plax-corrected'], True) as subscr:
+        with posttroll.subscriber.Subscribe('', ['CF/2',
+                                                 '2/nwcsaf-msg/0deg/ctth-plax-corrected',
+                                                 '2/nwcsaf-msg/0deg/ct-plax-corrected'], True) as subscr:
 
             for msg in subscr.recv(timeout=90):
                 if not self.loop:
@@ -365,20 +367,21 @@ def ctype_composite_worker(semaphore_obj, scene, job_id, publish_q):
     """Spawn/Start a Mesan composite generation on a new thread if available"""
 
     try:
-        LOG.debug("Waiting for acquired semaphore...")
+        LOG.debug("Ctype: Waiting for acquired semaphore...")
         with semaphore_obj:
-            LOG.debug("Acquired semaphore")
+            LOG.debug("Ctype: Acquired semaphore")
 
             # Get the time of analysis from start and end times:
             time_of_analysis = get_analysis_time(
                 scene['starttime'], scene['endtime'])
             delta_t = timedelta(minutes=TIME_WINDOW)
 
-            LOG.info("Make composite for area id = " + str(MESAN_AREA_ID))
+            LOG.info(
+                "Make ctype composite for area id = " + str(MESAN_AREA_ID))
             ctcomp = mcc.ctCompositer(time_of_analysis, delta_t, MESAN_AREA_ID)
             ctcomp.get_catalogue()
             if not ctcomp.make_composite():
-                LOG.error("Failed creating composite...")
+                LOG.error("Failed creating ctype composite...")
             else:
                 ctcomp.write()
                 ctcomp.make_quicklooks()
