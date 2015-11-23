@@ -200,7 +200,7 @@ class FileListener(threading.Thread):
 
     def run(self):
 
-        with posttroll.subscriber.Subscribe('', ['CF/2', '2/nwcsaf-msg/0deg/ctth-plax-corrected'], True) as subscr:
+        with posttroll.subscriber.Subscribe('', ['CF/2', '2/nwcsaf-msg/0deg/ctth-plax-corrected', '2/nwcsaf-msg/0deg/ct-plax-corrected'], True) as subscr:
 
             for msg in subscr.recv(timeout=90):
                 if not self.loop:
