@@ -217,7 +217,10 @@ def derive_sobs(ct_comp, ipar, npix, resultfile):
     so_lon = lon[np.ix_(ly, lx)]
     so_lat = lat[np.ix_(ly, lx)]
 
+    LOG.debug("Superobservation grid size: %d,%d", len(ly), len(lx))
+    LOG.debug("dlen = %d", dlen)
     so_tot = 0
+    so_rejected = 0
     for iy in range(len(ly)):
         for ix in range(len(lx)):
             # super ob domain is: ix-dlen:ix+dlen-1, iy-dlen:iy+dlen-1
@@ -260,8 +263,11 @@ def derive_sobs(ct_comp, ipar, npix, resultfile):
                      so_cloud, SDcc)
                 fpt.write(result)
                 so_tot += 1
+            else:
+                so_rejected = so_rejected + 1
 
     LOG.info('\tCreated %d superobservations', so_tot)
+    LOG.debug('\t%d superobservations rejected', so_rejected)
     fpt.close()
 
     now = datetime.utcnow()

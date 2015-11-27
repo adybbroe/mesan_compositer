@@ -139,8 +139,8 @@ def cloudtop(so_CTH, so_w, so_flg, num_of_datapoints):
         top = 0
         sd = 0
 
-    LOG.debug('wsmax=%.3f, top=%.1f, fopaque=%.3f, q=%f, nfound=%d',
-              wsmax, top, fopaque, q, nfound)
+    # LOG.debug('wsmax=%.3f, top=%.1f, fopaque=%.3f, q=%f, nfound=%d',
+    #          wsmax, top, fopaque, q, nfound)
     return top, sd
 
 
