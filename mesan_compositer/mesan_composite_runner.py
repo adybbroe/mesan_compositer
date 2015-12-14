@@ -82,8 +82,11 @@ from urlparse import urlparse
 import posttroll.subscriber
 from posttroll.publisher import Publish
 from posttroll.message import Message
+
+from multiprocessing import Pool, Manager
 import threading
-import Queue
+from Queue import Empty
+
 from datetime import timedelta, datetime
 from mesan_compositer.composite_tools import get_analysis_time
 from mesan_compositer import make_ct_composite as mcc
@@ -349,91 +352,37 @@ def ready2run(msg, files4comp, job_register, sceneid, product='CT'):
     return True
 
 
-def ctype_composite_worker(semaphore_obj, scene, job_id, publish_q):
+def ctype_composite_worker(scene, job_id, publish_q):
     """Spawn/Start a Mesan composite generation on a new thread if available"""
 
     try:
-        LOG.debug("Ctype: Waiting for acquired semaphore...")
-        with semaphore_obj:
-            LOG.debug("Ctype: Acquired semaphore")
+        LOG.debug("Ctype: Start compositer...")
+        # Get the time of analysis from start and end times:
+        time_of_analysis = get_analysis_time(
+            scene['starttime'], scene['endtime'])
+        delta_t = timedelta(minutes=TIME_WINDOW)
 
-            # Get the time of analysis from start and end times:
-            time_of_analysis = get_analysis_time(
-                scene['starttime'], scene['endtime'])
-            delta_t = timedelta(minutes=TIME_WINDOW)
-
-            LOG.info(
-                "Make ctype composite for area id = " + str(MESAN_AREA_ID))
-            ctcomp = mcc.ctCompositer(time_of_analysis, delta_t, MESAN_AREA_ID)
-            ctcomp.get_catalogue()
-            if not ctcomp.make_composite():
-                LOG.error("Failed creating ctype composite...")
-            else:
-                ctcomp.write()
-                ctcomp.make_quicklooks()
-
-                # Make Super observations:
-                LOG.info("Make Cloud Type super observations")
-
-                values = {"area": MESAN_AREA_ID, }
-                bname = time_of_analysis.strftime(
-                    OPTIONS['cloudamount_filename']) % values
-                path = OPTIONS['composite_output_dir']
-                filename = os.path.join(path, bname + '.dat')
-                derive_sobs_clamount(ctcomp.composite, IPAR, NPIX, filename)
-
-                result_file = ctcomp.filename
-
-                pubmsg = create_message(result_file, scene)
-                LOG.info("Sending: " + str(pubmsg))
-                publish_q.put(pubmsg)
-
-                if isinstance(job_id, datetime):
-                    dt_ = datetime.utcnow() - job_id
-                    LOG.info("Ctype composite scene " + str(job_id) +
-                             " finished. It took: " + str(dt_))
-                else:
-                    LOG.warning(
-                        "Job entry is not a datetime instance: " + str(job_id))
-
-    except:
-        LOG.exception('Failed in ctype_composite_worker...')
-        raise
-
-
-def ctth_composite_worker(semaphore_obj, scene, job_id, publish_q):
-    """Spawn/Start a Mesan cloud height composite generation on a new thread if
-    available"""
-
-    try:
-        LOG.debug("CTTH compositer: Waiting for acquired semaphore...")
-        with semaphore_obj:
-            LOG.debug("CTTH compositer: Acquired semaphore")
-
-            # Get the time of analysis from start and end times:
-            time_of_analysis = get_analysis_time(
-                scene['starttime'], scene['endtime'])
-            delta_t = timedelta(minutes=TIME_WINDOW)
-
-            LOG.info(
-                "Make cloud height composite for area id = " + str(MESAN_AREA_ID))
-            ctth_comp = make_ctth_composite.ctthComposite(
-                time_of_analysis, delta_t, MESAN_AREA_ID)
-            ctth_comp.get_catalogue()
-            ctth_comp.make_composite()
-            ctth_comp.write()
+        LOG.info(
+            "Make ctype composite for area id = " + str(MESAN_AREA_ID))
+        ctcomp = mcc.ctCompositer(time_of_analysis, delta_t, MESAN_AREA_ID)
+        ctcomp.get_catalogue()
+        if not ctcomp.make_composite():
+            LOG.error("Failed creating ctype composite...")
+        else:
+            ctcomp.write()
+            ctcomp.make_quicklooks()
 
             # Make Super observations:
+            LOG.info("Make Cloud Type super observations")
+
             values = {"area": MESAN_AREA_ID, }
             bname = time_of_analysis.strftime(
-                OPTIONS['cloudheight_filename']) % values
+                OPTIONS['cloudamount_filename']) % values
             path = OPTIONS['composite_output_dir']
             filename = os.path.join(path, bname + '.dat')
-            LOG.info("Make Cloud Height super observations. Output file = %s",
-                     str(filename))
-            derive_sobs_clheight(ctth_comp.composite, NPIX, filename)
+            derive_sobs_clamount(ctcomp.composite, IPAR, NPIX, filename)
 
-            result_file = ctth_comp.filename
+            result_file = ctcomp.filename
 
             pubmsg = create_message(result_file, scene)
             LOG.info("Sending: " + str(pubmsg))
@@ -441,11 +390,59 @@ def ctth_composite_worker(semaphore_obj, scene, job_id, publish_q):
 
             if isinstance(job_id, datetime):
                 dt_ = datetime.utcnow() - job_id
-                LOG.info("Cloud Height composite scene " + str(job_id) +
+                LOG.info("Ctype composite scene " + str(job_id) +
                          " finished. It took: " + str(dt_))
             else:
                 LOG.warning(
                     "Job entry is not a datetime instance: " + str(job_id))
+
+    except:
+        LOG.exception('Failed in ctype_composite_worker...')
+        raise
+
+
+def ctth_composite_worker(scene, job_id, publish_q):
+    """Spawn/Start a Mesan cloud height composite generation on a new thread if
+    available"""
+
+    try:
+        LOG.debug("CTTH compositer: Start...")
+        # Get the time of analysis from start and end times:
+        time_of_analysis = get_analysis_time(
+            scene['starttime'], scene['endtime'])
+        delta_t = timedelta(minutes=TIME_WINDOW)
+
+        LOG.info(
+            "Make cloud height composite for area id = " + str(MESAN_AREA_ID))
+        ctth_comp = make_ctth_composite.ctthComposite(
+            time_of_analysis, delta_t, MESAN_AREA_ID)
+        ctth_comp.get_catalogue()
+        ctth_comp.make_composite()
+        ctth_comp.write()
+
+        # Make Super observations:
+        values = {"area": MESAN_AREA_ID, }
+        bname = time_of_analysis.strftime(
+            OPTIONS['cloudheight_filename']) % values
+        path = OPTIONS['composite_output_dir']
+        filename = os.path.join(path, bname + '.dat')
+        LOG.info("Make Cloud Height super observations. Output file = %s",
+                 str(filename))
+        derive_sobs_clheight(ctth_comp.composite, NPIX, filename)
+
+        result_file = ctth_comp.filename
+
+        pubmsg = create_message(result_file, scene)
+        LOG.info("Sending: " + str(pubmsg))
+        publish_q.put(pubmsg)
+
+        if isinstance(job_id, datetime):
+            dt_ = datetime.utcnow() - job_id
+            LOG.info("Cloud Height composite scene " + str(job_id) +
+                     " finished. It took: " + str(dt_))
+        else:
+            LOG.warning(
+                "Job entry is not a datetime instance: " + str(job_id))
 
     except:
         LOG.exception('Failed in ctth_composite_worker...')
@@ -461,9 +458,10 @@ def mesan_live_runner():
     LOG.debug("MODE = " + str(MODE))
     LOG.debug("Number of pixels = " + str(NPIX))
 
-    sema = threading.Semaphore(8)
-    listener_q = Queue.Queue()
-    publisher_q = Queue.Queue()
+    pool = Pool(processes=6, maxtasksperchild=1)
+    manager = Manager()
+    listener_q = manager.Queue()
+    publisher_q = manager.Queue()
 
     pub_thread = FilePublisher(publisher_q)
     pub_thread.start()
@@ -471,13 +469,12 @@ def mesan_live_runner():
     listen_thread.start()
 
     composite_files = {}
-    threads = []
     jobs_dict = {}
     while True:
 
         try:
             msg = listener_q.get()
-        except Queue.Empty:
+        except Empty:
             LOG.debug("Empty listener queue...")
             continue
 
@@ -546,23 +543,19 @@ def mesan_live_runner():
 
             if product == 'CT':
                 LOG.debug("Product is CT")
-                t__ = threading.Thread(target=ctype_composite_worker,
-                                       args=(sema, scene,
-                                             jobs_dict[
-                                                 keyname],
-                                             publisher_q))
-                threads.append(t__)
-                t__.start()
+                pool.apply_async(ctype_composite_worker,
+                                 (scene,
+                                  jobs_dict[
+                                      keyname],
+                                  publisher_q))
 
             elif product == 'CTTH':
                 LOG.debug("Product is CTTH")
-                t_clheight = threading.Thread(target=ctth_composite_worker,
-                                              args=(sema, scene,
-                                                    jobs_dict[
-                                                        keyname],
-                                                    publisher_q))
-                threads.append(t_clheight)
-                t_clheight.start()
+                pool.apply_async(ctth_composite_worker,
+                                 (scene,
+                                  jobs_dict[
+                                      keyname],
+                                  publisher_q))
 
             else:
                 LOG.warning("Product %s not supported!", str(product))
@@ -573,15 +566,8 @@ def mesan_live_runner():
                 5 * 60.0, reset_job_registry, args=(jobs_dict, keyname))
             thread_job_registry.start()
 
-    LOG.info("Wait till all threads are dead...")
-    while True:
-        workers_ready = True
-        for thread in threads:
-            if thread.is_alive():
-                workers_ready = False
-
-        if workers_ready:
-            break
+    pool.close()
+    pool.join()
 
     pub_thread.stop()
     listen_thread.stop()
