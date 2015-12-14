@@ -191,8 +191,7 @@ class mesanComposite(object):
         msg_list = glob(
             os.path.join(msg_dir, '*_' + str(prodn) + '*' + str(ext)))
         self.msg_scenes = get_msglist(msg_list, self.time_window,
-                                      self.msg_areaname,
-                                      satellites=self.msg_satellites)
+                                      self.msg_areaname)  # satellites=self.msg_satellites)
 
 
 class ctthComposite(mesanComposite):

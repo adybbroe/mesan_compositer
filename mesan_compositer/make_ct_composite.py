@@ -216,8 +216,7 @@ class ctCompositer(object):
                  str(self.time_window[0]) + " - " +
                  str(self.time_window[1]))
         self.msg_scenes = get_msglist(msg_list, self.time_window,
-                                      self.msg_areaname,
-                                      satellites=self.msg_satellites)
+                                      self.msg_areaname)  # satellites=self.msg_satellites)
         LOG.info(str(len(self.msg_scenes)) + " MSG scenes located")
         for scene in self.msg_scenes:
             LOG.debug("Scene:\n" + str(scene))
