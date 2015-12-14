@@ -215,7 +215,7 @@ def make_dataset_ct(h5f, ppsobj):
     cloudtype.attrs['CLASS'] = np.string_("IMAGE")
     cloudtype.attrs['IMAGE_VERSION'] = np.string_("1.2")
     #cloudtype.attrs['PALETTE'] = h5f['PALETTE'].ref
-    cloudtype.attrs['description'] = "Cloud type classification"
+    cloudtype.attrs['description'] = np.string_("Cloud type classification")
 
 
 def make_dataset_pc(h5f, ppsobj):
@@ -309,7 +309,7 @@ def make_flags_ct(h5f, ppsobj):
     qualityflags[...] = oldflags
 
     qualityflags.attrs[
-        'description'] = "Bitwise quality or AVHRR Processing flag"
+        'description'] = np.string_("Bitwise quality or AVHRR Processing flag")
     qualityflags.attrs[
         "output_value_namelist"] = old_processing_flag_palette('cloudtype')
 
@@ -330,7 +330,7 @@ def make_flags_ctth(h5f, ppsobj):
     qualityflags[...] = oldflags
 
     qualityflags.attrs[
-        'description'] = "16 bit Processing flag"
+        'description'] = np.string_("16 bit Processing flag")
     qualityflags.attrs[
         "output_value_namelist"] = old_processing_flag_palette('ctth')
 
