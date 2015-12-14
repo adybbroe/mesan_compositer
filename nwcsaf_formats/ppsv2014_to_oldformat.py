@@ -49,18 +49,18 @@ def write_product(ppsobj, filename):
 
     h5f = h5py.File(filename, 'w')
     try:
-        h5f.attrs['description'] = str(ppsobj.mda['title'])
+        h5f.attrs['description'] = np.string_(ppsobj.mda['title'])
     except KeyError:
-        h5f.attrs['description'] = ppsobj.mda['description']
+        h5f.attrs['description'] = np.string_(ppsobj.mda['description'])
     try:
         h5f.attrs['orbit_number'] = np.int32(ppsobj.mda['orbit_number'])
     except KeyError:
         h5f.attrs['orbit_number'] = np.int32(ppsobj.mda['orbit'])
 
     try:
-        h5f.attrs['satellite_id'] = str(ppsobj.mda['platform'])
+        h5f.attrs['satellite_id'] = np.string_(ppsobj.mda['platform'])
     except KeyError:
-        h5f.attrs['satellite_id'] = str(ppsobj.mda['satellite'])
+        h5f.attrs['satellite_id'] = np.string_(ppsobj.mda['satellite'])
 
     try:
         dtobj = datetime.strptime(ppsobj.mda['time_coverage_start'][:-2],
@@ -70,9 +70,9 @@ def write_product(ppsobj, filename):
     h5f.attrs['sec_1970'] = time.mktime(dtobj.timetuple())
 
     try:
-        h5f.attrs['version'] = str(ppsobj.mda['source'])
+        h5f.attrs['version'] = np.string_(ppsobj.mda['source'])
     except KeyError:
-        h5f.attrs['version'] = ppsobj.mda['version']
+        h5f.attrs['version'] = np.string_(ppsobj.mda['version'])
 
     # Create the region data:
     comp_type = np.dtype([('area_extent', 'f8', (4,)),
@@ -215,7 +215,7 @@ def make_dataset_ct(h5f, ppsobj):
     cloudtype.attrs['CLASS'] = np.string_("IMAGE")
     cloudtype.attrs['IMAGE_VERSION'] = np.string_("1.2")
     #cloudtype.attrs['PALETTE'] = h5f['PALETTE'].ref
-    cloudtype.attrs['description'] = "Cloud type classification"
+    cloudtype.attrs['description'] = np.string_("Cloud type classification")
 
 
 def make_dataset_pc(h5f, ppsobj):
@@ -309,7 +309,7 @@ def make_flags_ct(h5f, ppsobj):
     qualityflags[...] = oldflags
 
     qualityflags.attrs[
-        'description'] = "Bitwise quality or AVHRR Processing flag"
+        'description'] = np.string_("Bitwise quality or AVHRR Processing flag")
     qualityflags.attrs[
         "output_value_namelist"] = old_processing_flag_palette('cloudtype')
 
@@ -330,7 +330,7 @@ def make_flags_ctth(h5f, ppsobj):
     qualityflags[...] = oldflags
 
     qualityflags.attrs[
-        'description'] = "16 bit Processing flag"
+        'description'] = np.string_("16 bit Processing flag")
     qualityflags.attrs[
         "output_value_namelist"] = old_processing_flag_palette('ctth')
 
