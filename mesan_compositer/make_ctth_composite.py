@@ -94,7 +94,8 @@ def ctth_pps(pps, areaid):
     global_data = PolarFactory.create_scene(pps.platform_name, "",
                                             SENSOR.get(
                                                 pps.platform_name, 'avhrr'),
-                                            pps.timeslot, pps.orbit)
+                                            pps.timeslot, pps.orbit,
+                                            variant="DR")
     try:
         global_data.load(['CTTH'], filename=pps.uri)
     except AttributeError:
