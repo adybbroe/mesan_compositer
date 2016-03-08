@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2015 Adam.Dybbroe
+# Copyright (c) 2014, 2015, 2016 Adam.Dybbroe
 
 # Author(s):
 
@@ -88,7 +88,7 @@ for option, value in conf.items(MODE, raw=True):
 _MESAN_LOG_FILE = OPTIONS.get('mesan_log_file', None)
 
 
-def ctth_pps(pps, areaid='mesanX'):
+def ctth_pps(pps, areaid):
     """Load PPS CTTH and reproject"""
     from mpop.satellites import PolarFactory
     global_data = PolarFactory.create_scene(pps.platform_name, "",
@@ -106,7 +106,7 @@ def ctth_pps(pps, areaid='mesanX'):
                                ' and product cannot be projected')
 
 
-def ctth_msg(msg, areaid='mesanX'):
+def ctth_msg(msg, areaid):
     """Load MSG paralax corrected ctth and reproject"""
     from mpop.satellites import GeostationaryFactory
 
@@ -235,6 +235,7 @@ class ctthComposite(mesanComposite):
         self.polar_satellites = options['polar_satellites'].split(',')
         self.msg_satellites = options['msg_satellites'].split(',')
         self.msg_areaname = options['msg_areaname']
+        self.areaid = areaid
 
         self.product_names = {'msg': 'CTTH', 'pps': 'CTTH'}
         self.composite = ncCTTHComposite()
@@ -260,7 +261,7 @@ class ctthComposite(mesanComposite):
             if (scene.platform_name.startswith("Meteosat") and
                     not hasattr(scene, 'orbit')):
                 is_MSG = True
-                x_local = ctth_msg(scene)
+                x_local = ctth_msg(scene, self.areaid)
                 dummy, lat = x_local.area.get_lonlats()
                 x_temperature = x_local['CTTH'].temperature
                 x_pressure = x_local['CTTH'].pressure
@@ -276,7 +277,7 @@ class ctthComposite(mesanComposite):
             else:
                 is_MSG = False
                 try:
-                    x_local = ctth_pps(scene)
+                    x_local = ctth_pps(scene, self.areaid)
                 except (ProjectException, LoadException) as err:
                     LOG.warning("Couldn't load pps scene:\n" + str(scene))
                     LOG.warning("Exception was: " + str(err))

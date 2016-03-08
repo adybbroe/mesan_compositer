@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2015 Adam.Dybbroe
+# Copyright (c) 2014, 2015, 2016 Adam.Dybbroe
 
 # Author(s):
 
@@ -91,7 +91,7 @@ for opt, val in CONF.items(MODE, raw=True):
 _MESAN_LOG_FILE = OPTIONS.get('mesan_log_file', None)
 
 
-def ctype_pps(pps, areaid='mesanX'):
+def ctype_pps(pps, areaid):
     """Load PPS Cloudtype and reproject"""
     from mpop.satellites import PolarFactory
     global_data = PolarFactory.create_scene(pps.platform_name, '',
@@ -110,7 +110,7 @@ def ctype_pps(pps, areaid='mesanX'):
                                ' and product cannot be projected')
 
 
-def ctype_msg(msg, areaid='mesanX'):
+def ctype_msg(msg, areaid):
     """Load MSG paralax corrected cloud type and reproject"""
     from mpop.satellites import GeostationaryFactory
 
@@ -245,7 +245,7 @@ class ctCompositer(object):
             if (scene.platform_name.startswith("Meteosat") and
                     not hasattr(scene, 'orbit')):
                 is_MSG = True
-                x_local = ctype_msg(scene)
+                x_local = ctype_msg(scene, self.areaid)
                 dummy, lat = x_local.area.get_lonlats()
                 x_CT = x_local['CloudType_plax'].cloudtype
                 # convert msg flags to pps
@@ -255,7 +255,7 @@ class ctCompositer(object):
             else:
                 is_MSG = False
                 try:
-                    x_local = ctype_pps(scene)
+                    x_local = ctype_pps(scene, self.areaid)
                 except (ProjectException, LoadException) as err:
                     LOG.warning("Couldn't load pps scene:\n" + str(scene))
                     LOG.warning("Exception was: " + str(err))
