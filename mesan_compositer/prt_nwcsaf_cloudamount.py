@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2015 Adam.Dybbroe
+# Copyright (c) 2014, 2015, 2016 Adam.Dybbroe
 
 # Author(s):
 
@@ -258,7 +258,7 @@ def derive_sobs(ct_comp, ipar, npix, resultfile):
                     cortyp = 1  # is this correct ???
                 #
                 # -999: no stn number, -60: satellite data */
-                result = '%8d%7.2f%7.2f%5d %2.2d %2.2d %8.2f %8.2f\n' % \
+                result = '%8d %7.2f %7.2f %5d %2.2d %2.2d %8.2f %8.2f\n' % \
                     (99999, so_lat[iy, ix], so_lon[iy, ix], -999, cortyp, -60,
                      so_cloud, SDcc)
                 fpt.write(result)
