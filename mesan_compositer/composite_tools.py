@@ -41,14 +41,22 @@ METEOSAT = {'MSG1': 'Meteosat-8',
 TERRA_AQUA_NAMES = {'eos1': 'EOS-Terra',
                     'eos2': 'EOS-Aqua'}
 
-PLATFORM_NAME = {'Suomi-NPP': 'npp',
-                 'EOS-Terra': 'eos1',
-                 'EOS-Aqua': 'eos2',
-                 'Metop-A': 'metop02',
-                 'Metop-B': 'metop01',
-                 'NOAA-18': 'noaa18',
-                 'NOAA-15': 'noaa15',
-                 'NOAA-19': 'noaa19'}
+PLATFORM_NAME_INV = {'Suomi-NPP': 'npp',
+                     'EOS-Terra': 'eos1',
+                     'EOS-Aqua': 'eos2',
+                     'Metop-A': 'metopa',
+                     'Metop-B': 'metopb',
+                     'NOAA-18': 'noaa18',
+                     'NOAA-15': 'noaa15',
+                     'NOAA-19': 'noaa19'}
+PLATFORM_NAME = {'npp': 'Suomi-NPP',
+                 'eos1': 'EOS-Terra',
+                 'eos2': 'EOS-Aqua',
+                 'metopa': 'Metop-A',
+                 'metopb': 'Metop-B',
+                 'noaa18': 'NOAA-18',
+                 'noaa15': 'NOAA-15',
+                 'noaa19': 'NOAA-19'}
 
 from mesan_compositer.pps_msg_conversions import get_bit_from_flags
 
@@ -127,16 +135,8 @@ def get_ppslist(filelist, timewindow, product="CT", satellites=None, variant=Non
         geofilename = filename.replace(product, 'CMA')
         orbit = bnsplit[4]
         timeslot = datetime.strptime(bnsplit[5], '%Y%m%dT%H%M%S%fZ')
-        if sat.startswith('npp'):
-            platform_name = 'Suomi-NPP'
-        elif sat.startswith('noaa'):
-            platform_name = 'NOAA-' + sat.split('noaa')[1]
-        elif sat.startswith('metop'):
-            platform_name = 'Metop-' + sat.split('metop')[1].upper()
-        elif sat.startswith('eos'):
-            satid = 'eos' + sat.split('eos')[1]
-            platform_name = TERRA_AQUA_NAMES.get(satid, satid)
-        else:
+        platform_name = PLATFORM_NAME.get(sat)
+        if not platform_name:
             raise IOError("Error: satellite %s not supported!" % sat)
 
         # Now filter out all passes outside time window:
