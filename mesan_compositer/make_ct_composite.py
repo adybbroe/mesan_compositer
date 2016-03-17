@@ -22,7 +22,6 @@
 
 """Make a Cloud Type composite
 """
-
 import argparse
 from datetime import datetime, timedelta
 import numpy as np
@@ -160,8 +159,8 @@ class ctCompositer(object):
         self.time_window = (obstime - tdiff, obstime + tdiff)
         LOG.debug("Time window: " + str(self.time_window[0]) +
                   " - " + str(self.time_window[1]))
-        self.polar_satellites = options['polar_satellites'].split(',')
-        self.msg_satellites = options['msg_satellites'].split(',')
+        self.polar_satellites = options['polar_satellites'].split()
+        self.msg_satellites = options['msg_satellites'].split()
         self.msg_areaname = options['msg_areaname']
         self.areaid = areaid
         self.longitude = None
