@@ -41,14 +41,14 @@ METEOSAT = {'MSG1': 'Meteosat-8',
 TERRA_AQUA_NAMES = {'eos1': 'EOS-Terra',
                     'eos2': 'EOS-Aqua'}
 
-PLATFORM_NAME = {'npp': 'Suomi-NPP',
-                 'eos1': 'EOS-Terra',
-                 'eos2': 'EOS-Aqua',
-                 'metop02': 'Metop-A',
-                 'metop01': 'Metop-B',
-                 'noaa18': 'NOAA-18',
-                 'noaa15': 'NOAA-15',
-                 'noaa19': 'NOAA-19'}
+PLATFORM_NAME = {'Suomi-NPP': 'npp',
+                 'EOS-Terra': 'eos1',
+                 'EOS-Aqua': 'eos2',
+                 'Metop-A': 'metop02',
+                 'Metop-B': 'metop01',
+                 'NOAA-18': 'noaa18',
+                 'NOAA-15': 'noaa15',
+                 'NOAA-19': 'noaa19'}
 
 from mesan_compositer.pps_msg_conversions import get_bit_from_flags
 
