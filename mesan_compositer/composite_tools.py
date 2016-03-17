@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2015 Adam.Dybbroe
+# Copyright (c) 2014, 2015, 2016 Adam.Dybbroe
 
 # Author(s):
 
@@ -40,6 +40,15 @@ METEOSAT = {'MSG1': 'Meteosat-8',
 
 TERRA_AQUA_NAMES = {'eos1': 'EOS-Terra',
                     'eos2': 'EOS-Aqua'}
+
+PLATFORM_NAME = {'npp': 'Suomi-NPP',
+                 'eos1': 'EOS-Terra',
+                 'eos2': 'EOS-Aqua',
+                 'metop02': 'Metop-A',
+                 'metop01': 'Metop-B',
+                 'noaa18': 'NOAA-18',
+                 'noaa15': 'NOAA-15',
+                 'noaa19': 'NOAA-19'}
 
 from mesan_compositer.pps_msg_conversions import get_bit_from_flags
 
@@ -112,7 +121,7 @@ def get_ppslist(filelist, timewindow, product="CT", satellites=None, variant=Non
         bname = os.path.basename(filename)
         bnsplit = bname.split('_')
         sat = bnsplit[3]
-        if satellites and sat not in satellites:
+        if satellites and PLATFORM_NAME.get(sat, sat) not in satellites:
             continue
 
         geofilename = filename.replace(product, 'CMA')
