@@ -94,7 +94,6 @@ from mesan_compositer import make_ctth_composite
 from mesan_compositer.prt_nwcsaf_cloudamount import derive_sobs as derive_sobs_clamount
 from mesan_compositer.prt_nwcsaf_cloudheight import derive_sobs as derive_sobs_clheight
 
-
 SENSOR = {'NOAA-19': 'avhrr/3',
           'NOAA-18': 'avhrr/3',
           'NOAA-15': 'avhrr/3',
@@ -104,9 +103,11 @@ SENSOR = {'NOAA-19': 'avhrr/3',
           'EOS-Terra': 'modis',
           'EOS-Aqua': 'modis',
           'Suomi-NPP': 'viirs',
-          'JPSS-1': 'viirs'}
+          'NOAA-20': 'viirs'}
 
-POLAR_SATELLITES = SENSOR.keys()
+POLSATS_STR = OPTIONS.get('polar_satellites')
+POLAR_SATELLITES = POLSATS_STR.split()
+
 
 GEO_SATS = ['Meteosat-10', 'Meteosat-9', 'Meteosat-8', 'Meteosat-11', ]
 MSG_NAME = {'Meteosat-10': 'MSG3', 'Meteosat-9': 'MSG2',
