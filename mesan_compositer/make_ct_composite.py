@@ -195,8 +195,10 @@ class ctCompositer(object):
         LOG.info("Number of direct readout pps cloudtype files in dir: " +
                  str(len(dr_list)))
         if len(dr_list) <= MIN_NUM_OF_PPS_DR_FILES:
-            LOG.critical("Too few PPS DR files found! (<=%d)\n" +
-                         "pps_dr_dir = %s", len(dr_list), str(pps_dr_dir))
+            LOG.critical("Too few PPS DR files found! (%d<=%d)\n" +
+                         "pps_dr_dir = %s",
+                         len(dr_list), MIN_NUM_OF_PPS_DR_FILES,
+                         str(pps_dr_dir))
         ppsdr = get_ppslist(dr_list, self.time_window,
                             satellites=self.polar_satellites)
 

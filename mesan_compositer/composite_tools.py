@@ -152,6 +152,8 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
 
     plist = []
     files_old = True
+    latest_file = None
+    latest_file_time = datetime(1970, 1, 1)
     for filename in filelist:
         bname = os.path.basename(filename)
         res = prod_p.parse(bname)
@@ -163,6 +165,9 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
         geofilename = filename.replace(product, 'CMA')
         orbit = '%05d' % res['orbit']
         timeslot = res['start_time']
+        if timeslot > latest_file_time:
+            latest_file_time = timeslot
+            latest_file = filename
         platform_name = PLATFORM_NAME.get(sat)
         if not platform_name:
             raise IOError("Error: satellite %s not supported!" % sat)
@@ -180,9 +185,11 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
         elif (timewindow[0] - timeslot) < timedelta(seconds=3600 * 4):
             files_old = False
 
-    if files_old:
-        LOG.critical("No fresh pps products found!\n" +
-                     "latest file is more than 4 hours from time-window\n")
+    if files_old and latest_file > 0:
+        LOG.critical("No fresh pps products found - " +
+                     "most recent = %s (obs-time = %s)\n" +
+                     "Latest file is more than 4 hours from time-window\n",
+                     os.path.basename(latest_file), str(latest_file_time))
 
     return plist
 
