@@ -147,7 +147,6 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
     """Get the full list of metadata keys for all pps passes in the *filelist*,
     but only for the satellites specified in the list *satellites* if given"""
 
-    from datetime import timedelta
     from trollsift import Parser
     prod_p = Parser(pps_filename)
 
@@ -162,7 +161,7 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
 
         product = res['product']
         geofilename = filename.replace(product, 'CMA')
-        orbit = res['orbit']
+        orbit = '%05d' % res['orbit']
         timeslot = res['start_time']
         platform_name = PLATFORM_NAME.get(sat)
         if not platform_name:
