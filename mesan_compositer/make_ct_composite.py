@@ -87,7 +87,7 @@ OPTIONS = {}
 for opt, val in CONF.items(MODE, raw=True):
     OPTIONS[opt] = val
 
-MIN_NUM_OF_PPS_DR_FILES = OPTIONS.get('min_num_of_pps_dr_files', 0)
+MIN_NUM_OF_PPS_DR_FILES = int(OPTIONS.get('min_num_of_pps_dr_files', '0'))
 
 _MESAN_LOG_FILE = OPTIONS.get('mesan_log_file', None)
 
