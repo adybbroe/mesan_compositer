@@ -586,7 +586,7 @@ def mesan_live_runner():
 
 
 if __name__ == "__main__":
-
+    from logging import handlers
     handler = logging.StreamHandler(sys.stderr)
 
     handler.setLevel(logging.DEBUG)
