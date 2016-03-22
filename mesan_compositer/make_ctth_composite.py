@@ -165,11 +165,11 @@ class mesanComposite(object):
         prodn = self.product_names['pps']
         dr_list = glob(
             os.path.join(pps_dr_dir, 'S_NWC_' + str(prodn) + '*.nc'))
-        ppsdr = get_ppslist(dr_list, self.time_window, product=prodn,
+        ppsdr = get_ppslist(dr_list, self.time_window,
                             satellites=self.polar_satellites)
 
         now = datetime.utcnow()
-        gds_list = glob(os.path.join(pps_gds_dir, '*' + str(prodn) + '*.h5'))
+        gds_list = glob(os.path.join(pps_gds_dir, '*' + str(prodn) + '*.nc'))
         LOG.info("Number of Metop GDS files in dir: " + str(len(gds_list)))
         ppsgds = get_ppslist(gds_list, self.time_window,
                              satellites=METOPS, variant='global')

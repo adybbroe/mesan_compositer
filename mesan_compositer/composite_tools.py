@@ -61,6 +61,29 @@ PLATFORM_NAME = {'npp': 'Suomi-NPP',
 from mesan_compositer.pps_msg_conversions import get_bit_from_flags
 
 
+CFG_DIR = os.environ.get('MESAN_COMPOSITE_CONFIG_DIR', './')
+DIST = os.environ.get("SMHI_DIST", 'elin4')
+if not DIST or DIST == 'linda4':
+    MODE = 'offline'
+else:
+    MODE = os.environ.get("SMHI_MODE", 'offline')
+
+
+import ConfigParser
+
+CONF = ConfigParser.ConfigParser()
+CONFIGFILE = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
+if not os.path.exists(CONFIGFILE):
+    raise IOError('Config file %s does not exist!' % CONFIGFILE)
+CONF.read(CONFIGFILE)
+
+OPTIONS = {}
+for opt, val in CONF.items(MODE, raw=True):
+    OPTIONS[opt] = val
+
+pps_filename = OPTIONS['pps_filename']
+
+
 class PpsMetaData(object):
 
     """Container for the metadata defining the pps scenes"""
@@ -120,21 +143,27 @@ def get_analysis_time(start_t, end_t):
         mean_time.year, mean_time.month, mean_time.day, mean_time.hour, 0, 0)
 
 
-def get_ppslist(filelist, timewindow, product="CT", satellites=None, variant=None):
+def get_ppslist(filelist, timewindow, satellites=None, variant=None):
     """Get the full list of metadata keys for all pps passes in the *filelist*,
     but only for the satellites specified in the list *satellites* if given"""
 
+    from datetime import timedelta
+    from trollsift import Parser
+    prod_p = Parser(pps_filename)
+
     plist = []
+    files_old = True
     for filename in filelist:
         bname = os.path.basename(filename)
-        bnsplit = bname.split('_')
-        sat = bnsplit[3]
+        res = prod_p.parse(bname)
+        sat = res['platform_name']
         if satellites and PLATFORM_NAME.get(sat, sat) not in satellites:
             continue
 
+        product = res['product']
         geofilename = filename.replace(product, 'CMA')
-        orbit = bnsplit[4]
-        timeslot = datetime.strptime(bnsplit[5], '%Y%m%dT%H%M%S%fZ')
+        orbit = res['orbit']
+        timeslot = res['start_time']
         platform_name = PLATFORM_NAME.get(sat)
         if not platform_name:
             raise IOError("Error: satellite %s not supported!" % sat)
@@ -148,6 +177,13 @@ def get_ppslist(filelist, timewindow, product="CT", satellites=None, variant=Non
                                      orbit=orbit, timeslot=timeslot,
                                      platform_name=platform_name,
                                      variant=variant))
+            files_old = False
+        elif (timewindow[0] - timeslot) < timedelta(seconds=3600 * 4):
+            files_old = False
+
+    if files_old:
+        LOG.critical("No fresh pps products found!\n" +
+                     "latest file is more than 4 hours from time-window\n")
 
     return plist
 
