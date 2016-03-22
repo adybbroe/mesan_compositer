@@ -87,6 +87,8 @@ OPTIONS = {}
 for opt, val in CONF.items(MODE, raw=True):
     OPTIONS[opt] = val
 
+MIN_NUM_OF_PPS_DR_FILES = OPTIONS.get('min_num_of_pps_dr_files', 0)
+
 _MESAN_LOG_FILE = OPTIONS.get('mesan_log_file', None)
 
 
@@ -194,6 +196,9 @@ class ctCompositer(object):
                  str(len(dr_list)))
         ppsdr = get_ppslist(dr_list, self.time_window, product="CT",
                             satellites=self.polar_satellites)
+        if len(self.pps_scenes) <= MIN_NUM_OF_PPS_DR_FILES:
+            LOG.critical("Too few PPS DR files found! (<=%d)\n" +
+                         "pps_dr_dir = %s", len(self.ppsdr), str(pps_dr_dir))
 
         now = datetime.utcnow()
         gds_list = glob(os.path.join(pps_gds_dir, 'S_NWC_CT_*nc'))
@@ -204,6 +209,9 @@ class ctCompositer(object):
         LOG.info("Retrieve the metop-gds list took " +
                  str((tic - now).seconds) + " sec")
         self.pps_scenes = ppsdr + ppsgds
+        LOG.info(str(len(self.pps_scenes)) + " PPS scenes located")
+        for scene in self.pps_scenes:
+            LOG.debug("Polar scene:\n" + str(scene))
 
         # Get all geostationary satellite scenes:
         msg_dir = self._options['msg_dir'] % {"number": "02"}
@@ -220,7 +228,7 @@ class ctCompositer(object):
                                       self.msg_areaname)  # satellites=self.msg_satellites)
         LOG.info(str(len(self.msg_scenes)) + " MSG scenes located")
         for scene in self.msg_scenes:
-            LOG.debug("Scene:\n" + str(scene))
+            LOG.debug("Geo scene:\n" + str(scene))
 
     def make_composite(self):
         """Make the Cloud Type composite"""

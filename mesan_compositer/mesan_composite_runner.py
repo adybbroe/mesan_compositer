@@ -70,6 +70,17 @@ import socket
 servername = socket.gethostname()
 SERVERNAME = OPTIONS.get('servername', servername)
 
+MAIL_HOST = 'localhost'
+SENDER = OPTIONS.get('mail_sender', 'safusr.u@smhi.se')
+MAIL_FROM = '"Mesan-compositer ALERT" <' + str(SENDER) + '>'
+try:
+    RECIPIENTS = OPTIONS.get("mail_subscribers").split()
+except AttributeError:
+    RECIPIENTS = "adam.dybbroe@smhi.se"
+MAIL_TO = RECIPIENTS
+MAIL_SUBJECT = 'New Critical Event From mesan_compositer'
+
+
 #: Default time format
 _DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 
@@ -585,6 +596,13 @@ if __name__ == "__main__":
     logging.getLogger('').addHandler(handler)
     logging.getLogger('').setLevel(logging.DEBUG)
     logging.getLogger('posttroll').setLevel(logging.INFO)
+
+    smtp_handler = handlers.SMTPHandler(MAIL_HOST,
+                                        MAIL_FROM,
+                                        MAIL_TO,
+                                        MAIL_SUBJECT)
+    smtp_handler.setLevel(logging.CRITICAL)
+    logging.getLogger('').addHandler(smtp_handler)
 
     LOG = logging.getLogger('mesan_composite_runner')
 
