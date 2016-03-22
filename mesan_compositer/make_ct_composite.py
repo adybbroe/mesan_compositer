@@ -203,11 +203,14 @@ class ctCompositer(object):
         now = datetime.utcnow()
         gds_list = glob(os.path.join(pps_gds_dir, 'S_NWC_CT_*nc'))
         LOG.info("Number of Metop GDS files in dir: " + str(len(gds_list)))
-        ppsgds = get_ppslist(gds_list, self.time_window,
-                             satellites=METOPS, variant='global')
-        tic = datetime.utcnow()
-        LOG.info("Retrieve the metop-gds list took " +
-                 str((tic - now).seconds) + " sec")
+        ppsgds = []
+        if len(gds_list) > 0:
+            ppsgds = get_ppslist(gds_list, self.time_window,
+                                 satellites=METOPS, variant='global')
+            tic = datetime.utcnow()
+            LOG.info("Retrieve the metop-gds list took " +
+                     str((tic - now).seconds) + " sec")
+
         self.pps_scenes = ppsdr + ppsgds
         LOG.info(str(len(self.pps_scenes)) + " PPS scenes located")
         for scene in self.pps_scenes:
