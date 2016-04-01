@@ -261,8 +261,15 @@ class ctthComposite(mesanComposite):
         comp_height = []
         comp_pressure = []
 
+        if len(self.msg_scenes + self.pps_scenes) == 0:
+            LOG.error(
+                "Cannot make ctth composite when no Scenes have been found!")
+            return False
+
         # Loop over all polar scenes:
         is_MSG = False
+        LOG.info(
+            "CTTH composite - Loop over all polar and geostationary scenes:")
         for scene in self.msg_scenes + self.pps_scenes:
             LOG.info("Scene:\n" + str(scene))
             if (scene.platform_name.startswith("Meteosat") and

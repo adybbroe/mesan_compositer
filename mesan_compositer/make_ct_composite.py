@@ -244,14 +244,13 @@ class ctCompositer(object):
 
         comp_CT = []
 
-        # Loop over all polar and geostationary satellite scenes:
-        is_MSG = False
-
         if len(self.msg_scenes + self.pps_scenes) == 0:
-            LOG.error("Cannot make composite when no Scenes have been found!")
+            LOG.error(
+                "Cannot make ct composite when no Scenes have been found!")
             return False
 
-        # for scene in self.pps_scenes + self.msg_scenes:
+        # Loop over all polar and geostationary satellite scenes:
+        is_MSG = False
         LOG.info("Loop over all polar and geostationary scenes:")
         for scene in self.msg_scenes + self.pps_scenes:
             x_CT = None
