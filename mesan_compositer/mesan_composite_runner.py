@@ -20,7 +20,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Posttroll-runner for the mesan composite generator.  Listens to incoming
+"""Posttroll-runner for the mesan composite generator. Listens to incoming
 satellite data products (lvl2 cloud products) and generates a mesan composite
 valid for the closest (whole) hour.
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2015, 2016 Adam.Dybbroe
+# Copyright (c) 2014, 2015, 2016, 2017 Adam.Dybbroe
 
 # Author(s):
 
@@ -119,7 +119,8 @@ def ctype_msg(msg, areaid):
 
     global_geo = GeostationaryFactory.create_scene(msg.platform_name, '',
                                                    "seviri",
-                                                   time_slot=msg.timeslot)
+                                                   time_slot=msg.timeslot,
+                                                   variant='0DEG')
     global_geo.load(['CloudType_plax'], filename=msg.uri)
     return global_geo.project(areaid)
 
