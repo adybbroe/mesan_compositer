@@ -404,7 +404,10 @@ class ncCTTHComposite(ncCloudTypeComposite):
         x__ = InfoObject()
         area_obj.get_proj_coords(cache=True)
 
-        x__.data = area_obj.projection_x_coords[0, :]
+        try:
+            x__.data = area_obj.projection_x_coords[0, :]
+        except IndexError:
+            x__.data = area_obj.projection_x_coords
         x__.info = {"var_name": "x" + str_res,
                     "var_data": x__.data,
                     "var_dim_names": ("x" + str_res,),
@@ -414,7 +417,11 @@ class ncCTTHComposite(ncCloudTypeComposite):
         setattr(self, x__.info["var_name"], x__)
 
         y__ = InfoObject()
-        y__.data = area_obj.projection_y_coords[:, 0]
+        try:
+            y__.data = area_obj.projection_y_coords[:, 0]
+        except IndexError:
+            y__.data = area_obj.projection_y_coords
+
         y__.info = {"var_name": "y" + str_res,
                     "var_data": y__.data,
                     "var_dim_names": ("y" + str_res,),
