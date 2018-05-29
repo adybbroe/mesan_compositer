@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2015, 2016, 2017 Adam.Dybbroe
+# Copyright (c) 2014, 2015, 2016, 2017, 2018 Adam.Dybbroe
 
 # Author(s):
 
@@ -258,9 +258,9 @@ class ctthComposite(mesanComposite):
         #sec1970 = datetime(1970, 1, 1)
         import time
 
-        comp_temperature = []
-        comp_height = []
-        comp_pressure = []
+        comp_temperature = None
+        comp_height = None
+        comp_pressure = None
 
         if len(self.msg_scenes + self.pps_scenes) == 0:
             LOG.error(
@@ -353,7 +353,7 @@ class ctthComposite(mesanComposite):
                 np.ones(np.shape(x_temperature))
             idx_MSG = is_MSG * np.ones(np.shape(x_temperature), dtype=np.bool)
 
-            if comp_temperature == []:
+            if comp_temperature is None:
                 # initialize field with current CTTH
                 comp_lon, comp_lat = x_local.area.get_lonlats()
                 comp_temperature = x_temperature
