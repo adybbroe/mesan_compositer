@@ -243,7 +243,7 @@ class ctCompositer(object):
         #sec1970 = datetime(1970, 1, 1)
         import time
 
-        comp_CT = []
+        comp_CT = None
 
         if len(self.msg_scenes + self.pps_scenes) == 0:
             LOG.error(
@@ -290,7 +290,7 @@ class ctCompositer(object):
             x_time = time.mktime(scene.timeslot.timetuple()) * \
                 np.ones(np.shape(x_CT))
             idx_MSG = is_MSG * np.ones(np.shape(x_CT), dtype=np.bool)
-            if comp_CT == []:
+            if comp_CT is None:
                 # initialize field with current CT
                 comp_lon, comp_lat = x_local.area.get_lonlats()
                 comp_CT = x_CT
