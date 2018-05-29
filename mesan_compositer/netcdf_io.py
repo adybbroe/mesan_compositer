@@ -152,7 +152,7 @@ class ncCloudTypeComposite(object):
         area_obj.get_proj_coords(cache=True)
         try:
             x__.data = area_obj.projection_x_coords[0, :]
-        except IndexErrror:
+        except IndexError:
             x__.data = area_obj.projection_x_coords
 
         x__.info = {"var_name": "x" + str_res,
