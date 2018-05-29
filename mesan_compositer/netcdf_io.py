@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2015 Adam.Dybbroe
+# Copyright (c) 2014, 2015, 2018 Adam.Dybbroe
 
 # Author(s):
 
@@ -150,7 +150,11 @@ class ncCloudTypeComposite(object):
         setattr(self, self.area.info["var_name"], self.area)
         x__ = InfoObject()
         area_obj.get_proj_coords(cache=True)
-        x__.data = area_obj.projection_x_coords[0, :]
+        try:
+            x__.data = area_obj.projection_x_coords[0, :]
+        except IndexErrror:
+            x__.data = area_obj.projection_x_coords
+
         x__.info = {"var_name": "x" + str_res,
                     "var_data": x__.data,
                     "var_dim_names": ("x" + str_res,),
@@ -160,7 +164,10 @@ class ncCloudTypeComposite(object):
         setattr(self, x__.info["var_name"], x__)
 
         y__ = InfoObject()
-        y__.data = area_obj.projection_y_coords[:, 0]
+        try:
+            y__.data = area_obj.projection_y_coords[:, 0]
+        except IndexError:
+            y__.data = area_obj.projection_y_coords
         y__.info = {"var_name": "y" + str_res,
                     "var_data": y__.data,
                     "var_dim_names": ("y" + str_res,),
@@ -396,6 +403,9 @@ class ncCTTHComposite(ncCloudTypeComposite):
         setattr(self, self.area.info["var_name"], self.area)
         x__ = InfoObject()
         area_obj.get_proj_coords(cache=True)
+        import pdb
+        pdb.set_trace()
+
         x__.data = area_obj.projection_x_coords[0, :]
         x__.info = {"var_name": "x" + str_res,
                     "var_data": x__.data,
