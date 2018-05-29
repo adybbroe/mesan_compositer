@@ -403,8 +403,6 @@ class ncCTTHComposite(ncCloudTypeComposite):
         setattr(self, self.area.info["var_name"], self.area)
         x__ = InfoObject()
         area_obj.get_proj_coords(cache=True)
-        import pdb
-        pdb.set_trace()
 
         x__.data = area_obj.projection_x_coords[0, :]
         x__.info = {"var_name": "x" + str_res,
