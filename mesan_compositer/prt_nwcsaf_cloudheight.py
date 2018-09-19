@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2015, 2016 Adam.Dybbroe
+# Copyright (c) 2015, 2016, 2018 Adam.Dybbroe
 
 # Author(s):
 
@@ -62,6 +62,7 @@ _MESAN_LOG_FILE = OPTIONS.get('mesan_log_file', None)
 
 class cthError(Exception):
     pass
+
 
 # min 8 x 8 pixels in super obs
 DLENMIN = 4

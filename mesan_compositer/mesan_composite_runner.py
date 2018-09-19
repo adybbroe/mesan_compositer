@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2015, 2016 Adam.Dybbroe
+# Copyright (c) 2015, 2016, 2018 Adam.Dybbroe
 
 # Author(s):
 
@@ -429,32 +429,32 @@ def ctth_composite_worker(scene, job_id, publish_q):
         ctth_comp = make_ctth_composite.ctthComposite(
             time_of_analysis, delta_t, MESAN_AREA_ID)
         ctth_comp.get_catalogue()
-        ctth_comp.make_composite()
-        ctth_comp.write()
-
-        # Make Super observations:
-        values = {"area": MESAN_AREA_ID, }
-        bname = time_of_analysis.strftime(
-            OPTIONS['cloudheight_filename']) % values
-        path = OPTIONS['composite_output_dir']
-        filename = os.path.join(path, bname + '.dat')
-        LOG.info("Make Cloud Height super observations. Output file = %s",
-                 str(filename))
-        derive_sobs_clheight(ctth_comp.composite, NPIX, filename)
-
-        result_file = ctth_comp.filename
-
-        pubmsg = create_message(result_file, scene)
-        LOG.info("Sending: " + str(pubmsg))
-        publish_q.put(pubmsg)
-
-        if isinstance(job_id, datetime):
-            dt_ = datetime.utcnow() - job_id
-            LOG.info("Cloud Height composite scene " + str(job_id) +
-                     " finished. It took: " + str(dt_))
+        if not ctth_comp.make_composite():
+            LOG.error("Failed creating ctth composite...")
         else:
-            LOG.warning(
-                "Job entry is not a datetime instance: " + str(job_id))
+            ctth_comp.write()
+
+            # Make Super observations:
+            values = {"area": MESAN_AREA_ID, }
+            bname = time_of_analysis.strftime(OPTIONS['cloudheight_filename']) % values
+            path = OPTIONS['composite_output_dir']
+            filename = os.path.join(path, bname + '.dat')
+            LOG.info("Make Cloud Height super observations. Output file = %s", str(filename))
+            derive_sobs_clheight(ctth_comp.composite, NPIX, filename)
+
+            result_file = ctth_comp.filename
+
+            pubmsg = create_message(result_file, scene)
+            LOG.info("Sending: " + str(pubmsg))
+            publish_q.put(pubmsg)
+
+            if isinstance(job_id, datetime):
+                dt_ = datetime.utcnow() - job_id
+                LOG.info("Cloud Height composite scene " + str(job_id) +
+                         " finished. It took: " + str(dt_))
+            else:
+                LOG.warning(
+                    "Job entry is not a datetime instance: " + str(job_id))
 
     except:
         LOG.exception('Failed in ctth_composite_worker...')
