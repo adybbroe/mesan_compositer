@@ -400,6 +400,8 @@ class ctthComposite(mesanComposite):
                      "id": comp_id.astype(np.uint8)}
         self.composite.store(composite, self.area)
 
+        return True
+
     def write(self):
         """Write the composite to a netcdf file"""
         tmpfname = tempfile.mktemp(suffix=os.path.basename(self.filename),
