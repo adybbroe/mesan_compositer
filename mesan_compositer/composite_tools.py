@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2015, 2016 Adam.Dybbroe
+# Copyright (c) 2014, 2015, 2016, 2018 Adam.Dybbroe
 
 # Author(s):
 
@@ -156,7 +156,13 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
     latest_file_time = datetime(1970, 1, 1)
     for filename in filelist:
         bname = os.path.basename(filename)
-        res = prod_p.parse(bname)
+        try:
+            res = prod_p.parse(bname)
+        except ValueError:
+            LOG.exception('Failed processing filename %s', filename)
+            LOG.warning('Probably wrong date time string in PPS file, skip it...')
+            continue
+
         sat = res['platform_name']
         if satellites and PLATFORM_NAME.get(sat, sat) not in satellites:
             continue
