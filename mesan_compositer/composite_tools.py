@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2015, 2016, 2018 Adam.Dybbroe
+# Copyright (c) 2014, 2015, 2016, 2018, 2019 Adam.Dybbroe
 
 # Author(s):
 
@@ -42,18 +42,22 @@ TERRA_AQUA_NAMES = {'eos1': 'EOS-Terra',
                     'eos2': 'EOS-Aqua'}
 
 PLATFORM_NAME_INV = {'Suomi-NPP': 'npp',
+                     'NOAA-20': 'noaa20',
                      'EOS-Terra': 'eos1',
                      'EOS-Aqua': 'eos2',
                      'Metop-A': 'metopa',
                      'Metop-B': 'metopb',
+                     'Metop-C': 'metopc',
                      'NOAA-18': 'noaa18',
                      'NOAA-15': 'noaa15',
                      'NOAA-19': 'noaa19'}
 PLATFORM_NAME = {'npp': 'Suomi-NPP',
+                 'noaa20': 'NOAA-20',
                  'eos1': 'EOS-Terra',
                  'eos2': 'EOS-Aqua',
                  'metopa': 'Metop-A',
                  'metopb': 'Metop-B',
+                 'metopc': 'Metop-C',
                  'noaa18': 'NOAA-18',
                  'noaa15': 'NOAA-15',
                  'noaa19': 'NOAA-19'}
