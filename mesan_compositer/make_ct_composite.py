@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2015, 2016, 2017, 2018 Adam.Dybbroe
+# Copyright (c) 2014-2019 Adam.Dybbroe
 
 # Author(s):
 
@@ -50,8 +50,7 @@ if not DIST or DIST == 'linda4':
 else:
     MODE = os.environ.get("SMHI_MODE", 'offline')
 
-
-METOPS = ['metop02', 'metop01']
+METOPS = ['metop03', 'metop02', 'metop01']
 
 SENSOR = {'NOAA-19': 'avhrr/3',
           'NOAA-18': 'avhrr/3',
@@ -62,7 +61,8 @@ SENSOR = {'NOAA-19': 'avhrr/3',
           'EOS-Terra': 'modis',
           'EOS-Aqua': 'modis',
           'Suomi-NPP': 'viirs',
-          'JPSS-1': 'viirs'}
+          'JPSS-1': 'viirs',
+          'NOAA-20': 'viirs'}
 
 PLATFORM_NAMES_FROM_PPS = {}
 
@@ -163,6 +163,8 @@ class ctCompositer(object):
         LOG.debug("Time window: " + str(self.time_window[0]) +
                   " - " + str(self.time_window[1]))
         self.polar_satellites = options['polar_satellites'].split()
+        LOG.debug("Polar satellites supported: %s", str(self.polar_satellites))
+
         self.msg_satellites = options['msg_satellites'].split()
         self.msg_areaname = options['msg_areaname']
         self.areaid = areaid

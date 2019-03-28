@@ -169,6 +169,7 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
 
         sat = res['platform_name']
         if satellites and PLATFORM_NAME.get(sat, sat) not in satellites:
+            LOG.info("Satellite not in the list of platforms! platform=%s", PLATFORM_NAME.get(sat, sat))
             continue
 
         product = res['product']
