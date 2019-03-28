@@ -154,6 +154,8 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
     from trollsift import Parser
     prod_p = Parser(pps_filename)
 
+    LOG.debug("List of satellites: %s", str(satellites))
+
     plist = []
     files_old = True
     latest_file = None
@@ -168,8 +170,9 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
             continue
 
         sat = res['platform_name']
+
         if satellites and PLATFORM_NAME.get(sat, sat) not in satellites:
-            LOG.info("Satellite not in the list of platforms! platform=%s", PLATFORM_NAME.get(sat, sat))
+            LOG.debug("Satellite not in the list of platforms! platform=%s", PLATFORM_NAME.get(sat, sat))
             continue
 
         product = res['product']

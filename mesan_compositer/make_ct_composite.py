@@ -202,6 +202,7 @@ class ctCompositer(object):
                          "pps_dr_dir = %s",
                          len(dr_list), MIN_NUM_OF_PPS_DR_FILES,
                          str(pps_dr_dir))
+
         ppsdr = get_ppslist(dr_list, self.time_window,
                             satellites=self.polar_satellites)
 
