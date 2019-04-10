@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2015, 2016, 2017, 2018 Adam.Dybbroe
+# Copyright (c) 2014 - 2019 Adam.Dybbroe
 
 # Author(s):
 
@@ -240,8 +240,8 @@ class ctthComposite(mesanComposite):
         self.pps_scenes = []
         self.msg_scenes = []
 
-        self.polar_satellites = options['polar_satellites'].split(',')
-        self.msg_satellites = options['msg_satellites'].split(',')
+        self.polar_satellites = options['polar_satellites'].split()
+        self.msg_satellites = options['msg_satellites'].split()
         self.msg_areaname = options['msg_areaname']
         self.areaid = areaid
 
@@ -414,6 +414,29 @@ class ctthComposite(mesanComposite):
         os.rename(tmpfname, self.filename + '.nc')
 
         return
+
+    def make_quicklooks(self):
+        """Make quicklook images"""
+
+        import mpop.imageo.palettes
+        from mpop.imageo import geo_image
+
+        palette = mpop.imageo.palettes.ctth_height()
+
+        ctth_data = self.composite.height.data
+        cloud_free = self.composite.height.data == 0
+        ctth_data = ctth_data / 500.0 + 1
+        ctth_data[cloud_free] = 0
+        ctth_data = np.ma.array(ctth_data, mask=self.composite.flag.mask)
+
+        img = geo_image.GeoImage(ctth_data.astype(np.uint8),
+                                 self.areaid,
+                                 None,
+                                 fill_value=(0),
+                                 mode="P",
+                                 palette=palette)
+
+        img.save(self.filename.strip('.nc') + '_ctth.png')
 
 
 if __name__ == "__main__":

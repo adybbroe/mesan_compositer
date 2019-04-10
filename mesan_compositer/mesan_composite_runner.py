@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2015, 2016, 2018 Adam.Dybbroe
+# Copyright (c) 2015 - 2019 Adam.Dybbroe
 
 # Author(s):
 
@@ -433,6 +433,7 @@ def ctth_composite_worker(scene, job_id, publish_q):
             LOG.error("Failed creating ctth composite...")
         else:
             ctth_comp.write()
+            # ctth_comp.make_quicklooks()
 
             # Make Super observations:
             values = {"area": MESAN_AREA_ID, }
