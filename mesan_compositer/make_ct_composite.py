@@ -39,6 +39,7 @@ from mesan_compositer.netcdf_io import ncCloudTypeComposite
 from nwcsaf_formats.pps_conversions import (map_cloudtypes,
                                             ctype_convert_flags)
 
+from mesan_compositer.composite_tools import SENSOR, METOPS
 
 import sys
 import os
@@ -49,20 +50,6 @@ if not DIST or DIST == 'linda4':
     MODE = 'offline'
 else:
     MODE = os.environ.get("SMHI_MODE", 'offline')
-
-METOPS = ['metop03', 'metop02', 'metop01']
-
-SENSOR = {'NOAA-19': 'avhrr/3',
-          'NOAA-18': 'avhrr/3',
-          'NOAA-15': 'avhrr/3',
-          'Metop-A': 'avhrr/3',
-          'Metop-B': 'avhrr/3',
-          'Metop-C': 'avhrr/3',
-          'EOS-Terra': 'modis',
-          'EOS-Aqua': 'modis',
-          'Suomi-NPP': 'viirs',
-          'JPSS-1': 'viirs',
-          'NOAA-20': 'viirs'}
 
 PLATFORM_NAMES_FROM_PPS = {}
 

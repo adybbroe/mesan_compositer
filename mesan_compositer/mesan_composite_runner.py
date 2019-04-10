@@ -433,7 +433,7 @@ def ctth_composite_worker(scene, job_id, publish_q):
             LOG.error("Failed creating ctth composite...")
         else:
             ctth_comp.write()
-            # ctth_comp.make_quicklooks()
+            ctth_comp.make_quicklooks()
 
             # Make Super observations:
             values = {"area": MESAN_AREA_ID, }

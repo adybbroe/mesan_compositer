@@ -31,8 +31,7 @@ import numpy as np
 from mesan_compositer import (ProjectException, LoadException)
 from mesan_compositer.pps_msg_conversions import ctth_procflags2pps
 from nwcsaf_formats.pps_conversions import ctth_convert_flags
-
-
+from mesan_compositer.composite_tools import SENSOR, METOPS
 from mesan_compositer.netcdf_io import ncCTTHComposite
 
 from mesan_compositer.composite_tools import (get_msglist,
@@ -50,19 +49,6 @@ if not DIST or DIST == 'linda4':
 else:
     MODE = os.environ.get("SMHI_MODE", 'offline')
 
-
-METOPS = ['metop02', 'metop01']
-
-SENSOR = {'NOAA-19': 'avhrr/3',
-          'NOAA-18': 'avhrr/3',
-          'NOAA-15': 'avhrr/3',
-          'Metop-A': 'avhrr/3',
-          'Metop-B': 'avhrr/3',
-          'Metop-C': 'avhrr/3',
-          'EOS-Terra': 'modis',
-          'EOS-Aqua': 'modis',
-          'Suomi-NPP': 'viirs',
-          'JPSS-1': 'viirs'}
 
 import logging
 LOG = logging.getLogger(__name__)
@@ -252,10 +238,10 @@ class ctthComposite(mesanComposite):
         super(ctthComposite, self).get_catalogue(product)
 
     def make_composite(self):
-        """Make the Cloud Type composite"""
+        """Make the CTTH composite"""
 
         # Reference time for time stamp in composite file
-        #sec1970 = datetime(1970, 1, 1)
+        # sec1970 = datetime(1970, 1, 1)
         import time
 
         comp_temperature = None
@@ -306,36 +292,42 @@ class ctthComposite(mesanComposite):
                           str(x_local['CTTH'].ctth_tempe.info['scale_factor']),
                           str(x_local['CTTH'].ctth_tempe.info['add_offset']))
 
-                try:
-                    x_temperature = (x_local['CTTH'].ctth_tempe.data *
-                                     x_local['CTTH'].ctth_tempe.info['scale_factor'][0] +
-                                     x_local['CTTH'].ctth_tempe.info['add_offset'][0])
-                except IndexError:
-                    x_temperature = (x_local['CTTH'].ctth_tempe.data *
-                                     x_local['CTTH'].ctth_tempe.info['scale_factor'] +
-                                     x_local['CTTH'].ctth_tempe.info['add_offset'])
+                # try:
+                #     x_temperature = (x_local['CTTH'].ctth_tempe.data *
+                #                      x_local['CTTH'].ctth_tempe.info['scale_factor'][0] +
+                #                      x_local['CTTH'].ctth_tempe.info['add_offset'][0])
+                # except IndexError:
+                #     x_temperature = (x_local['CTTH'].ctth_tempe.data *
+                #                      x_local['CTTH'].ctth_tempe.info['scale_factor'] +
+                #                      x_local['CTTH'].ctth_tempe.info['add_offset'])
+
+                x_temperature = x_local['CTTH'].ctth_tempe.data
 
                 # Pressure (hPa)', u'no_data_value': 255, u'intercept': 0.0,
                 # u'gain': 25.0
-                try:
-                    x_pressure = (x_local['CTTH'].ctth_pres.data * x_local[
-                        'CTTH'].ctth_pres.info['scale_factor'][0] +
-                        x_local['CTTH'].ctth_pres.info['add_offset'][0])
-                except IndexError:
-                    x_pressure = (x_local['CTTH'].ctth_pres.data * x_local[
-                        'CTTH'].ctth_pres.info['scale_factor'] +
-                        x_local['CTTH'].ctth_pres.info['add_offset'])
+                # try:
+                #     x_pressure = (x_local['CTTH'].ctth_pres.data * x_local[
+                #         'CTTH'].ctth_pres.info['scale_factor'][0] +
+                #         x_local['CTTH'].ctth_pres.info['add_offset'][0])
+                # except IndexError:
+                #     x_pressure = (x_local['CTTH'].ctth_pres.data * x_local[
+                #         'CTTH'].ctth_pres.info['scale_factor'] +
+                #         x_local['CTTH'].ctth_pres.info['add_offset'])
+
+                x_pressure = x_local['CTTH'].ctth_pres.data
 
                 # Height (m)', u'no_data_value': 255, u'intercept': 0.0,
                 # u'gain': 200.0
-                try:
-                    x_height = (x_local['CTTH'].ctth_alti.data * x_local[
-                        'CTTH'].ctth_alti.info['scale_factor'][0] +
-                        x_local['CTTH'].ctth_alti.info['add_offset'][0])
-                except IndexError:
-                    x_height = (x_local['CTTH'].ctth_alti.data * x_local[
-                        'CTTH'].ctth_alti.info['scale_factor'] +
-                        x_local['CTTH'].ctth_alti.info['add_offset'])
+                # try:
+                #     x_height = (x_local['CTTH'].ctth_alti.data * x_local[
+                #         'CTTH'].ctth_alti.info['scale_factor'][0] +
+                #         x_local['CTTH'].ctth_alti.info['add_offset'][0])
+                # except IndexError:
+                #     x_height = (x_local['CTTH'].ctth_alti.data * x_local[
+                #         'CTTH'].ctth_alti.info['scale_factor'] +
+                #         x_local['CTTH'].ctth_alti.info['add_offset'])
+
+                x_height = x_local['CTTH'].ctth_alti.data
 
                 sflags = x_local['CTTH'].ctth_status_flag.data.filled(0)
                 cflags = x_local['CTTH'].ctth_conditions.data.filled(0)
@@ -427,8 +419,7 @@ class ctthComposite(mesanComposite):
         cloud_free = self.composite.height.data == 0
         ctth_data = ctth_data / 500.0 + 1
         ctth_data[cloud_free] = 0
-        ctth_data = np.ma.array(ctth_data, mask=self.composite.flag.mask)
-
+        # ctth_data = np.ma.array(ctth_data, mask=self.composite.flags.mask)
         img = geo_image.GeoImage(ctth_data.astype(np.uint8),
                                  self.areaid,
                                  None,
@@ -436,7 +427,7 @@ class ctthComposite(mesanComposite):
                                  mode="P",
                                  palette=palette)
 
-        img.save(self.filename.strip('.nc') + '_ctth.png')
+        img.save(self.filename.strip('.nc') + '_height.png')
 
 
 if __name__ == "__main__":
@@ -487,3 +478,4 @@ if __name__ == "__main__":
     ctth_comp.get_catalogue()
     ctth_comp.make_composite()
     ctth_comp.write()
+    ctth_comp.make_quicklooks()

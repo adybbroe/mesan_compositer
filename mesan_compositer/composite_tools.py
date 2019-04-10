@@ -62,6 +62,20 @@ PLATFORM_NAME = {'npp': 'Suomi-NPP',
                  'noaa15': 'NOAA-15',
                  'noaa19': 'NOAA-19'}
 
+METOPS = ['metop03', 'metop02', 'metop01']
+
+SENSOR = {'NOAA-19': 'avhrr/3',
+          'NOAA-18': 'avhrr/3',
+          'NOAA-15': 'avhrr/3',
+          'Metop-A': 'avhrr/3',
+          'Metop-B': 'avhrr/3',
+          'Metop-C': 'avhrr/3',
+          'EOS-Terra': 'modis',
+          'EOS-Aqua': 'modis',
+          'Suomi-NPP': 'viirs',
+          'JPSS-1': 'viirs',
+          'NOAA-20': 'viirs'}
+
 from mesan_compositer.pps_msg_conversions import get_bit_from_flags
 
 
