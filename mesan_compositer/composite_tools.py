@@ -125,6 +125,18 @@ class PpsMetaData(object):
                           'timeslot=' + str(self.timeslot),
                           'variant=' + str(self.variant)])
 
+    def __lt__(self, other):
+        return self.timeslot < other.timeslot
+
+    def __gt__(self, other):
+        return self.timeslot > other.timeslot
+
+    def __le__(self, other):
+        return self.timeslot <= other.timeslot
+
+    def __ge__(self, other):
+        return self.timeslot >= other.timeslot
+
 
 class MsgMetaData(object):
 
@@ -142,6 +154,18 @@ class MsgMetaData(object):
                           'platform_name=' + str(self.platform_name),
                           'areaid=' + self.areaid,
                           'timeslot=' + str(self.timeslot)])
+
+    def __lt__(self, other):
+        return self.timeslot < other.timeslot
+
+    def __gt__(self, other):
+        return self.timeslot > other.timeslot
+
+    def __le__(self, other):
+        return self.timeslot <= other.timeslot
+
+    def __ge__(self, other):
+        return self.timeslot >= other.timeslot
 
 
 def get_analysis_time(start_t, end_t):
@@ -204,11 +228,12 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
         if (timeslot > timewindow[0] and
                 timeslot < timewindow[1]):
 
-            plist.append(PpsMetaData(filename=filename,
-                                     geofilename=geofilename,
-                                     orbit=orbit, timeslot=timeslot,
-                                     platform_name=platform_name,
-                                     variant=variant))
+            mda = PpsMetaData(filename=filename,
+                              geofilename=geofilename,
+                              orbit=orbit, timeslot=timeslot,
+                              platform_name=platform_name,
+                              variant=variant)
+            plist.append(mda)
             files_old = False
         elif (timewindow[0] - timeslot) < timedelta(seconds=3600 * 4):
             files_old = False
@@ -265,9 +290,10 @@ def get_msglist(filelist, timewindow, area_id, satellites=None):
         # Now filter out all passes outside time window:
         if (timeslot > timewindow[0] and
                 timeslot < timewindow[1]):
-            mlist.append(MsgMetaData(filename=filename,
-                                     areaid=areaid, timeslot=timeslot,
-                                     platform_name=platform_name))
+            mda = MsgMetaData(filename=filename,
+                              areaid=areaid, timeslot=timeslot,
+                              platform_name=platform_name)
+            mlist.append(mda)
 
     return mlist
 

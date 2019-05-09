@@ -205,6 +205,7 @@ class ctCompositer(object):
                      str((tic - now).seconds) + " sec")
 
         self.pps_scenes = ppsdr + ppsgds
+        self.pps_scenes.sort()
         LOG.info(str(len(self.pps_scenes)) + " PPS scenes located")
         for scene in self.pps_scenes:
             LOG.debug("Polar scene:\n" + str(scene))
@@ -220,8 +221,10 @@ class ctCompositer(object):
         LOG.info("Get files inside time window: " +
                  str(self.time_window[0]) + " - " +
                  str(self.time_window[1]))
+
         self.msg_scenes = get_msglist(msg_list, self.time_window,
                                       self.msg_areaname)  # satellites=self.msg_satellites)
+        self.msg_scenes.sort()
         LOG.info(str(len(self.msg_scenes)) + " MSG scenes located")
         for scene in self.msg_scenes:
             LOG.debug("Geo scene:\n" + str(scene))
