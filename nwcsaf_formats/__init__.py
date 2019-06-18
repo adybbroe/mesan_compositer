@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2015 Adam.Dybbroe
+# Copyright (c) 2014 Adam.Dybbroe
 
 # Author(s):
 
@@ -20,7 +20,15 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""
+"""nwcsaf format conversion tools. First of all supporting conversion from PPS
+v2014 format to old (v2012 and earlier) formats. Please be aware that this
+format conversion is not a one-to-one mapping! There is information in the new
+format that cannot be transfered to the old format!
 """
 
-__version__ = '0.1.0'
+from mesan_compositer import version
+
+__version__ = version.__version__
+
+import logging
+LOG = logging.getLogger(__name__)

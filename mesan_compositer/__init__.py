@@ -30,3 +30,11 @@ __version__ = version.__version__
 
 import logging
 LOG = logging.getLogger(__name__)
+
+
+class ProjectException(Exception):
+    pass
+
+
+class LoadException(Exception):
+    pass

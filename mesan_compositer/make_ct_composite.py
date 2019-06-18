@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 Adam.Dybbroe
+# Copyright (c) 2014-2019 Adam.Dybbroe
 
 # Author(s):
 
@@ -22,53 +22,94 @@
 
 """Make a Cloud Type composite
 """
-
-
 import argparse
 from datetime import datetime, timedelta
 import numpy as np
+import tempfile
+import shutil
 
 from mpop.satin.msg_hdf import ctype_procflags2pps
 
+from mesan_compositer import (ProjectException, LoadException)
 from mesan_compositer.composite_tools import (get_msglist,
                                               get_ppslist,
-                                              wCT)
+                                              get_weight_cloudtype)
 from mesan_compositer.netcdf_io import ncCloudTypeComposite
+
+from nwcsaf_formats.pps_conversions import (map_cloudtypes,
+                                            ctype_convert_flags)
+
+from mesan_compositer.composite_tools import SENSOR, METOPS
 
 import sys
 import os
 
 CFG_DIR = os.environ.get('MESAN_COMPOSITE_CONFIG_DIR', './')
-MODE = os.environ.get("SMHI_MODE", 'offline')
+DIST = os.environ.get("SMHI_DIST", 'elin4')
+if not DIST or DIST == 'linda4':
+    MODE = 'offline'
+else:
+    MODE = os.environ.get("SMHI_MODE", 'offline')
 
-METOPS = ['metop02', 'metop01']
+PLATFORM_NAMES_FROM_PPS = {}
 
-SENSOR = {'noaa': 'avhrr',
-          'metop': 'avhrr',
-          'npp': 'viirs'}
+import logging
+LOG = logging.getLogger(__name__)
+
+#: Default time format
+_DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
+
+#: Default log format
+_DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
+
+import ConfigParser
+
+CONF = ConfigParser.ConfigParser()
+CONFIGFILE = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
+if not os.path.exists(CONFIGFILE):
+    raise IOError('Config file %s does not exist!' % CONFIGFILE)
+CONF.read(CONFIGFILE)
+
+OPTIONS = {}
+for opt, val in CONF.items(MODE, raw=True):
+    OPTIONS[opt] = val
+
+MIN_NUM_OF_PPS_DR_FILES = int(OPTIONS.get('min_num_of_pps_dr_files', '0'))
+
+_MESAN_LOG_FILE = OPTIONS.get('mesan_log_file', None)
 
 
-def ctype_pps(pps, areaid='mesanX'):
+def ctype_pps(pps, areaid):
     """Load PPS Cloudtype and reproject"""
     from mpop.satellites import PolarFactory
-    global_data = PolarFactory.create_scene(pps.platform, str(pps.number),
-                                            SENSOR.get(pps.platform, 'avhrr'),
-                                            pps.timeslot, pps.orbit)
-    global_data.load(['CloudType'])
-    return global_data.project(areaid)
+    global_data = PolarFactory.create_scene(pps.platform_name, '',
+                                            SENSOR.get(
+                                                pps.platform_name, 'avhrr/3'),
+                                            pps.timeslot, pps.orbit,
+                                            variant='DR')
+
+    try:
+        global_data.load(['CT'], filename=pps.uri)
+    except AttributeError:
+        raise LoadException('MPOP scene object fails to load!')
+
+    if global_data.area or global_data['CT'].area:
+        return global_data.project(areaid)
+    else:
+        raise ProjectException('MPOP Scene object has no area instance' +
+                               ' and product cannot be projected')
 
 
-def ctype_msg(msg, areaid='mesanX'):
+def ctype_msg(msg, areaid):
     """Load MSG paralax corrected cloud type and reproject"""
     from mpop.satellites import GeostationaryFactory
 
-    global_geo = GeostationaryFactory.create_scene(msg.platform,
-                                                   msg.number, "seviri",
-                                                   time_slot=msg.timeslot)
-    global_geo.load(['CloudType_plax'])
+    global_geo = GeostationaryFactory.create_scene(msg.platform_name, '',
+                                                   "seviri",
+                                                   time_slot=msg.timeslot,
+                                                   variant='0DEG')
+    global_geo.load(['CloudType_plax'], filename=msg.uri)
     return global_geo.project(areaid)
-
-# ---------------------------------------------------------------------------
 
 
 class ctCompositer(object):
@@ -76,7 +117,6 @@ class ctCompositer(object):
     """The Cloud Type Composite generator class"""
 
     def __init__(self, obstime, tdiff, areaid, **kwargs):
-        import ConfigParser
 
         conf = ConfigParser.ConfigParser()
         configfile = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
@@ -95,17 +135,26 @@ class ctCompositer(object):
         else:
             # Generate the filename from the observation time and the
             # specifcations in the config file:
+            LOG.info("Output file name is generated from observation " +
+                     "time and info in config file:")
             bname = obstime.strftime(options['ct_composite_filename']) % values
             path = options['composite_output_dir']
             self.filename = os.path.join(path, bname)
+
+        LOG.info('Filename = ' + str(self.filename))
 
         self.description = "Cloud Type composite for Mesan"
         self.obstime = obstime
         self.timediff = tdiff
         self.time_window = (obstime - tdiff, obstime + tdiff)
-        self.polar_satellites = eval(options['polar_satellites'])
-        self.msg_satellites = eval(options['msg_satellites'])
-        self.msg_areaname = eval(options['msg_areaname'])
+        LOG.debug("Time window: " + str(self.time_window[0]) +
+                  " - " + str(self.time_window[1]))
+        self.polar_satellites = options['polar_satellites'].split()
+        LOG.debug("Polar satellites supported: %s", str(self.polar_satellites))
+
+        self.msg_satellites = options['msg_satellites'].split()
+        self.msg_areaname = options['msg_areaname']
+        self.areaid = areaid
         self.longitude = None
         self.latitude = None
         # An mpop-scene area object:
@@ -128,50 +177,82 @@ class ctCompositer(object):
 
         # Get all polar satellite scenes:
         pps_dr_dir = self._options['pps_direct_readout_dir']
+        LOG.debug('pps_dr_dir = ' + str(pps_dr_dir))
         pps_gds_dir = self._options['pps_metop_gds_dir']
 
-        dr_list = glob(os.path.join(pps_dr_dir, '*cloudtype.h5'))
+        # Example: S_NWC_CT_metopb_14320_20150622T1642261Z_20150622T1654354Z.nc
+        dr_list = glob(os.path.join(pps_dr_dir, 'S_NWC_CT_*nc'))
+        LOG.info("Number of direct readout pps cloudtype files in dir: " +
+                 str(len(dr_list)))
+        if len(dr_list) <= MIN_NUM_OF_PPS_DR_FILES:
+            LOG.critical("Too few PPS DR files found! (%d<=%d)\n" +
+                         "pps_dr_dir = %s",
+                         len(dr_list), MIN_NUM_OF_PPS_DR_FILES,
+                         str(pps_dr_dir))
+
         ppsdr = get_ppslist(dr_list, self.time_window,
                             satellites=self.polar_satellites)
 
         now = datetime.utcnow()
-        gds_list = glob(os.path.join(pps_gds_dir, '*cloudtype.h5'))
-        print "Number of Metop GDS files in dir: " + str(len(gds_list))
-        ppsgds = get_ppslist(gds_list, self.time_window,
-                             satellites=METOPS)
-        tic = datetime.utcnow()
-        print("Retrieve the metop-gds list took " +
-              str((tic - now).seconds) + " sec")
+        gds_list = glob(os.path.join(pps_gds_dir, 'S_NWC_CT_*nc'))
+        LOG.info("Number of Metop GDS files in dir: " + str(len(gds_list)))
+        ppsgds = []
+        if len(gds_list) > 0:
+            ppsgds = get_ppslist(gds_list, self.time_window,
+                                 satellites=METOPS, variant='global')
+            tic = datetime.utcnow()
+            LOG.info("Retrieve the metop-gds list took " +
+                     str((tic - now).seconds) + " sec")
+
         self.pps_scenes = ppsdr + ppsgds
+        self.pps_scenes.sort()
+        LOG.info(str(len(self.pps_scenes)) + " PPS scenes located")
+        for scene in self.pps_scenes:
+            LOG.debug("Polar scene:\n" + str(scene))
 
         # Get all geostationary satellite scenes:
-        msg_dir = self._options['msg_dir']
-        ext = self._options['msg_cty_file_ext']
+        msg_dir = self._options['msg_dir'] % {"number": "02"}
+        #ext = self._options['msg_cty_file_ext']
         # SAFNWC_MSG2_CT___201206252345_EuropeCanary.h5
         # What about EuropeCanary and possible other areas!? FIXME!
         msg_list = glob(os.path.join(msg_dir, '*_CT___*.PLAX.CTTH.0.h5'))
-        self.msg_scenes = get_msglist(msg_list, self.time_window,
-                                      self.msg_areaname,
-                                      satellites=self.msg_satellites)
+        LOG.debug(
+            "MSG files in directory " + str(msg_dir) + " : " + str(msg_list))
+        LOG.info("Get files inside time window: " +
+                 str(self.time_window[0]) + " - " +
+                 str(self.time_window[1]))
 
-    def make_composite(self, areaid="mesanX"):
+        self.msg_scenes = get_msglist(msg_list, self.time_window,
+                                      self.msg_areaname)  # satellites=self.msg_satellites)
+        self.msg_scenes.sort()
+        LOG.info(str(len(self.msg_scenes)) + " MSG scenes located")
+        for scene in self.msg_scenes:
+            LOG.debug("Geo scene:\n" + str(scene))
+
+    def make_composite(self):
         """Make the Cloud Type composite"""
 
         # Reference time for time stamp in composite file
         #sec1970 = datetime(1970, 1, 1)
         import time
 
-        comp_CT = []
+        comp_CT = None
 
-        # Loop over all polar scenes:
+        if len(self.msg_scenes + self.pps_scenes) == 0:
+            LOG.error(
+                "Cannot make ct composite when no Scenes have been found!")
+            return False
+
+        # Loop over all polar and geostationary satellite scenes:
         is_MSG = False
-        # for scene in self.pps_scenes + self.msg_scenes:
+        LOG.info("Loop over all polar and geostationary scenes:")
         for scene in self.msg_scenes + self.pps_scenes:
             x_CT = None
-            print scene
-            if scene.platform == "meteosat" and not hasattr(scene, 'orbit'):
+            LOG.info("Scene:\n" + str(scene))
+            if (scene.platform_name.startswith("Meteosat") and
+                    not hasattr(scene, 'orbit')):
                 is_MSG = True
-                x_local = ctype_msg(scene)
+                x_local = ctype_msg(scene, self.areaid)
                 dummy, lat = x_local.area.get_lonlats()
                 x_CT = x_local['CloudType_plax'].cloudtype
                 # convert msg flags to pps
@@ -180,10 +261,21 @@ class ctCompositer(object):
                 x_id = 1 * np.ones(np.shape(x_CT))
             else:
                 is_MSG = False
+                try:
+                    x_local = ctype_pps(scene, self.areaid)
+                except (ProjectException, LoadException) as err:
+                    LOG.warning("Couldn't load pps scene:\n" + str(scene))
+                    LOG.warning("Exception was: " + str(err))
+                    continue
 
-                x_local = ctype_pps(scene)
-                x_CT = x_local['CloudType'].cloudtype.data
-                x_flag = x_local['CloudType'].quality_flag.data
+                #x_CT = x_local['CT'].ct.data
+                #x_flag = x_local['CT'].ct_quality.data
+                # Convert to old format:
+                x_CT = map_cloudtypes(x_local['CT'].ct.data.filled(0))
+                sflags = x_local['CT'].ct_status_flag.data.filled(0)
+                cflags = x_local['CT'].ct_conditions.data.filled(0)
+                qflags = x_local['CT'].ct_quality.data.filled(0)
+                x_flag = ctype_convert_flags(sflags, cflags, qflags)
                 x_id = 0 * np.ones(np.shape(x_CT))
                 lat = 0 * np.ones(np.shape(x_CT))
 
@@ -191,18 +283,18 @@ class ctCompositer(object):
             x_time = time.mktime(scene.timeslot.timetuple()) * \
                 np.ones(np.shape(x_CT))
             idx_MSG = is_MSG * np.ones(np.shape(x_CT), dtype=np.bool)
-            if comp_CT == []:
+            if comp_CT is None:
                 # initialize field with current CT
                 comp_lon, comp_lat = x_local.area.get_lonlats()
                 comp_CT = x_CT
                 comp_flag = x_flag
                 comp_time = x_time
                 comp_id = x_id
-                comp_w = wCT(
+                comp_w = get_weight_cloudtype(
                     x_CT, x_flag, lat, abs(self.obstime - scene.timeslot), idx_MSG)
             else:
                 # compare with quality of current CT
-                x_w = wCT(
+                x_w = get_weight_cloudtype(
                     x_CT, x_flag, lat, abs(self.obstime - scene.timeslot), idx_MSG)
 
                 # replace info where current CT data is best
@@ -215,7 +307,6 @@ class ctCompositer(object):
 
         self.longitude = comp_lon
         self.latitude = comp_lat
-
         self.area = x_local.area
 
         composite = {"cloudtype": comp_CT,
@@ -225,11 +316,52 @@ class ctCompositer(object):
                      "id": comp_id.astype(np.uint8)}
         self.composite.store(composite, self.area)
 
+        return True
+
     def write(self):
         """Write the composite to a netcdf file"""
-        self.composite.write(self.filename + '.nc')
+        tmpfname = tempfile.mktemp(suffix=os.path.basename(self.filename),
+                                   dir=os.path.dirname(self.filename))
+        #self.composite.write(self.filename + '.nc')
+        self.composite.write(tmpfname)
+        now = datetime.utcnow()
+        fname_with_timestamp = str(
+            self.filename) + now.strftime('_%Y%m%d%H%M%S.nc')
+        shutil.copy(tmpfname, fname_with_timestamp)
+        os.rename(tmpfname, self.filename + '.nc')
 
-        return
+    def make_quicklooks(self):
+        """Make quicklook images"""
+
+        import mpop.imageo.palettes
+        palette = mpop.imageo.palettes.cms_modified()
+        from mpop.imageo import geo_image
+
+        img = geo_image.GeoImage(self.composite.cloudtype.data,
+                                 self.areaid,
+                                 None,
+                                 fill_value=(0),
+                                 mode="P",
+                                 palette=palette)
+        img.save(self.filename.strip('.nc') + '_cloudtype.png')
+
+        comp_id = self.composite.id.data * 13
+        idimg = geo_image.GeoImage(comp_id,
+                                   self.areaid,
+                                   None,
+                                   fill_value=(0),
+                                   mode="P",
+                                   palette=palette)
+        idimg.save(self.filename.strip('.nc') + '_id.png')
+
+        comp_w = self.composite.weight.data * 20
+        wimg = geo_image.GeoImage(comp_w,
+                                  self.areaid,
+                                  None,
+                                  fill_value=(0),
+                                  mode="P",
+                                  palette=palette)
+        wimg.save(self.filename.strip('.nc') + '_weight.png')
 
 
 if __name__ == "__main__":
@@ -248,6 +380,33 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    from logging import handlers
+
+    if _MESAN_LOG_FILE:
+        ndays = int(OPTIONS["log_rotation_days"])
+        ncount = int(OPTIONS["log_rotation_backup"])
+        handler = handlers.TimedRotatingFileHandler(_MESAN_LOG_FILE,
+                                                    when='midnight',
+                                                    interval=ndays,
+                                                    backupCount=ncount,
+                                                    encoding=None,
+                                                    delay=False,
+                                                    utc=True)
+
+        # handler.doRollover()
+    else:
+        handler = logging.StreamHandler(sys.stderr)
+
+    handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter(fmt=_DEFAULT_LOG_FORMAT,
+                                  datefmt=_DEFAULT_TIME_FORMAT)
+    handler.setFormatter(formatter)
+    logging.getLogger('').addHandler(handler)
+    logging.getLogger('').setLevel(logging.DEBUG)
+    logging.getLogger('mpop').setLevel(logging.DEBUG)
+
+    LOG = logging.getLogger('make_ct_composite')
+
     time_of_analysis = datetime.strptime(args.datetime, '%Y%m%d%H')
     delta_t = timedelta(minutes=int(args.time_window))
 
@@ -255,3 +414,4 @@ if __name__ == "__main__":
     ctcomp.get_catalogue()
     ctcomp.make_composite()
     ctcomp.write()
+    ctcomp.make_quicklooks()

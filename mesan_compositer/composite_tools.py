@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 Adam.Dybbroe
+# Copyright (c) 2014, 2015, 2016, 2018, 2019 Adam.Dybbroe
 
 # Author(s):
 
@@ -23,91 +23,226 @@
 """Collection of minor helper tools for the generation of Mesan composites"""
 
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
+
+import logging
+LOG = logging.getLogger(__name__)
 
 
-MSGSATS = {'meteosat09': 'MSG2',
-           'meteosat08': 'MSG1',
-           'meteosat10': 'MSG3',
-           'meteosat11': 'MSG4'}
-METEOSAT = {'MSG1': 'meteosat08',
-            'MSG2': 'meteosat09',
-            'MSG3': 'meteosat10',
-            'MSG4': 'meteosat11'}
+MSGSATS = {'Meteosat-9': 'MSG2',
+           'Meteosat-8': 'MSG1',
+           'Meteosat-10': 'MSG3',
+           'Meteosat-11': 'MSG4'}
+METEOSAT = {'MSG1': 'Meteosat-8',
+            'MSG2': 'Meteosat-9',
+            'MSG3': 'Meteosat-10',
+            'MSG4': 'Meteosat-11'}
+
+TERRA_AQUA_NAMES = {'eos1': 'EOS-Terra',
+                    'eos2': 'EOS-Aqua'}
+
+PLATFORM_NAME_INV = {'Suomi-NPP': 'npp',
+                     'NOAA-20': 'noaa20',
+                     'EOS-Terra': 'eos1',
+                     'EOS-Aqua': 'eos2',
+                     'Metop-A': 'metopa',
+                     'Metop-B': 'metopb',
+                     'Metop-C': 'metopc',
+                     'NOAA-18': 'noaa18',
+                     'NOAA-15': 'noaa15',
+                     'NOAA-19': 'noaa19'}
+PLATFORM_NAME = {'npp': 'Suomi-NPP',
+                 'noaa20': 'NOAA-20',
+                 'eos1': 'EOS-Terra',
+                 'eos2': 'EOS-Aqua',
+                 'metopa': 'Metop-A',
+                 'metopb': 'Metop-B',
+                 'metopc': 'Metop-C',
+                 'noaa18': 'NOAA-18',
+                 'noaa15': 'NOAA-15',
+                 'noaa19': 'NOAA-19'}
+
+METOPS = ['metop03', 'metop02', 'metop01']
+
+SENSOR = {'NOAA-19': 'avhrr/3',
+          'NOAA-18': 'avhrr/3',
+          'NOAA-15': 'avhrr/3',
+          'Metop-A': 'avhrr/3',
+          'Metop-B': 'avhrr/3',
+          'Metop-C': 'avhrr/3',
+          'EOS-Terra': 'modis',
+          'EOS-Aqua': 'modis',
+          'Suomi-NPP': 'viirs',
+          'JPSS-1': 'viirs',
+          'NOAA-20': 'viirs'}
+
+from mesan_compositer.pps_msg_conversions import get_bit_from_flags
 
 
-class ppsMetaData(object):
+CFG_DIR = os.environ.get('MESAN_COMPOSITE_CONFIG_DIR', './')
+DIST = os.environ.get("SMHI_DIST", 'elin4')
+if not DIST or DIST == 'linda4':
+    MODE = 'offline'
+else:
+    MODE = os.environ.get("SMHI_MODE", 'offline')
+
+
+import ConfigParser
+
+CONF = ConfigParser.ConfigParser()
+CONFIGFILE = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
+if not os.path.exists(CONFIGFILE):
+    raise IOError('Config file %s does not exist!' % CONFIGFILE)
+CONF.read(CONFIGFILE)
+
+OPTIONS = {}
+for opt, val in CONF.items(MODE, raw=True):
+    OPTIONS[opt] = val
+
+pps_filename = OPTIONS['pps_filename']
+
+
+class PpsMetaData(object):
 
     """Container for the metadata defining the pps scenes"""
 
-    def __init__(self, platform=None, number=None,
+    def __init__(self, filename=None, geofilename=None,
+                 platform_name=None,
                  orbit="00000", timeslot=None,
                  variant=None):
-        self.platform = platform
-        self.number = number
+        self.platform_name = platform_name
         self.orbit = orbit
         self.timeslot = timeslot
         self.variant = variant
+        self.uri = filename
+        self.geofilename = geofilename
 
     def __str__(self):
-        return "\n".join(['platform=' + str(self.platform),
-                          'number=' + str(self.number),
+        return "\n".join(['filename=' + str(self.uri),
+                          'geofilename=' + str(self.geofilename),
+                          'platform_name=' + str(self.platform_name),
                           'orbit=' + self.orbit,
                           'timeslot=' + str(self.timeslot),
                           'variant=' + str(self.variant)])
 
+    def __lt__(self, other):
+        return self.timeslot < other.timeslot
 
-class msgMetaData(object):
+    def __gt__(self, other):
+        return self.timeslot > other.timeslot
+
+    def __le__(self, other):
+        return self.timeslot <= other.timeslot
+
+    def __ge__(self, other):
+        return self.timeslot >= other.timeslot
+
+
+class MsgMetaData(object):
 
     """Container for the metadata defining the msg scenes"""
 
-    def __init__(self, platform=None, number=None,
+    def __init__(self, filename=None, platform_name=None,
                  areaid=None, timeslot=None):
         self.timeslot = timeslot
         self.areaid = areaid
-        self.platform = platform
-        self.number = number
+        self.platform_name = platform_name
+        self.uri = filename
 
     def __str__(self):
-        return "\n".join(['platform=' + str(self.platform),
-                          'number=' + str(self.number),
+        return "\n".join(['filename=' + str(self.uri),
+                          'platform_name=' + str(self.platform_name),
                           'areaid=' + self.areaid,
                           'timeslot=' + str(self.timeslot)])
+
+    def __lt__(self, other):
+        return self.timeslot < other.timeslot
+
+    def __gt__(self, other):
+        return self.timeslot > other.timeslot
+
+    def __le__(self, other):
+        return self.timeslot <= other.timeslot
+
+    def __ge__(self, other):
+        return self.timeslot >= other.timeslot
+
+
+def get_analysis_time(start_t, end_t):
+    """From two times defining an interval, determine the closest hour (zero
+    minutes past) and return as a datetime object"""
+
+    if end_t and start_t > end_t:
+        raise IOError("Start time greater than end time!")
+    elif not end_t:
+        end_t = start_t + timedelta(seconds=300)
+        LOG.warning(
+            "No end time, so assuming equal to start time + 5 minutes!")
+    mean_time = (end_t - start_t) / 2 + start_t
+    mean_time = mean_time + timedelta(seconds=1800)
+
+    return datetime(
+        mean_time.year, mean_time.month, mean_time.day, mean_time.hour, 0, 0)
 
 
 def get_ppslist(filelist, timewindow, satellites=None, variant=None):
     """Get the full list of metadata keys for all pps passes in the *filelist*,
     but only for the satellites specified in the list *satellites* if given"""
 
+    from trollsift import Parser
+    prod_p = Parser(pps_filename)
+
+    LOG.debug("List of satellites: %s", str(satellites))
+
     plist = []
+    files_old = True
+    latest_file = None
+    latest_file_time = datetime(1970, 1, 1)
     for filename in filelist:
         bname = os.path.basename(filename)
-        bnsplit = bname.split('_')
-        sat = bnsplit[0]
-        if satellites and sat not in satellites:
+        try:
+            res = prod_p.parse(bname)
+        except ValueError:
+            LOG.exception('Failed processing filename %s', filename)
+            LOG.warning('Probably wrong date time string in PPS file, skip it...')
             continue
 
-        orbit = bnsplit[3]
-        timeslot = datetime.strptime(bnsplit[1] + bnsplit[2], '%Y%m%d%H%M')
-        if sat.find('npp') == 0:
-            platform = 'npp'
-            number = ''
-        elif sat.find('noaa') == 0:
-            platform = 'noaa'
-            number = sat.split('noaa')[1]
-        elif sat.find('metop') == 0:
-            platform = 'metop'
-            number = sat.split('metop')[1]
-        else:
+        sat = res['platform_name']
+
+        if satellites and PLATFORM_NAME.get(sat, sat) not in satellites:
+            LOG.debug("Satellite not in the list of platforms! platform=%s", PLATFORM_NAME.get(sat, sat))
+            continue
+
+        product = res['product']
+        geofilename = filename.replace(product, 'CMA')
+        orbit = '%05d' % res['orbit']
+        timeslot = res['start_time']
+        if timeslot > latest_file_time:
+            latest_file_time = timeslot
+            latest_file = filename
+        platform_name = PLATFORM_NAME.get(sat)
+        if not platform_name:
             raise IOError("Error: satellite %s not supported!" % sat)
 
         # Now filter out all passes outside time window:
         if (timeslot > timewindow[0] and
                 timeslot < timewindow[1]):
 
-            plist.append(ppsMetaData(orbit=orbit, timeslot=timeslot,
-                                     platform=platform, number=number,
-                                     variant=variant))
+            mda = PpsMetaData(filename=filename,
+                              geofilename=geofilename,
+                              orbit=orbit, timeslot=timeslot,
+                              platform_name=platform_name,
+                              variant=variant)
+            plist.append(mda)
+            files_old = False
+        elif (timewindow[0] - timeslot) < timedelta(seconds=3600 * 4):
+            files_old = False
+
+    if files_old and latest_file > 0:
+        LOG.critical("No fresh pps products found - " +
+                     "most recent = %s (obs-time = %s)\n" +
+                     "Latest file is more than 4 hours from time-window\n",
+                     os.path.basename(latest_file), str(latest_file_time))
 
     return plist
 
@@ -118,43 +253,47 @@ def get_msglist(filelist, timewindow, area_id, satellites=None):
     if given"""
 
     if not satellites:
-        satellites = ['meteosat08', 'meteosat09',
-                      'meteosat10', 'meteosat11']
+        satellites = ['Meteosat-8', 'Meteosat-9',
+                      'Meteosat-10', 'Meteosat-11']
     metsats = [MSGSATS.get(s, 'MSGx') for s in satellites]
-
-    print metsats
 
     mlist = []
     for filename in filelist:
         bname = os.path.basename(filename)
+        LOG.debug("Filename: %s", str(bname))
+
         bnsplit = bname.split('_')
         sat = bnsplit[1]
         if sat not in metsats:
+            LOG.warning('Satellite ' + str(sat) +
+                        ' not in list: ' + str(metsats))
             continue
 
-        platform = 'meteosat'
-        number = (METEOSAT.get(sat, 'meteosat09')).split(platform)[1]
-        areaid = bnsplit[-1].split('.')[0]
-
-        #import pdb
-        # pdb.set_trace()
-
+        platform_name = METEOSAT[sat]
+        bnsplit = bname[17:].split('_')
+        areaid = bnsplit[1].split('.')[0]
         if areaid != area_id:
+            LOG.debug("Area id " + str(areaid) +
+                      " not requested (" + str(area_id) + ")")
+            LOG.debug("bnsplit = %s", str(bnsplit))
             continue
 
         # Hardcoded the filenaming convention! FIXME!
         try:
-            timeslot = datetime.strptime(bname[17:17 + 12], '%Y%m%d%H%M')
+            #timeslot = datetime.strptime(bname[17:17 + 12], '%Y%m%d%H%M')
+            timeslot = datetime.strptime(bnsplit[0], '%Y%m%d%H%M')
         except ValueError:
-            print("Failure: Can't get the time of the msg scene! " +
-                  str(bname))
+            LOG.error("Failure: Can't get the time of the msg scene! " +
+                      str(bname))
             continue
 
         # Now filter out all passes outside time window:
         if (timeslot > timewindow[0] and
                 timeslot < timewindow[1]):
-            mlist.append(msgMetaData(areaid=areaid, timeslot=timeslot,
-                                     platform=platform, number=number))
+            mda = MsgMetaData(filename=filename,
+                              areaid=areaid, timeslot=timeslot,
+                              platform_name=platform_name)
+            mlist.append(mda)
 
     return mlist
 
@@ -165,21 +304,85 @@ def get_nwcsaf_files(basedir, file_ext):
     return glob(os.path.join(basedir, '*' + file_ext))
 
 
-def wCT(CT, CT_flag, lat, tdiff, MSG):
-    """Weights for given CT, CT flag, time diff and latitude (only MSG).
+def get_weight_ctth(ctth_flag, lat, tdiff, is_msg):
+    """Weights for given CTTH flag, time diff and latitude (only MSG).
     """
     #
     import numpy as np
     #
     #  limits; linear lat dependence for MSG
-    LATMIN_MSG = 52.0  # weight factor is 1 if lat < LATMIN_MSG
-    LATMAX_MSG = 75.0  # weight factor is 0 if lat > LATMAX_MSG
+    latmin_msg = 52.0  # weight factor is 1 if lat < LATMIN_MSG
+    latmax_msg = 75.0  # weight factor is 0 if lat > LATMAX_MSG
     #
     # time diff in minutes when diff affects quality
     # weight factor is 0.5 if diff > TDIFF
-    TDIFF = 30.0
+    tdiff_thr = 30.0
     #
     # weight factors per CT quality flag (MSG,PPS)
+    # this is based on pps flags, msg flags are mapped to pps
+    wCTTHflg = np.array([
+        [0.0,  0.0],  # 00 Not processed
+        [1.0,  1.0],  # 01 Cloudy
+        [1.0,  1.0],  # 02 Opaque cloud
+        [1.0,  1.0],  # 03 RTTOV IR simulations available
+        [0.5,  0.5],  # 04 Missing NWP data
+        [0.5,  0.5],  # 05 Thermal inversion available
+        [1.0,  1.0],  # 06 Missing AVHRR data
+        [1.0,  1.0],  # 07 RTTOV IR simulation applied
+        [0.5,  0.5],  # 08 Windowing technique applied
+        [1.0,  1.0],  # 09 ???
+        [1.0,  1.0],  # 10 ???
+        [1.0,  1.0],  # 11 ???
+        [1.0,  1.0],  # 12 ??? prev used for PPS/MSG
+        [1.0,  1.0],  # 13 ??? prev used for large time diff
+        [1.0,  1.0],  # 14 Quality estimation available
+        [0.5,  0.5]   # 15 Low confidence
+    ])
+    #
+    #
+    # default quality is 1.0
+    weight = np.ones(np.shape(ctth_flag))
+    #
+    # large time diff to analysis time - decrease weight
+    if abs(tdiff).seconds / 60 > tdiff_thr:
+        weight *= 0.5
+    #
+    # reduce quality according to CT flag, MSG = 0 / 1
+    #
+    #
+    for bit in range(len(wCTTHflg)):
+        b = get_bit_from_flags(ctth_flag, bit)
+        # need integer for index to this array
+        weight[np.nonzero(b)] *= wCTTHflg[bit, 1 * is_msg[np.nonzero(b)]]
+    # linear lat dependence for MSG btw LATMIN_MSG and latmax_msg
+    # weight is 1.0 for lat < LATMIN and 0.0 for lat > LATMAX
+    if not np.all(is_msg == False):
+        ii = (lat >= latmin_msg) * (lat <= latmax_msg) * is_msg
+        weight[ii] *= (latmax_msg - lat[ii]) / (latmax_msg - latmin_msg)
+        ii = (lat > latmax_msg) * is_msg
+        weight[ii] = 0.0
+
+    return weight
+
+
+def get_weight_cloudtype(ctype, ctype_flag, lat, tdiff, is_msg):
+    """Weights for given ctype, ctype flag, time diff and latitude (only MSG).
+    """
+    #
+    import numpy as np
+
+    #import pdb
+    # pdb.set_trace()
+    #
+    #  limits; linear lat dependence for MSG
+    latmin_msg = 52.0  # weight factor is 1 if lat < latmin_msg
+    latmax_msg = 75.0  # weight factor is 0 if lat > latmax_msg
+    #
+    # time diff in minutes when diff affects quality
+    # weight factor is 0.5 if diff > tdiff_thr
+    tdiff_thr = 30.0
+    #
+    # weight factors per ctype quality flag (MSG,PPS)
     # this is based on pps flags, msg flags are mapped to pps
     wCTflg = np.array([
         [1.0,  1.0],  # 00 Land
@@ -196,8 +399,8 @@ def wCT(CT, CT_flag, lat, tdiff, MSG):
         [1.0,  1.0]   # 11 Stratiform-cumuliform distinction performed
     ])
     #
-    # weight factors per CT class
-    wCTcl = np.array([
+    # weight factors per ctype class
+    weights_ctype_class = np.array([
         0.0,  # 00 Not processed
         0.95,  # 01 Cloud free land
         1.0,  # 02 Cloud free sea
@@ -222,51 +425,53 @@ def wCT(CT, CT_flag, lat, tdiff, MSG):
     ])
     #
 
-    def get_bit_from_flags(arr, nbit):
-        """I don't know what this function does.
-        """
-        res = np.bitwise_and(np.right_shift(arr, nbit), 1)
-        return res.astype('b')
     #
     # default quality is 1.0
-    w = np.ones(np.shape(CT_flag))
+    weight = np.ones(np.shape(ctype_flag))
     #
     # large time diff to analysis time - decrease weight
-    if abs(tdiff).seconds / 60 > TDIFF:
-        w *= 0.5
+    if abs(tdiff).seconds / 60 > tdiff_thr:
+        weight *= 0.5
     #
-    # reduce quality according to CT flag, MSG = 0 / 1
+    # reduce quality according to ctype flag, is_msg = 0 / 1
     for bit in range(len(wCTflg)):
-        b = get_bit_from_flags(CT_flag, bit)
+        bit_is_set = get_bit_from_flags(ctype_flag, bit)
         # need integer for index to this array
-        w[np.nonzero(b)] *= wCTflg[bit, 1 * MSG[np.nonzero(b)]]
-    #
-    #    pdb.set_trace()
-    #
-    # linear lat dependence for MSG btw LATMIN_MSG and LATMAX_MSG
+        weight[np.nonzero(bit_is_set)] *= wCTflg[bit,
+                                                 1 * is_msg[np.nonzero(bit_is_set)]]
+
+    # linear lat dependence for MSG btw latmin_msg and latmax_msg
     # weight is 1.0 for lat < LATMIN and 0.0 for lat > LATMAX
-    if not np.all(MSG == False):
-        ii = (lat >= LATMIN_MSG) * (lat <= LATMAX_MSG) * MSG
-        w[ii] *= (LATMAX_MSG - lat[ii]) / (LATMAX_MSG - LATMIN_MSG)
-        ii = (lat > LATMAX_MSG) * MSG
-        w[ii] = 0.0
+    if not np.all(is_msg == False):
+        ii = (lat >= latmin_msg) * (lat <= latmax_msg) * is_msg
+        weight[ii] *= (latmax_msg - lat[ii]) / (latmax_msg - latmin_msg)
+        ii = (lat > latmax_msg) * is_msg
+        weight[ii] = 0.0
     #
     # special treatment of high clouds - medium to Cirrus
     # why? increase q to override ceilometers???
     #
     # if weight is very small: set to 0.0
-    ii = (CT >= 9) * (CT <= 18) * (w < 1e-6)
-    w[ii] = 0.0
+    ii = (ctype >= 9) * (ctype <= 18) * (weight < 1e-6)
+    weight[ii] = 0.0
     # if not low quality: set to 1.0
-    b = get_bit_from_flags(CT_flag, 9)
-    ii = (CT >= 9) * (CT <= 18) * (b == 0)
-    w[ii] = 1.0
+    b = get_bit_from_flags(ctype_flag, 9)
+    ii = (ctype >= 9) * (ctype <= 18) * (b == 0)
+    weight[ii] = 1.0
     #
-    # all CT above 20 are set to 20 (undefined with weight 0)
-    # howto index with x_CT.astype('int') from masked array ?
-    CT[CT > 20] = 20
+    # all ctype above 20 are set to 20 (undefined with weight 0)
+    # howto index with x_ctype.astype('int') from masked array ?
+    ctype[ctype > 20] = 20
     #
-    # dependece on cloud type
-    w *= wCTcl[CT.astype('int')]
+    # dependence on cloud type
+    weight *= weights_ctype_class[ctype.astype('int')]
     #
-    return w
+    # pdb.set_trace()
+    # np.savez('input_output.npz',
+    #          CTYPE=ctype.data[1200:1210, 1000:1010],
+    #          CTYPE_FLAGS=ctype_flag.data[1200:1210, 1000:1010],
+    #          LAT=lat[1200:1210, 1000:1010],
+    #          IS_MSG=is_msg[1200:1210, 1000:1010],
+    #          WEIGHTS=weight[1200:1210, 1000:1010])
+
+    return weight

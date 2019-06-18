@@ -20,12 +20,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Make quick look images of the cloudtype composite
+"""Make quick look images of the ctth composite
 """
-
 import argparse
 from datetime import datetime
-from mesan_compositer.netcdf_io import ncCloudTypeComposite
+from mesan_compositer.netcdf_io import ncCTTHComposite
 import sys
 import os
 
@@ -78,8 +77,6 @@ if __name__ == "__main__":
                                                     encoding=None,
                                                     delay=False,
                                                     utc=True)
-
-        # handler.doRollover()
     else:
         handler = logging.StreamHandler(sys.stderr)
 
@@ -91,45 +88,27 @@ if __name__ == "__main__":
     logging.getLogger('').setLevel(logging.DEBUG)
     logging.getLogger('mpop').setLevel(logging.DEBUG)
 
-    LOG = logging.getLogger('ct_quicklooks')
+    LOG = logging.getLogger('ctth_quicklooks')
 
     obstime = datetime.strptime(args.datetime, '%Y%m%d%H')
     values = {"area": args.area_id, }
-    bname = obstime.strftime(OPTIONS['ct_composite_filename']) % values
+    bname = obstime.strftime(OPTIONS['ctth_composite_filename']) % values
     path = OPTIONS['composite_output_dir']
     filename = os.path.join(path, bname) + '.nc'
     if not os.path.exists(filename):
         LOG.error("File " + str(filename) + " does not exist!")
         sys.exit(-1)
 
-    comp = ncCloudTypeComposite()
+    comp = ncCTTHComposite()
     comp.load(filename)
 
     import mpop.imageo.palettes
-    palette = mpop.imageo.palettes.cms_modified()
+    palette = mpop.imageo.palettes.ctth_height()
     from mpop.imageo import geo_image
-    img = geo_image.GeoImage(comp.cloudtype.data,
+    img = geo_image.GeoImage(comp.height.data,
                              args.area_id,
                              None,
                              fill_value=(0),
-                             mode = "P",
-                             palette = palette)
-    img.save(filename.strip('.nc') + '_cloudtype.png')
-
-    comp_id = comp.id.data * 13
-    idimg = geo_image.GeoImage(comp_id,
-                               args.area_id,
-                               None,
-                               fill_value=(0),
-                               mode = "P",
-                               palette = palette)
-    idimg.save(filename.strip('.nc') + '_id.png')
-
-    comp_w = comp.weight.data * 20
-    wimg = geo_image.GeoImage(comp_w,
-                              args.area_id,
-                              None,
-                              fill_value=(0),
-                              mode = "P",
-                              palette = palette)
-    wimg.save(filename.strip('.nc') + '_weight.png')
+                             mode="P",
+                             palette=palette)
+    img.save(filename.strip('.nc') + '_height.png')

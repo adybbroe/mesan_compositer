@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2013, 2014 Adam Dybbroe
+# Copyright (c) 2013, 2014, 2015 Adam Dybbroe
 
 # Author(s):
 
@@ -37,7 +37,7 @@ version = imp.load_source(
     'mesan_compositer.version', 'mesan_compositer/version.py')
 
 setup(name='mesan-compositer',
-      version='v0.1.0',
+      version='0.1.0',
       description=SHORT_DESC,
       author='Adam Dybbroe, Tomas Landelius',
       author_email='adam.dybbroe@smhi.se, tomas.landelius@smhi.se',
@@ -53,24 +53,29 @@ setup(name='mesan-compositer',
       long_description=long_description,
       license='GPLv3',
 
-      packages=['mesan_compositer'],
+      packages=['mesan_compositer', 'nwcsaf_formats'],
       package_data={},
 
       # Project should use reStructuredText, so ensure that the docutils get
       # installed or upgraded on the target machine
       install_requires=['docutils>=0.3',
                         'numpy>=1.5.1',
-                        'netCDF4',
-                        'pyresample',
-                        'pyorbital >= v0.2.3'],
+                        'mpop>=v1.0',
+                        'pyresample'],
+      #'pyorbital >= v0.2.3'],
 
       test_requires=["mock"],
-      extras_require={},
+      extras_require={'netcdf4-python': ['netCDF4']},
       scripts=['mesan_compositer/make_ct_composite.py',
-               'mesan_compositer/ct_quicklooks.py'],
+               'mesan_compositer/make_ctth_composite.py',
+               'mesan_compositer/prt_nwcsaf_cloudamount.py',
+               'mesan_compositer/prt_nwcsaf_cloudheight.py',
+               'mesan_compositer/ct_quicklooks.py',
+               'mesan_compositer/ctth_quicklooks.py',
+               'mesan_compositer/mesan_composite_runner.py'],
       data_files=[('etc', ['etc/mesan_sat_config.cfg_template']),
                   ],
-      test_suite='mesan_compositer.tests.suite',
+      test_suite='tests.suite',
       tests_require=[],
       zip_safe=False
       )

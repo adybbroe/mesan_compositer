@@ -2,20 +2,28 @@
 
 composite_output_dir = /path/to/mesan/output
 ct_composite_filename = mesan_composite_%(area)s_%Y%m%d_%H%M_ct
+cloudamount_filename = mesan_composite_%(area)s_%Y%m%d_%H%M_clamount
 
 pps_direct_readout_dir = /path/to/pps/direct/readout/products
 pps_metop_gds_dir = /path/to/pps/global/metop/products
 
-pps_cty_filename = %(satellite)s_%Y%m%d_%H%M_?????_satproj_?????_?????_cloudtype.h5
-pps_ctth_filename = %(satellite)s_%Y%m%d_%H%M_%(orbit)s_satproj_?????_?????_ctth.h5
-polar_satellites = ['npp', 'noaa19', 'noaa18', 'noaa16', 'metop02']
+#pps_cty_filename = %(satellite)s_%Y%m%d_%H%M_?????_satproj_?????_?????_cloudtype.h5
+#pps_ctth_filename = %(satellite)s_%Y%m%d_%H%M_%(orbit)s_satproj_?????_?????_ctth.h5
+pps_cty_filename = S_NWC_CT_%(satellite)s_%(orbit)s_%Y%m%dT%H%M%S*Z.h5
+pps_ctth_filename = S_NWC_CTTH_%(satellite)s_%(orbit)s_%Y%m%dT%H%M%S*Z.h5
+polar_satellites = npp,noaa19,noaa18,noaa15,metopa,metopb
 
 msg_dir = /path/to/msg/products
 msg_satellites = ['meteosat10']
 msg_cty_filename = SAFNWC_%(satellite)s_CT___%Y%m%d%H%M_%(area)s.PLAX.CTTH.0.h5
 msg_cty_file_ext = PLAX.CTTH.0.h5
+msg_ctth_filename = SAFNWC_%(satellite)s_CTTH_%Y%m%d%H%M_%(area)s.PLAX.CTTH.0.h5
+msg_ctth_file_ext = PLAX.CTTH.0.h5
 msg_areaname = "EuropeCanary"
 
+mesan_log_file = /var/log/satellit/mesan_compositer.log
+log_rotation_days = 1
+log_rotation_backup = 10
 
 [prod]
 
