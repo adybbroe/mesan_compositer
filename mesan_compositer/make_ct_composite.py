@@ -246,7 +246,27 @@ class ctCompositer(object):
         # Loop over all polar and geostationary satellite scenes:
         is_MSG = False
         LOG.info("Loop over all polar and geostationary scenes:")
-        for scene in self.msg_scenes + self.pps_scenes:
+        #msgscenes = [self.msg_scenes[0], self.msg_scenes[2], self.msg_scenes[1]]
+        #msgscenes = [self.msg_scenes[2], self.msg_scenes[1], self.msg_scenes[0]]
+        #msgscenes = [self.msg_scenes[1], self.msg_scenes[0], self.msg_scenes[2]]
+        #msgscenes = [self.msg_scenes[1], self.msg_scenes[2], self.msg_scenes[0]]
+        # for scene in msgscenes + self.pps_scenes:
+
+        # Go through the list of msg-scenes and find the one closest to the
+        # obs-time, and put in front. Also revert the list. All this is to make
+        # the code work as it did when the system tests were generated:
+        tdelta = timedelta(seconds=9999)
+        myindex = 0
+        for idx, scene in enumerate(self.msg_scenes):
+            if abs(scene.timeslot - self.obstime) < tdelta:
+                tdelta = abs(scene.timeslot - self.obstime)
+                myindex = idx
+        msgscenes = self.msg_scenes[::-1]
+        scene = self.msg_scenes[myindex]
+        msgscenes.remove(scene)
+        msgscenes.insert(0, scene)
+
+        for scene in msgscenes + self.pps_scenes:
             x_CT = None
             LOG.info("Scene:\n" + str(scene))
             if (scene.platform_name.startswith("Meteosat") and

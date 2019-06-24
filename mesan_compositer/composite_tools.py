@@ -432,6 +432,10 @@ def get_weight_cloudtype(ctype, ctype_flag, lat, tdiff, is_msg):
     # large time diff to analysis time - decrease weight
     if abs(tdiff).seconds / 60 > tdiff_thr:
         weight *= 0.5
+    # else:
+    #     # Small time difference to analysis time, decrease wight slightly only:
+    #     weight *= (1 - abs(tdiff).seconds/(tdiff_thr * 60.)**2)
+
     #
     # reduce quality according to ctype flag, is_msg = 0 / 1
     for bit in range(len(wCTflg)):
