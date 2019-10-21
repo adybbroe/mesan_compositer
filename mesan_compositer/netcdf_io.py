@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2015, 2018 Adam.Dybbroe
+# Copyright (c) 2014, 2015, 2018, 2019 Adam.Dybbroe
 
 # Author(s):
 
@@ -26,7 +26,8 @@ import logging
 LOG = logging.getLogger(__name__)
 
 import numpy as np
-from mpop.satout.cfscene import proj2cf
+from utils import proj2cf
+import netcdf4
 
 TIME_UNITS = "seconds since 1970-01-01 00:00:00"
 CF_FLOAT_TYPE = np.float64
@@ -145,36 +146,31 @@ class ncCloudTypeComposite(object):
         self.area.info = {"var_name": 'area',
                           "var_data": self.area.data,
                           "var_dim_names": ()}
+
         self.area.info.update(proj2cf(area_obj.proj_dict))
 
         setattr(self, self.area.info["var_name"], self.area)
-        x__ = InfoObject()
-        area_obj.get_proj_coords(cache=True)
-        try:
-            x__.data = area_obj.projection_x_coords[0, :]
-        except IndexError:
-            x__.data = area_obj.projection_x_coords
 
-        x__.info = {"var_name": "x" + str_res,
-                    "var_data": x__.data,
-                    "var_dim_names": ("x" + str_res,),
-                    "units": "m",
-                    "standard_name": "projection_x_coordinate",
-                    "long_name": "x coordinate of projection"}
-        setattr(self, x__.info["var_name"], x__)
+        # x__ = InfoObject()
+        # y__ = InfoObject()
 
-        y__ = InfoObject()
-        try:
-            y__.data = area_obj.projection_y_coords[:, 0]
-        except IndexError:
-            y__.data = area_obj.projection_y_coords
-        y__.info = {"var_name": "y" + str_res,
-                    "var_data": y__.data,
-                    "var_dim_names": ("y" + str_res,),
-                    "units": "m",
-                    "standard_name": "projection_y_coordinate",
-                    "long_name": "y coordinate of projection"}
-        setattr(self, y__.info["var_name"], y__)
+        # x__.data, y__.data = area_obj.get_proj_coords_dask()
+
+        # x__.info = {"var_name": "x" + str_res,
+        #             "var_data": x__.data,
+        #             "var_dim_names": ("x" + str_res,),
+        #             "units": "m",
+        #             "standard_name": "projection_x_coordinate",
+        #             "long_name": "x coordinate of projection"}
+        # setattr(self, x__.info["var_name"], x__)
+
+        # y__.info = {"var_name": "y" + str_res,
+        #             "var_data": y__.data,
+        #             "var_dim_names": ("y" + str_res,),
+        #             "units": "m",
+        #             "standard_name": "projection_y_coordinate",
+        #             "long_name": "y coordinate of projection"}
+        # setattr(self, y__.info["var_name"], y__)
 
         self.cloudtype.info["grid_mapping"] = self.area.info["var_name"]
         self.weight.info["grid_mapping"] = self.area.info["var_name"]
@@ -184,7 +180,6 @@ class ncCloudTypeComposite(object):
     def write(self, filename):
         """Write the data to netCDF file"""
 
-        from mpop.satout import netcdf4
         netcdf4.netcdf_cf_writer(filename, self, compression=6)
 
         return

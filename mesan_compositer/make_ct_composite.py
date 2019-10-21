@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014-2019 Adam.Dybbroe
+# Copyright (c) 2014 - 2019 Adam.Dybbroe
 
 # Author(s):
 
@@ -28,7 +28,7 @@ import numpy as np
 import tempfile
 import shutil
 
-from mpop.satin.msg_hdf import ctype_procflags2pps
+from utils import ctype_procflags2pps
 
 from mesan_compositer import (ProjectException, LoadException)
 from mesan_compositer.composite_tools import (get_msglist,
@@ -62,9 +62,9 @@ _DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 #: Default log format
 _DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
 
-import ConfigParser
+from six.moves import configparser
 
-CONF = ConfigParser.ConfigParser()
+CONF = configparser.ConfigParser()
 CONFIGFILE = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
 if not os.path.exists(CONFIGFILE):
     raise IOError('Config file %s does not exist!' % CONFIGFILE)
@@ -81,35 +81,27 @@ _MESAN_LOG_FILE = OPTIONS.get('mesan_log_file', None)
 
 def ctype_pps(pps, areaid):
     """Load PPS Cloudtype and reproject"""
-    from mpop.satellites import PolarFactory
-    global_data = PolarFactory.create_scene(pps.platform_name, '',
-                                            SENSOR.get(
-                                                pps.platform_name, 'avhrr/3'),
-                                            pps.timeslot, pps.orbit,
-                                            variant='DR')
+    from satpy.scene import Scene
+    from satpy.utils import debug_on
+    debug_on()
 
-    try:
-        global_data.load(['CT'], filename=pps.uri)
-    except AttributeError:
-        raise LoadException('MPOP scene object fails to load!')
+    scene = Scene(filenames=[pps.uri, pps.geofilename], reader='nwcsaf-pps_nc')
+    scene.load(['cloudtype', 'ct', 'ct_quality', 'ct_status_flag', 'ct_conditions'])
 
-    if global_data.area or global_data['CT'].area:
-        return global_data.project(areaid)
-    else:
-        raise ProjectException('MPOP Scene object has no area instance' +
-                               ' and product cannot be projected')
+    retv = scene.resample(areaid, radius_of_influence=5000)
+    return retv
 
 
 def ctype_msg(msg, areaid):
     """Load MSG paralax corrected cloud type and reproject"""
-    from mpop.satellites import GeostationaryFactory
 
-    global_geo = GeostationaryFactory.create_scene(msg.platform_name, '',
-                                                   "seviri",
-                                                   time_slot=msg.timeslot,
-                                                   variant='0DEG')
-    global_geo.load(['CloudType_plax'], filename=msg.uri)
-    return global_geo.project(areaid)
+    from satpy.scene import Scene
+    from satpy.utils import debug_on
+    debug_on()
+
+    scene = Scene(filenames=[msg.uri, ], reader='nwcsaf-msg2013-hdf5')
+    scene.load(['cloudtype', 'ct', 'ct_quality'])
+    return scene.resample(areaid, radius_of_influence=20000)
 
 
 class ctCompositer(object):
@@ -118,7 +110,7 @@ class ctCompositer(object):
 
     def __init__(self, obstime, tdiff, areaid, **kwargs):
 
-        conf = ConfigParser.ConfigParser()
+        conf = configparser.ConfigParser()
         configfile = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
         if not os.path.exists(configfile):
             raise IOError('Config file %s does not exist!' % configfile)
@@ -212,7 +204,7 @@ class ctCompositer(object):
 
         # Get all geostationary satellite scenes:
         msg_dir = self._options['msg_dir'] % {"number": "02"}
-        #ext = self._options['msg_cty_file_ext']
+        # ext = self._options['msg_cty_file_ext']
         # SAFNWC_MSG2_CT___201206252345_EuropeCanary.h5
         # What about EuropeCanary and possible other areas!? FIXME!
         msg_list = glob(os.path.join(msg_dir, '*_CT___*.PLAX.CTTH.0.h5'))
@@ -233,7 +225,7 @@ class ctCompositer(object):
         """Make the Cloud Type composite"""
 
         # Reference time for time stamp in composite file
-        #sec1970 = datetime(1970, 1, 1)
+        # sec1970 = datetime(1970, 1, 1)
         import time
 
         comp_CT = None
@@ -246,10 +238,10 @@ class ctCompositer(object):
         # Loop over all polar and geostationary satellite scenes:
         is_MSG = False
         LOG.info("Loop over all polar and geostationary scenes:")
-        #msgscenes = [self.msg_scenes[0], self.msg_scenes[2], self.msg_scenes[1]]
-        #msgscenes = [self.msg_scenes[2], self.msg_scenes[1], self.msg_scenes[0]]
-        #msgscenes = [self.msg_scenes[1], self.msg_scenes[0], self.msg_scenes[2]]
-        #msgscenes = [self.msg_scenes[1], self.msg_scenes[2], self.msg_scenes[0]]
+        # msgscenes = [self.msg_scenes[0], self.msg_scenes[2], self.msg_scenes[1]]
+        # msgscenes = [self.msg_scenes[2], self.msg_scenes[1], self.msg_scenes[0]]
+        # msgscenes = [self.msg_scenes[1], self.msg_scenes[0], self.msg_scenes[2]]
+        # msgscenes = [self.msg_scenes[1], self.msg_scenes[2], self.msg_scenes[0]]
         # for scene in msgscenes + self.pps_scenes:
 
         # Go through the list of msg-scenes and find the one closest to the
@@ -273,11 +265,11 @@ class ctCompositer(object):
                     not hasattr(scene, 'orbit')):
                 is_MSG = True
                 x_local = ctype_msg(scene, self.areaid)
-                dummy, lat = x_local.area.get_lonlats()
-                x_CT = x_local['CloudType_plax'].cloudtype
+                dummy, lat = x_local['ct'].area.get_lonlats()
+                x_CT = x_local['ct'].data.compute()
+
                 # convert msg flags to pps
-                x_flag = ctype_procflags2pps(
-                    x_local['CloudType_plax'].processing_flags)
+                x_flag = ctype_procflags2pps(x_local['ct_quality'].data.compute())
                 x_id = 1 * np.ones(np.shape(x_CT))
             else:
                 is_MSG = False
@@ -288,24 +280,23 @@ class ctCompositer(object):
                     LOG.warning("Exception was: " + str(err))
                     continue
 
-                #x_CT = x_local['CT'].ct.data
-                #x_flag = x_local['CT'].ct_quality.data
+                # x_CT = x_local['CT'].ct.data
+                # x_flag = x_local['CT'].ct_quality.data
                 # Convert to old format:
-                x_CT = map_cloudtypes(x_local['CT'].ct.data.filled(0))
-                sflags = x_local['CT'].ct_status_flag.data.filled(0)
-                cflags = x_local['CT'].ct_conditions.data.filled(0)
-                qflags = x_local['CT'].ct_quality.data.filled(0)
+                x_CT = map_cloudtypes(x_local['ct'].data)
+                sflags = x_local['ct_status_flag']
+                cflags = x_local['ct_conditions']
+                qflags = x_local['ct_quality']
                 x_flag = ctype_convert_flags(sflags, cflags, qflags)
                 x_id = 0 * np.ones(np.shape(x_CT))
                 lat = 0 * np.ones(np.shape(x_CT))
 
             # time identifier is seconds since 1970-01-01 00:00:00
-            x_time = time.mktime(scene.timeslot.timetuple()) * \
-                np.ones(np.shape(x_CT))
+            x_time = time.mktime(scene.timeslot.timetuple()) * np.ones(np.shape(x_CT))
             idx_MSG = is_MSG * np.ones(np.shape(x_CT), dtype=np.bool)
             if comp_CT is None:
                 # initialize field with current CT
-                comp_lon, comp_lat = x_local.area.get_lonlats()
+                comp_lon, comp_lat = x_local['ct'].area.get_lonlats()
                 comp_CT = x_CT
                 comp_flag = x_flag
                 comp_time = x_time
@@ -319,15 +310,17 @@ class ctCompositer(object):
 
                 # replace info where current CT data is best
                 ii = x_w > comp_w
-                comp_CT[ii] = x_CT[ii]
-                comp_flag[ii] = x_flag[ii]
-                comp_w[ii] = x_w[ii]
-                comp_time[ii] = x_time[ii]
-                comp_id[ii] = x_id[ii]
+
+                comp_CT = np.where(ii, x_CT, comp_CT)
+                comp_flag = np.where(ii, x_flag, comp_flag)
+                comp_w = np.where(ii, x_w, comp_w)
+                comp_time = np.where(ii, x_time, comp_time)
+                comp_id = np.where(ii, x_id, comp_id)
 
         self.longitude = comp_lon
         self.latitude = comp_lat
-        self.area = x_local.area
+
+        self.area = x_local['ct'].area
 
         composite = {"cloudtype": comp_CT,
                      "flag": comp_flag,
@@ -342,7 +335,6 @@ class ctCompositer(object):
         """Write the composite to a netcdf file"""
         tmpfname = tempfile.mktemp(suffix=os.path.basename(self.filename),
                                    dir=os.path.dirname(self.filename))
-        #self.composite.write(self.filename + '.nc')
         self.composite.write(tmpfname)
         now = datetime.utcnow()
         fname_with_timestamp = str(
@@ -389,7 +381,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--datetime', '-d', help='Date and time of observation - yyyymmddhh',
                         required=True)
-    parser.add_argument('--time_window', '-t', help='Number of minutes before and after time window',
+    parser.add_argument('--time_window', '-t', help='Number of minutes before and after analysis time',
                         required=True)
     parser.add_argument('--area_id', '-a', help='Area id',
                         required=True)
@@ -434,4 +426,4 @@ if __name__ == "__main__":
     ctcomp.get_catalogue()
     ctcomp.make_composite()
     ctcomp.write()
-    ctcomp.make_quicklooks()
+    # ctcomp.make_quicklooks()
