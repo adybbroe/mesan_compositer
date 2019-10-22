@@ -333,6 +333,7 @@ class ctCompositer(object):
 
     def write(self):
         """Write the composite to a netcdf file"""
+
         tmpfname = tempfile.mktemp(suffix=os.path.basename(self.filename),
                                    dir=os.path.dirname(self.filename))
         self.composite.write(tmpfname)
@@ -341,6 +342,8 @@ class ctCompositer(object):
             self.filename) + now.strftime('_%Y%m%d%H%M%S.nc')
         shutil.copy(tmpfname, fname_with_timestamp)
         os.rename(tmpfname, self.filename + '.nc')
+
+        return
 
     def make_quicklooks(self):
         """Make quicklook images"""

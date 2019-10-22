@@ -22,12 +22,14 @@
 
 """Defining the netCDF4 mesan-composite object with read and write methods
 """
-import logging
-LOG = logging.getLogger(__name__)
 
+import logging
 import numpy as np
 from utils import proj2cf
-import netcdf4
+import xarray as xr
+from datetime import datetime
+
+LOG = logging.getLogger(__name__)
 
 TIME_UNITS = "seconds since 1970-01-01 00:00:00"
 CF_FLOAT_TYPE = np.float64
@@ -180,7 +182,49 @@ class ncCloudTypeComposite(object):
     def write(self, filename):
         """Write the data to netCDF file"""
 
-        netcdf4.netcdf_cf_writer(filename, self, compression=6)
+        other_to_netcdf_kwargs = {'compute': True}
+        root = xr.Dataset({}, attrs={'history': 'Created by mesan_compositor on {}'.format(datetime.utcnow()),
+                                     'Conventions': 'Undefined'})
+        engine = 'netcdf4'
+
+        xcoord, ycoord = self.area_def.get_proj_vectors()
+        attrs = get_nc_attributes_from_object(self.cloudtype.info)
+
+        ctype = xr.DataArray(data=self.cloudtype.data, dims=['y1000 m', 'x1000 m'], attrs=attrs)
+
+        attrs = get_nc_attributes_from_object(self.id.info)
+        data_id = xr.DataArray(data=self.id.data, dims=['y1000 m', 'x1000 m'], attrs=attrs)
+
+        attrs = get_nc_attributes_from_object(self.time.info)
+        data_time = xr.DataArray(data=self.time.data, dims=['y1000 m', 'x1000 m'], attrs=attrs)
+
+        attrs = get_nc_attributes_from_object(self.weight.info)
+        weight = xr.DataArray(data=self.weight.data, dims=['y1000 m', 'x1000 m'], attrs=attrs)
+
+        attrs = get_nc_attributes_from_object(self.area.info)
+        area_data = xr.DataArray(data=self.area.data, dims=None, attrs=attrs)
+
+        _ = root.to_netcdf(filename, engine=engine, mode='w')
+
+        data_arrays = [ctype, data_id, data_time, weight, area_data]
+        data_names = ['cloudtype', 'id', 'time', 'weight', 'area']
+
+        encodings = {'dtype': ctype.dtype, 'scale_factor': 1, 'zlib': True,
+                     'complevel': 4, '_FillValue': 255, 'add_offset': 0}
+        encodings2 = {'complevel': 4, 'zlib': True}
+
+        dataset_dict = {}
+        encoding = {}
+        for dataset_name, data_array in zip(data_names, data_arrays):
+            dataset_dict[dataset_name] = data_array
+            if dataset_name in ['cloudtype', 'id']:
+                encoding[dataset_name] = encodings
+            elif dataset_name not in ['area']:
+                encoding[dataset_name] = encodings2
+
+        dataset = xr.Dataset(dataset_dict, coords={'y1000 m': ycoord, 'x1000 m': xcoord})
+        _ = dataset.to_netcdf(filename, engine=engine, group=None, mode='a',
+                              encoding=encoding, **other_to_netcdf_kwargs)
 
         return
 
@@ -193,7 +237,8 @@ class ncCloudTypeComposite(object):
         rootgrp = Dataset(filename, 'r')
 
         self.info["Conventions"] = rootgrp.Conventions
-        self.info["product"] = rootgrp.product
+        # self.info["product"] = rootgrp.product
+        self.info["product"] = 'Unknown'
 
         for var_name in rootgrp.variables.keys():
             LOG.debug(str(var_name))
@@ -431,3 +476,13 @@ class ncCTTHComposite(ncCloudTypeComposite):
         self.weight.info["grid_mapping"] = self.area.info["var_name"]
         self.id.info["grid_mapping"] = self.area.info["var_name"]
         self.time.info["grid_mapping"] = self.area.info["var_name"]
+
+
+def get_nc_attributes_from_object(info_dict):
+    attrs = {}
+    for key in info_dict.keys():
+        if key in ['var_data']:
+            continue
+        attrs[key] = info_dict[key]
+
+    return attrs
