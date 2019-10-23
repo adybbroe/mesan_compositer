@@ -25,8 +25,13 @@
 import argparse
 from datetime import datetime, timedelta
 import numpy as np
+import xarray as xr
 import tempfile
 import shutil
+
+from trollimage.xrimage import XRImage
+from mesan_compositer import cms_modified
+from satpy.composites import PaletteCompositor
 
 from utils import ctype_procflags2pps
 
@@ -348,35 +353,33 @@ class ctCompositer(object):
     def make_quicklooks(self):
         """Make quicklook images"""
 
-        import mpop.imageo.palettes
-        palette = mpop.imageo.palettes.cms_modified()
-        from mpop.imageo import geo_image
+        palette = cms_modified()
+        attrs = {'_FillValue': np.nan}
 
-        img = geo_image.GeoImage(self.composite.cloudtype.data,
-                                 self.areaid,
-                                 None,
-                                 fill_value=(0),
-                                 mode="P",
-                                 palette=palette)
-        img.save(self.filename.strip('.nc') + '_cloudtype.png')
+        # Cloud type field:
+        pimage = PaletteCompositor('MesanComposite')
+        xdata = xr.DataArray(self.composite.cloudtype.data, dims=['y', 'x'], attrs=attrs)
+        ximg = XRImage(pimage((xdata, palette)))
 
-        comp_id = self.composite.id.data * 13
-        idimg = geo_image.GeoImage(comp_id,
-                                   self.areaid,
-                                   None,
-                                   fill_value=(0),
-                                   mode="P",
-                                   palette=palette)
-        idimg.save(self.filename.strip('.nc') + '_id.png')
+        filename = self.filename.strip('.nc') + '_cloudtype.png'
+        ximg.save(filename)
 
-        comp_w = self.composite.weight.data * 20
-        wimg = geo_image.GeoImage(comp_w,
-                                  self.areaid,
-                                  None,
-                                  fill_value=(0),
-                                  mode="P",
-                                  palette=palette)
-        wimg.save(self.filename.strip('.nc') + '_weight.png')
+        # Id field:
+        pimage = PaletteCompositor('MesanComposite')
+        xdata = xr.DataArray(self.composite.id.data * 13, dims=['y', 'x'], attrs=attrs)
+        ximg = XRImage(pimage((xdata, palette)))
+
+        filename = self.filename.strip('.nc') + '_id.png'
+        ximg.save(filename)
+
+        # Weight field:
+        pimage = PaletteCompositor('MesanComposite')
+        data = (self.composite.weight.data * 20).astype(np.dtype('uint8'))
+        xdata = xr.DataArray(data, dims=['y', 'x'], attrs=attrs)
+        ximg = XRImage(pimage((xdata, palette)))
+
+        filename = self.filename.strip('.nc') + '_weight.png'
+        ximg.save(filename)
 
 
 if __name__ == "__main__":
@@ -429,4 +432,4 @@ if __name__ == "__main__":
     ctcomp.get_catalogue()
     ctcomp.make_composite()
     ctcomp.write()
-    # ctcomp.make_quicklooks()
+    ctcomp.make_quicklooks()

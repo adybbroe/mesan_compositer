@@ -357,7 +357,7 @@ class ncCTTHComposite(ncCloudTypeComposite):
         # Temperature
         self.temperature.data = comp_dict["temperature"]
         valid_min, valid_max = (
-            self.temperature.data.min(), self.temperature.data.max())
+            np.nanmin(self.temperature.data), np.nanmax(self.temperature.data))
         self.temperature.info = {"var_name": "temperature",
                                  "var_data": self.temperature.data,
                                  'var_dim_names': dim_names,
@@ -372,7 +372,7 @@ class ncCTTHComposite(ncCloudTypeComposite):
         # Height
         self.height.data = comp_dict["height"]
         valid_min, valid_max = (
-            self.height.data.min(), self.height.data.max())
+            np.nanmin(self.height.data), np.nanmax(self.height.data))
         self.height.info = {"var_name": "height",
                             "var_data": self.height.data,
                             'var_dim_names': dim_names,
@@ -387,7 +387,7 @@ class ncCTTHComposite(ncCloudTypeComposite):
         # Pressure
         self.pressure.data = comp_dict["pressure"]
         valid_min, valid_max = (
-            self.pressure.data.min(), self.pressure.data.max())
+            np.nanmin(self.pressure.data), np.nanmax(self.pressure.data))
         self.pressure.info = {"var_name": "pressure",
                               "var_data": self.pressure.data,
                               'var_dim_names': dim_names,
@@ -441,34 +441,34 @@ class ncCTTHComposite(ncCloudTypeComposite):
         self.area.info.update(proj2cf(area_obj.proj_dict))
 
         setattr(self, self.area.info["var_name"], self.area)
-        x__ = InfoObject()
-        area_obj.get_proj_coords(cache=True)
+        # x__ = InfoObject()
+        # area_obj.get_proj_coords(cache=True)
 
-        try:
-            x__.data = area_obj.projection_x_coords[0, :]
-        except IndexError:
-            x__.data = area_obj.projection_x_coords
-        x__.info = {"var_name": "x" + str_res,
-                    "var_data": x__.data,
-                    "var_dim_names": ("x" + str_res,),
-                    "units": "m",
-                    "standard_name": "projection_x_coordinate",
-                    "long_name": "x coordinate of projection"}
-        setattr(self, x__.info["var_name"], x__)
+        # try:
+        #     x__.data = area_obj.projection_x_coords[0, :]
+        # except IndexError:
+        #     x__.data = area_obj.projection_x_coords
+        # x__.info = {"var_name": "x" + str_res,
+        #             "var_data": x__.data,
+        #             "var_dim_names": ("x" + str_res,),
+        #             "units": "m",
+        #             "standard_name": "projection_x_coordinate",
+        #             "long_name": "x coordinate of projection"}
+        # setattr(self, x__.info["var_name"], x__)
 
-        y__ = InfoObject()
-        try:
-            y__.data = area_obj.projection_y_coords[:, 0]
-        except IndexError:
-            y__.data = area_obj.projection_y_coords
+        # y__ = InfoObject()
+        # try:
+        #     y__.data = area_obj.projection_y_coords[:, 0]
+        # except IndexError:
+        #     y__.data = area_obj.projection_y_coords
 
-        y__.info = {"var_name": "y" + str_res,
-                    "var_data": y__.data,
-                    "var_dim_names": ("y" + str_res,),
-                    "units": "m",
-                    "standard_name": "projection_y_coordinate",
-                    "long_name": "y coordinate of projection"}
-        setattr(self, y__.info["var_name"], y__)
+        # y__.info = {"var_name": "y" + str_res,
+        #             "var_data": y__.data,
+        #             "var_dim_names": ("y" + str_res,),
+        #             "units": "m",
+        #             "standard_name": "projection_y_coordinate",
+        #             "long_name": "y coordinate of projection"}
+        # setattr(self, y__.info["var_name"], y__)
 
         self.temperature.info["grid_mapping"] = self.area.info["var_name"]
         self.height.info["grid_mapping"] = self.area.info["var_name"]
@@ -476,6 +476,61 @@ class ncCTTHComposite(ncCloudTypeComposite):
         self.weight.info["grid_mapping"] = self.area.info["var_name"]
         self.id.info["grid_mapping"] = self.area.info["var_name"]
         self.time.info["grid_mapping"] = self.area.info["var_name"]
+
+    def write(self, filename):
+        """Write the data to netCDF file"""
+
+        other_to_netcdf_kwargs = {'compute': True}
+        root = xr.Dataset({}, attrs={'history': 'Created by mesan_compositor on {}'.format(datetime.utcnow()),
+                                     'Conventions': 'Undefined'})
+        engine = 'netcdf4'
+
+        xcoord, ycoord = self.area_def.get_proj_vectors()
+
+        attrs = get_nc_attributes_from_object(self.height.info)
+        height = xr.DataArray(data=self.height.data, dims=['y1000 m', 'x1000 m'], attrs=attrs)
+
+        attrs = get_nc_attributes_from_object(self.temperature.info)
+        temperature = xr.DataArray(data=self.temperature.data, dims=['y1000 m', 'x1000 m'], attrs=attrs)
+
+        attrs = get_nc_attributes_from_object(self.pressure.info)
+        pressure = xr.DataArray(data=self.pressure.data, dims=['y1000 m', 'x1000 m'], attrs=attrs)
+
+        attrs = get_nc_attributes_from_object(self.weight.info)
+        weight = xr.DataArray(data=self.weight.data, dims=['y1000 m', 'x1000 m'], attrs=attrs)
+
+        attrs = get_nc_attributes_from_object(self.id.info)
+        identifiers = xr.DataArray(data=self.id.data, dims=['y1000 m', 'x1000 m'], attrs=attrs)
+
+        attrs = get_nc_attributes_from_object(self.time.info)
+        time_data = xr.DataArray(data=self.time.data, dims=['y1000 m', 'x1000 m'], attrs=attrs)
+
+        # More data sets here...
+
+        attrs = get_nc_attributes_from_object(self.area.info)
+        area_data = xr.DataArray(data=self.area.data, dims=None, attrs=attrs)
+
+        _ = root.to_netcdf(filename, engine=engine, mode='w')
+
+        data_arrays = [height, temperature, pressure, weight, identifiers, time_data, area_data]
+        data_names = ['ctth_height', 'ctth_tempe', 'ctth_pres', 'id', 'time', 'area']
+
+        encodings = {'dtype': height.dtype, 'scale_factor': 1, 'zlib': True,
+                     'complevel': 4, '_FillValue': 255, 'add_offset': 0}
+        encodings2 = {'complevel': 4, 'zlib': True}
+
+        dataset_dict = {}
+        encoding = {}
+        for dataset_name, data_array in zip(data_names, data_arrays):
+            dataset_dict[dataset_name] = data_array
+            if dataset_name not in ['area']:
+                encoding[dataset_name] = encodings2
+
+        dataset = xr.Dataset(dataset_dict, coords={'y1000 m': ycoord, 'x1000 m': xcoord})
+        _ = dataset.to_netcdf(filename, engine=engine, group=None, mode='a',
+                              encoding=encoding, **other_to_netcdf_kwargs)
+
+        return
 
 
 def get_nc_attributes_from_object(info_dict):

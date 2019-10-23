@@ -237,11 +237,13 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
         elif (timewindow[0] - timeslot) < timedelta(seconds=3600 * 4):
             files_old = False
 
-    if files_old and latest_file > 0:
+    if files_old and latest_file is not None:
         LOG.critical("No fresh pps products found - " +
                      "most recent = %s (obs-time = %s)\n" +
                      "Latest file is more than 4 hours from time-window\n",
                      os.path.basename(latest_file), str(latest_file_time))
+    elif len(plist) == 0:
+        LOG.critical("No pps products found at all in directory!")
 
     return plist
 

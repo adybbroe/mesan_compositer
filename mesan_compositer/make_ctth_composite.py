@@ -27,12 +27,18 @@
 import argparse
 from datetime import datetime, timedelta
 import numpy as np
+import xarray as xr
+
+from trollimage.xrimage import XRImage
+from mesan_compositer import ctth_height
+from satpy.composites import PaletteCompositor
 
 from mesan_compositer import (ProjectException, LoadException)
 from mesan_compositer.pps_msg_conversions import ctth_procflags2pps
 from nwcsaf_formats.pps_conversions import ctth_convert_flags
 from mesan_compositer.composite_tools import SENSOR, METOPS
 from mesan_compositer.netcdf_io import ncCTTHComposite
+from mesan_compositer.netcdf_io import get_nc_attributes_from_object
 
 from mesan_compositer.composite_tools import (get_msglist,
                                               get_ppslist,
@@ -59,9 +65,10 @@ _DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 #: Default log format
 _DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
 
-import ConfigParser
 
-conf = ConfigParser.ConfigParser()
+from six.moves import configparser
+
+conf = configparser.ConfigParser()
 configfile = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
 if not os.path.exists(configfile):
     raise IOError('Config file %s does not exist!' % configfile)
@@ -76,33 +83,30 @@ _MESAN_LOG_FILE = OPTIONS.get('mesan_log_file', None)
 
 def ctth_pps(pps, areaid):
     """Load PPS CTTH and reproject"""
-    from mpop.satellites import PolarFactory
-    global_data = PolarFactory.create_scene(pps.platform_name, "",
-                                            SENSOR.get(
-                                                pps.platform_name, 'avhrr'),
-                                            pps.timeslot, pps.orbit,
-                                            variant="DR")
-    try:
-        global_data.load(['CTTH'], filename=pps.uri)
-    except AttributeError:
-        raise LoadException('MPOP scene object fails to load!')
-    if global_data.area or global_data['CTTH'].area:
-        return global_data.project(areaid)
-    else:
-        raise ProjectException('MPOP Scene object has no area instance' +
-                               ' and product cannot be projected')
+
+    from satpy.scene import Scene
+    from satpy.utils import debug_on
+    debug_on()
+
+    scene = Scene(filenames=[pps.uri, pps.geofilename], reader='nwcsaf-pps_nc')
+    scene.load(['ctth_alti', 'ctth_pres', 'ctth_tempe', 'ctth_quality', 'ctth_conditions', 'ctth_status_flag'])
+
+    retv = scene.resample(areaid, radius_of_influence=5000)
+    return retv
 
 
 def ctth_msg(msg, areaid):
     """Load MSG paralax corrected ctth and reproject"""
-    from mpop.satellites import GeostationaryFactory
 
-    global_geo = GeostationaryFactory.create_scene(msg.platform_name,
-                                                   "", "seviri",
-                                                   time_slot=msg.timeslot,
-                                                   variant='0DEG')
-    global_geo.load(['CTTH'], filename=msg.uri)
-    return global_geo.project(areaid)
+    from satpy.scene import Scene
+    from satpy.utils import debug_on
+    debug_on()
+
+    scene = Scene(filenames=[msg.uri, ], reader='nwcsaf-msg2013-hdf5')
+    scene.load(['ctth_alti', 'ctth_pres', 'ctth_tempe', 'ctth_quality', 'ctth_effective_cloudiness'])
+
+    retv = scene.resample(areaid, radius_of_influence=20000)
+    return retv
 
 
 class mesanComposite(object):
@@ -197,9 +201,7 @@ class ctthComposite(mesanComposite):
     def __init__(self, obstime, tdiff, areaid, **kwargs):
         super(ctthComposite, self).__init__(obstime, tdiff, areaid, **kwargs)
 
-        import ConfigParser
-
-        conf = ConfigParser.ConfigParser()
+        conf = configparser.ConfigParser()
         configfile = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
         if not os.path.exists(configfile):
             raise IOError('Config file %s does not exist!' % configfile)
@@ -265,16 +267,17 @@ class ctthComposite(mesanComposite):
                     not hasattr(scene, 'orbit')):
                 is_MSG = True
                 x_local = ctth_msg(scene, self.areaid)
-                dummy, lat = x_local.area.get_lonlats()
-                x_temperature = x_local['CTTH'].temperature
-                x_pressure = x_local['CTTH'].pressure
-                x_height = x_local['CTTH'].height
+
+                dummy, lat = x_local['ctth_alti'].area.get_lonlats()
+                x_temperature = x_local['ctth_tempe'].data.compute()
+                x_pressure = x_local['ctth_pres'].data.compute()
+                x_height = x_local['ctth_alti'].data.compute()
 
                 # convert msg flags to pps
                 # fill_value = 0, fill with 65535 (same as pps flag fill value)
                 # so that bit 0 is set -> unprocessed -> w=0
                 # The weight for masked data is set further down
-                x_flag = np.ma.filled(ctth_procflags2pps(x_local['CTTH'].processing_flags),
+                x_flag = np.ma.filled(ctth_procflags2pps(x_local['ctth_quality'].data.compute()),
                                       fill_value=65535)
                 x_id = 1 * np.ones(np.shape(x_temperature))
             else:
@@ -288,56 +291,22 @@ class ctthComposite(mesanComposite):
 
                 # Temperature (K)', u'no_data_value': 255, u'intercept': 100.0,
                 # u'gain': 1.0
-                LOG.debug(
-                    "Info dict (ctth_tempe) = %s", str(x_local['CTTH'].ctth_tempe.info))
-                LOG.debug("scale and offset: %s %s",
-                          str(x_local['CTTH'].ctth_tempe.info['scale_factor']),
-                          str(x_local['CTTH'].ctth_tempe.info['add_offset']))
+                LOG.debug("scale and offset: %s %s", str(x_local['ctth_tempe'].attrs['scale_factor']),
+                          str(x_local['ctth_tempe'].attrs['add_offset']))
 
-                # try:
-                #     x_temperature = (x_local['CTTH'].ctth_tempe.data *
-                #                      x_local['CTTH'].ctth_tempe.info['scale_factor'][0] +
-                #                      x_local['CTTH'].ctth_tempe.info['add_offset'][0])
-                # except IndexError:
-                #     x_temperature = (x_local['CTTH'].ctth_tempe.data *
-                #                      x_local['CTTH'].ctth_tempe.info['scale_factor'] +
-                #                      x_local['CTTH'].ctth_tempe.info['add_offset'])
+                x_temperature = x_local['ctth_tempe'].data.compute()
+                x_pressure = x_local['ctth_pres'].data.compute()
+                x_height = x_local['ctth_alti'].data.compute()
 
-                x_temperature = x_local['CTTH'].ctth_tempe.data
-
-                # Pressure (hPa)', u'no_data_value': 255, u'intercept': 0.0,
-                # u'gain': 25.0
-                # try:
-                #     x_pressure = (x_local['CTTH'].ctth_pres.data * x_local[
-                #         'CTTH'].ctth_pres.info['scale_factor'][0] +
-                #         x_local['CTTH'].ctth_pres.info['add_offset'][0])
-                # except IndexError:
-                #     x_pressure = (x_local['CTTH'].ctth_pres.data * x_local[
-                #         'CTTH'].ctth_pres.info['scale_factor'] +
-                #         x_local['CTTH'].ctth_pres.info['add_offset'])
-
-                x_pressure = x_local['CTTH'].ctth_pres.data
-
-                # Height (m)', u'no_data_value': 255, u'intercept': 0.0,
-                # u'gain': 200.0
-                # try:
-                #     x_height = (x_local['CTTH'].ctth_alti.data * x_local[
-                #         'CTTH'].ctth_alti.info['scale_factor'][0] +
-                #         x_local['CTTH'].ctth_alti.info['add_offset'][0])
-                # except IndexError:
-                #     x_height = (x_local['CTTH'].ctth_alti.data * x_local[
-                #         'CTTH'].ctth_alti.info['scale_factor'] +
-                #         x_local['CTTH'].ctth_alti.info['add_offset'])
-
-                x_height = x_local['CTTH'].ctth_alti.data
-
-                sflags = x_local['CTTH'].ctth_status_flag.data.filled(0)
-                cflags = x_local['CTTH'].ctth_conditions.data.filled(0)
-                qflags = x_local['CTTH'].ctth_quality.data.filled(0)
+                sflags = x_local['ctth_status_flag'].data.compute()
+                cflags = x_local['ctth_conditions'].data.compute()
+                # qflags = x_local['CTTH'].ctth_quality.data.filled(0)
+                qflags = x_local['ctth_quality'].data.compute()
                 oldflags = ctth_convert_flags(sflags, cflags, qflags)
 
                 # fill_value = 65535 i.e bit 0 is set -> unprocessed -> w=0
-                x_flag = np.ma.filled(oldflags, fill_value=65535)
+                # x_flag = np.ma.filled(oldflags, fill_value=65535)
+                x_flag = oldflags
 
                 x_id = 0 * np.ones(np.shape(x_temperature))
                 lat = 0 * np.ones(np.shape(x_temperature))
@@ -349,7 +318,7 @@ class ctthComposite(mesanComposite):
 
             if comp_temperature is None:
                 # initialize field with current CTTH
-                comp_lon, comp_lat = x_local.area.get_lonlats()
+                comp_lon, comp_lat = x_local['ctth_alti'].area.get_lonlats()
                 comp_temperature = x_temperature
                 comp_pressure = x_pressure
                 comp_height = x_height
@@ -359,17 +328,18 @@ class ctthComposite(mesanComposite):
                 comp_w = get_weight_ctth(x_flag, lat,
                                          abs(self.obstime - scene.timeslot),
                                          idx_MSG)
-                # fix to cope with unprocessed data
-                ii = (x_height.mask == True) | (x_height == 0)
-                comp_w[ii] = 0
+                # # fix to cope with unprocessed data
+                # ii = (x_height.mask == True) | (x_height == 0)
+                # comp_w[ii] = 0
             else:
                 # compare with quality of current CTTH
                 x_w = get_weight_ctth(x_flag, lat,
                                       abs(self.obstime - scene.timeslot),
                                       idx_MSG)
-                # fix to cope with unprocessed data
-                ii = (x_height.mask == True) | (x_height == 0)
-                x_w[ii] = 0
+
+                # # fix to cope with unprocessed data
+                # ii = (x_height.mask == True) | (x_height == 0)
+                # x_w[ii] = 0
 
                 # replace info where current CTTH data is best
                 ii = x_w > comp_w
@@ -383,7 +353,7 @@ class ctthComposite(mesanComposite):
 
         self.longitude = comp_lon
         self.latitude = comp_lat
-        self.area = x_local.area
+        self.area = x_local['ctth_alti'].area
 
         composite = {"temperature": comp_temperature,
                      "height": comp_height,
@@ -411,25 +381,16 @@ class ctthComposite(mesanComposite):
 
     def make_quicklooks(self):
         """Make quicklook images"""
+        palette = ctth_height()
+        filename = self.filename.strip('.nc') + '_height.png'
 
-        import mpop.imageo.palettes
-        from mpop.imageo import geo_image
+        attrs = get_nc_attributes_from_object(self.composite.height.info)
+        attrs['_FillValue'] = np.nan
+        pimage = PaletteCompositor('MesanComposite')
+        xdata = xr.DataArray(self.composite.height.data, dims=['y', 'x'], attrs=attrs)
+        ximg = XRImage(pimage((xdata, palette)))
 
-        palette = mpop.imageo.palettes.ctth_height()
-
-        ctth_data = self.composite.height.data
-        cloud_free = self.composite.height.data == 0
-        ctth_data = ctth_data / 500.0 + 1
-        ctth_data[cloud_free] = 0
-        # ctth_data = np.ma.array(ctth_data, mask=self.composite.flags.mask)
-        img = geo_image.GeoImage(ctth_data.astype(np.uint8),
-                                 self.areaid,
-                                 None,
-                                 fill_value=(0),
-                                 mode="P",
-                                 palette=palette)
-
-        img.save(self.filename.strip('.nc') + '_height.png')
+        ximg.save(filename)
 
 
 if __name__ == "__main__":
