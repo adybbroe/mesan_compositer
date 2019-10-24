@@ -441,6 +441,7 @@ class ncCTTHComposite(ncCloudTypeComposite):
         self.area.info.update(proj2cf(area_obj.proj_dict))
 
         setattr(self, self.area.info["var_name"], self.area)
+
         # x__ = InfoObject()
         # area_obj.get_proj_coords(cache=True)
 
@@ -474,6 +475,7 @@ class ncCTTHComposite(ncCloudTypeComposite):
         self.height.info["grid_mapping"] = self.area.info["var_name"]
         self.pressure.info["grid_mapping"] = self.area.info["var_name"]
         self.weight.info["grid_mapping"] = self.area.info["var_name"]
+        self.flags.info["grid_mapping"] = self.area.info["var_name"]
         self.id.info["grid_mapping"] = self.area.info["var_name"]
         self.time.info["grid_mapping"] = self.area.info["var_name"]
 
@@ -499,6 +501,9 @@ class ncCTTHComposite(ncCloudTypeComposite):
         attrs = get_nc_attributes_from_object(self.weight.info)
         weight = xr.DataArray(data=self.weight.data, dims=['y1000 m', 'x1000 m'], attrs=attrs)
 
+        attrs = get_nc_attributes_from_object(self.flags.info)
+        flags = xr.DataArray(data=self.flags.data, dims=['y1000 m', 'x1000 m'], attrs=attrs)
+
         attrs = get_nc_attributes_from_object(self.id.info)
         identifiers = xr.DataArray(data=self.id.data, dims=['y1000 m', 'x1000 m'], attrs=attrs)
 
@@ -512,8 +517,8 @@ class ncCTTHComposite(ncCloudTypeComposite):
 
         _ = root.to_netcdf(filename, engine=engine, mode='w')
 
-        data_arrays = [height, temperature, pressure, weight, identifiers, time_data, area_data]
-        data_names = ['ctth_height', 'ctth_tempe', 'ctth_pres', 'id', 'time', 'area']
+        data_arrays = [height, temperature, pressure, weight, flags, identifiers, time_data, area_data]
+        data_names = ['height', 'temperature', 'pressure', 'weight', 'flags', 'id', 'time', 'area']
 
         encodings = {'dtype': height.dtype, 'scale_factor': 1, 'zlib': True,
                      'complevel': 4, '_FillValue': 255, 'add_offset': 0}
