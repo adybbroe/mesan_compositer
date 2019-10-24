@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2015, 2016 Adam.Dybbroe
+# Copyright (c) 2014, 2015, 2016, 2019 Adam.Dybbroe
 
 # Author(s):
 
@@ -30,7 +30,7 @@ import argparse
 from datetime import datetime
 import os
 import sys
-import ConfigParser
+from six.moves import configparser
 
 import logging
 LOG = logging.getLogger(__name__)
@@ -163,7 +163,7 @@ nctypecl = {'71': ntctypecl, '73': nlctypecl, '74': nmctypecl, '75': nhctypecl}
 CFG_DIR = os.environ.get('MESAN_COMPOSITE_CONFIG_DIR', './')
 MODE = os.environ.get("SMHI_MODE", 'offline')
 
-conf = ConfigParser.ConfigParser()
+conf = configparser.ConfigParser()
 configfile = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
 if not os.path.exists(configfile):
     raise IOError('Config file %s does not exist!' % configfile)
@@ -276,6 +276,7 @@ def derive_sobs(ct_comp, ipar, npix, resultfile):
     os.rename(tmpfname, resultfile)
 
     return
+
 
 if __name__ == "__main__":
 
