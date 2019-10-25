@@ -23,9 +23,8 @@
 """Functions for converting from new to old PPS product outputs
 """
 
-from mesan_compositer.pps_msg_conversions import (get_bit_from_flags,
-                                                  bits2value,
-                                                  value2bits)
+from mesan_compositer.pps_msg_conversions import get_bit_from_flags
+
 import numpy as np
 
 

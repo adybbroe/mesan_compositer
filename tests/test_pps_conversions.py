@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2015 Adam.Dybbroe
+# Copyright (c) 2014, 2015, 2019 Adam.Dybbroe
 
 # Author(s):
 
@@ -60,47 +60,37 @@ class TestCtypeConversions(unittest.TestCase):
         """Test mapping the flags from new to old cloudtype"""
 
         # Low level inv, sea ice available and sea ice acc to ext map
-        res = bits2value([1, 0, 1, 1])
-        self.assertEqual(res, 13)
         res = ctype_convert_flags(np.array([13], 'int32'),
                                   np.array([0], 'int32'),
                                   np.array([0], 'int32'))
-        bits = value2bits(res[0])
-        self.assertEqual(
-            bits, [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1])
 
-        res = bits2value([0, 1, 1, 1])  # Twilight + sunglint
-        self.assertEqual(res, 14)
+        bits = get_bit_from_flags(res[0], range(16))
+        np.testing.assert_allclose(
+            bits, np.array([0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1], dtype=np.int8))
+
+        # [0, 1, 1, 1]  # Twilight + sunglint
+        res = 14
         res = ctype_convert_flags(np.array([0], 'int32'),
                                   np.array([res], 'int32'),
                                   np.array([0], 'int32'))
-        bits = value2bits(res[0])
-        self.assertEqual(bits, [0, 0, 0, 1, 1])
+        bits = get_bit_from_flags(res[0], range(5))
+        np.testing.assert_allclose(bits, np.array([0, 0, 0, 1, 1], dtype=np.int8))
 
-        res = bits2value([0, 0, 1, 0])  # Day and no sunglint
-        self.assertEqual(res, 4)
+        res = 4  # [0, 0, 1, 0]) Day and no sunglint
         res = ctype_convert_flags(np.array([0], 'int32'),
                                   np.array([res], 'int32'),
                                   np.array([0], 'int32'))
-        bits = value2bits(res[0])
-        self.assertEqual(bits, [])
 
-        res = bits2value([0, 1, 0, 0])  # Night and no sunglint
-        self.assertEqual(res, 2)
+        bits = get_bit_from_flags(res[0], range(5))
+        np.testing.assert_allclose(bits, np.array([0, 0, 0, 0, 0], dtype=np.int8))
+
+        res = 2  # [0, 1, 0, 0]  Night and no sunglint
         res = ctype_convert_flags(np.array([0], 'int32'),
                                   np.array([res], 'int32'),
                                   np.array([0], 'int32'))
-        bits = value2bits(res[0])
-        self.assertEqual(bits, [0, 0, 1])
 
-        res = bits2value([0, 1, 0, 0])  # Land and coast
-
-        self.assertEqual(res, 2)
-        res = ctype_convert_flags(np.array([0], 'int32'),
-                                  np.array([res], 'int32'),
-                                  np.array([0], 'int32'))
-        bits = value2bits(res[0])
-        self.assertEqual(bits, [0, 0, 1])
+        bits = get_bit_from_flags(res[0], range(3))
+        np.testing.assert_allclose(bits, np.array([0, 0, 1], dtype=np.int8))
 
     def tearDown(self):
         """Clean up"""
@@ -119,62 +109,55 @@ class TestCtthConversions(unittest.TestCase):
     def test_map_ctth_flags(self):
         """Test mapping the flags from new to old ctth product"""
 
-        # Non processed:
-        res = bits2value([1, 0, 0, ])
-        self.assertEqual(res, 1)
+        res = 1  # [1, 0, 0, ]   Non processed
         res = ctth_convert_flags(np.array([0], 'int32'),
                                  np.array([0], 'int32'),
-                                 np.array([1], 'int32'))
-        bits = value2bits(res[0])
-        self.assertEqual(bits, [1, ])
+                                 np.array([res], 'int32'))
+        bits = get_bit_from_flags(res[0], range(3))
+        np.testing.assert_allclose(bits, np.array([1, 0, 0], dtype=np.int8))
 
-        # Quality assessment - Interpolated => low confidence
-        res = bits2value([0, 0, 0, 0, 0, 1])
-        self.assertEqual(res, 32)
+        res = 32  # [0, 0, 0, 0, 0, 1] Quality assessment - Interpolated => low confidence
         res = ctth_convert_flags(np.array([0], 'int32'),
                                  np.array([0], 'int32'),
                                  np.array([32], 'int32'))
-        bits = value2bits(res[0])
-        self.assertEqual(bits, [0, 1, 0, 0, 0, 0, 0,
-                                0, 0, 0, 0, 0, 0, 0, 1, 1, ])
 
-        # Quality assessment - Bad => low confidence
-        res = bits2value([0, 0, 0, 1, 1, 0])
-        self.assertEqual(res, 24)
+        bits = get_bit_from_flags(res[0], range(16))
+        np.testing.assert_allclose(bits, np.array([0, 1, 0, 0, 0, 0, 0, 0,
+                                                   0, 0, 0, 0, 0, 0, 1, 1], dtype=np.int8))
+
+        res = 24  # [0, 0, 0, 1, 1, 0]  Quality assessment - Bad => low confidence
         res = ctth_convert_flags(np.array([0], 'int32'),
                                  np.array([0], 'int32'),
                                  np.array([24], 'int32'))
-        bits = value2bits(res[0])
-        self.assertEqual(bits, [0, 1, 0, 0, 0, 0, 0,
-                                0, 0, 0, 0, 0, 0, 0, 1, 1, ])
-        # Quality assessment - Questionable => low confidence
-        res = bits2value([0, 0, 0, 0, 1, 0])
-        self.assertEqual(res, 16)
+        bits = get_bit_from_flags(res[0], range(16))
+        expected = np.array([0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1], dtype=np.int8)
+        np.testing.assert_allclose(bits, expected)
+
+        res = 16  # [0, 0, 0, 0, 1, 0]  # Quality assessment - Questionable => low confidence
         res = ctth_convert_flags(np.array([0], 'int32'),
                                  np.array([0], 'int32'),
                                  np.array([16], 'int32'))
-        bits = value2bits(res[0])
-        self.assertEqual(bits, [0, 1, 0, 0, 0, 0, 0,
-                                0, 0, 0, 0, 0, 0, 0, 1, 1, ])
+        bits = get_bit_from_flags(res[0], range(16))
+        expected = np.array([0, 1, 0, 0, 0, 0, 0, 0,
+                             0, 0, 0, 0, 0, 0, 1, 1], dtype=np.int8)
+        np.testing.assert_allclose(bits, expected)
 
-        # Cloudy and Opaque clouds:
-        res = bits2value([0, 0, 1, 1, ])
-        self.assertEqual(res, 12)
+        res = 12  # [0, 0, 1, 1, ]  # Cloudy and Opaque clouds:
         res = ctth_convert_flags(np.array([12], 'int32'),
                                  np.array([0], 'int32'),
                                  np.array([0], 'int32'))
-        bits = value2bits(res[0])
-        self.assertEqual(bits, [0, 1, 1, ])
+        bits = get_bit_from_flags(res[0], range(3))
+        expected = np.array([0, 1, 1], dtype=np.int8)
+        np.testing.assert_allclose(bits, expected)
 
-        # Inversion, RTTOV and window technique:
-        res = bits2value([0, 0, 0, 0, 1, 0, 1, 1, ])
-        self.assertEqual(res, 208)
-        res = ctth_convert_flags(np.array([208], 'int32'),
+        res = 208  # [0, 0, 0, 0, 1, 0, 1, 1, ]  # Inversion, RTTOV and window technique:
+        res = ctth_convert_flags(np.array([res], 'int32'),
                                  np.array([0], 'int32'),
                                  np.array([0], 'int32'))
-
-        bits = value2bits(res[0])
-        self.assertEqual(bits, [0, 1, 0, 0, 0, 1, 0, 1, 1, ])
+        bits = get_bit_from_flags(res[0], range(16))
+        expected = np.array([0, 1, 0, 0, 0, 1, 0, 1,
+                             1, 0, 0, 0, 0, 0, 0, 0], dtype=np.int8)
+        np.testing.assert_allclose(bits, expected)
 
         # condition flags:
         # value2bits(21794)
@@ -193,9 +176,10 @@ class TestCtthConversions(unittest.TestCase):
         res = ctth_convert_flags(np.array([192], 'int32'),
                                  np.array([21794], 'int32'),
                                  np.array([32], 'int32'))
-        bits = value2bits(res[0])
-        self.assertEqual(
-            bits, [0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 1])
+        bits = get_bit_from_flags(res[0], range(16))
+        expected = np.array([0, 1, 0, 0, 0, 0, 0, 1,
+                             1, 0, 0, 0, 0, 0, 1, 1], dtype=np.int8)
+        np.testing.assert_allclose(bits, expected)
 
     def tearDown(self):
         """Clean up"""

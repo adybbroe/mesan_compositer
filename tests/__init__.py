@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2015 Adam.Dybbroe
+# Copyright (c) 2014, 2015, 2019 Adam.Dybbroe
 
 # Author(s):
 
@@ -23,10 +23,10 @@
 """The unit test package
 """
 
-import test_input
-import test_pps_msg_converter
-import test_compositer
-import test_pps_conversions
+from tests import test_input
+from tests import test_pps_msg_converter
+from tests import test_compositer
+from tests import test_pps_conversions
 import unittest
 import doctest
 
@@ -52,6 +52,7 @@ def suite():
     mysuite.addTests(test_pps_conversions.suite())
 
     return mysuite
+
 
 if __name__ == '__main__':
     unittest.TextTestRunner(verbosity=2).run(suite())
