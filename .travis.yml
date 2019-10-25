@@ -1,19 +1,48 @@
 language: python
-python:
-  - "2.7"
-# command to install dependencies, e.g. 
-install: 
-  - pip install .
-  - pip install coveralls
+env:
+  global:
+  # Set defaults to avoid repeating in most cases
+  - PYTHON_VERSION=$TRAVIS_PYTHON_VERSION
+  - NUMPY_VERSION=stable
+  - MAIN_CMD='python setup.py'
+  - CONDA_DEPENDENCIES='scipy coveralls coverage h5py mock requests six appdirs satpy pyresample pyorbital dask docutils pyyaml codecov pytest pytest-cov'
+  - PIP_DEPENDENCIES=''
+  - SETUP_XVFB=False
+  - EVENT_TYPE='push pull_request cron'
+  - SETUP_CMD='test'
+  - CONDA_CHANNELS='conda-forge'
+  - CONDA_CHANNEL_PRIORITY="strict"
+
+matrix:
+  include:
+    - env: PYTHON_VERSION=2.7
+      os: linux
+    - env: PYTHON_VERSION=2.7
+      os: osx
+      language: generic
+    - env: PYTHON_VERSION=3.6
+      os: linux
+    - env: PYTHON_VERSION=3.6
+      os: osx
+      language: generic
+install:      
+    - git clone --depth 1 git://github.com/astropy/ci-helpers.git
+    - source ci-helpers/travis/setup_conda.sh
 # command to run tests, e.g. python setup.py test
-script: coverage run --source=mesan_compositer setup.py test
-after_success: coveralls
+#script: coverage run --source=mesan_compositer setup.py test
+script:
+  - pytest --cov=./
+after_success:
+- if [[ $PYTHON_VERSION == 3.6 ]]; then coveralls; fi
 deploy:
   provider: pypi
   user: adybbroe
   password:
     secure: FznD38SHxuj1RoFXUqLstF//O3+pypF84hCOHO8A3Poa+ygh7X4a+9aimCeiuY9d+5tbE0ZlyG7LMcCOFA3JCvH7lUChmQbbn3pcFvJdJzzYQgxYNfvCL9YtjRF/n648bVdpN265hm07rmOe7DHbysw4q8hMlxtUH87MYctRg90=
+    distributions: sdist bdist_wheel
+    skip_existing: true
   on:
     tags: true
     repo: adybbroe/mesan_compositer
     branch: master
+

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2013, 2014, 2015 Adam Dybbroe
+# Copyright (c) 2013, 2014, 2015, 2019 Adam Dybbroe
 
 # Author(s):
 
@@ -60,9 +60,9 @@ setup(name='mesan-compositer',
       # installed or upgraded on the target machine
       install_requires=['docutils>=0.3',
                         'numpy>=1.5.1',
-                        'mpop>=v1.0',
+                        'satpy',
                         'pyresample'],
-      #'pyorbital >= v0.2.3'],
+      # 'pyorbital >= v0.2.3'],
 
       test_requires=["mock"],
       extras_require={'netcdf4-python': ['netCDF4']},
