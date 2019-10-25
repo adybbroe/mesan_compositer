@@ -24,8 +24,10 @@
 
 import os
 from datetime import datetime, timedelta
-
+from six.moves import configparser
+from mesan_compositer.pps_msg_conversions import get_bit_from_flags
 import logging
+
 LOG = logging.getLogger(__name__)
 
 
@@ -76,8 +78,6 @@ SENSOR = {'NOAA-19': 'avhrr/3',
           'JPSS-1': 'viirs',
           'NOAA-20': 'viirs'}
 
-from mesan_compositer.pps_msg_conversions import get_bit_from_flags
-
 
 CFG_DIR = os.environ.get('MESAN_COMPOSITE_CONFIG_DIR', './')
 DIST = os.environ.get("SMHI_DIST", 'elin4')
@@ -87,9 +87,8 @@ else:
     MODE = os.environ.get("SMHI_MODE", 'offline')
 
 
-import ConfigParser
+CONF = configparser.ConfigParser()
 
-CONF = ConfigParser.ConfigParser()
 CONFIGFILE = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
 if not os.path.exists(CONFIGFILE):
     raise IOError('Config file %s does not exist!' % CONFIGFILE)
@@ -238,11 +237,13 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
         elif (timewindow[0] - timeslot) < timedelta(seconds=3600 * 4):
             files_old = False
 
-    if files_old and latest_file > 0:
+    if files_old and latest_file is not None:
         LOG.critical("No fresh pps products found - " +
                      "most recent = %s (obs-time = %s)\n" +
                      "Latest file is more than 4 hours from time-window\n",
                      os.path.basename(latest_file), str(latest_file_time))
+    elif len(plist) == 0:
+        LOG.critical("No pps products found at all in directory!")
 
     return plist
 
@@ -371,9 +372,6 @@ def get_weight_cloudtype(ctype, ctype_flag, lat, tdiff, is_msg):
     #
     import numpy as np
 
-    #import pdb
-    # pdb.set_trace()
-    #
     #  limits; linear lat dependence for MSG
     latmin_msg = 52.0  # weight factor is 1 if lat < latmin_msg
     latmax_msg = 75.0  # weight factor is 0 if lat > latmax_msg
@@ -470,7 +468,6 @@ def get_weight_cloudtype(ctype, ctype_flag, lat, tdiff, is_msg):
     # dependence on cloud type
     weight *= weights_ctype_class[ctype.astype('int')]
     #
-    # pdb.set_trace()
     # np.savez('input_output.npz',
     #          CTYPE=ctype.data[1200:1210, 1000:1010],
     #          CTYPE_FLAGS=ctype_flag.data[1200:1210, 1000:1010],

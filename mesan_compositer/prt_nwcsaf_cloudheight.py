@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2015, 2016, 2018 Adam.Dybbroe
+# Copyright (c) 2015, 2016, 2018, 2019 Adam.Dybbroe
 
 # Author(s):
 
@@ -31,9 +31,9 @@ import argparse
 from datetime import datetime
 import os
 import sys
-import ConfigParser
 import tempfile
 import shutil
+from six.moves import configparser
 
 import logging
 LOG = logging.getLogger(__name__)
@@ -47,7 +47,7 @@ _DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
 CFG_DIR = os.environ.get('MESAN_COMPOSITE_CONFIG_DIR', './')
 MODE = os.environ.get("SMHI_MODE", 'offline')
 
-conf = ConfigParser.ConfigParser()
+conf = configparser.ConfigParser()
 configfile = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
 if not os.path.exists(configfile):
     raise IOError('Config file %s does not exist!' % configfile)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2015 Adam.Dybbroe
+# Copyright (c) 2014, 2015, 2019 Adam.Dybbroe
 
 # Author(s):
 
@@ -141,7 +141,7 @@ def ctth_convert_flags(status_flag, conditions_flag, quality_flag):
     arr = np.where(is_bit2_set, np.left_shift(ones, 2), 0)
     retv = np.add(retv, arr)
 
-    # Inverion:
+    # Inversion:
     is_bit4_set = get_bit_from_flags(status_flag, 4)
     arr = np.where(is_bit4_set, np.left_shift(ones, 5), 0)
     retv = np.add(retv, arr)
@@ -1118,3 +1118,21 @@ def old_ctth_temp_palette_data():
         [0, 0, 0],
         [0, 0, 0],
         [78, 119, 145]], dtype="u1")
+
+
+if __name__ == "__main__":
+
+    qflags = np.array([[8, 8, 8, 8],
+                       [1, 1, 8, 8],
+                       [8, 1, 8, 8],
+                       [8, 8, 8, 8]], dtype=np.uint16)
+    sflags = np.array([[0, 0, 0, 0],
+                       [1, 1, 0, 0],
+                       [0, 1, 0, 0],
+                       [0, 0, 0, 0]], dtype=np.uint16)
+    cflags = np.array([[21796, 21796, 21796, 21796],
+                       [21796, 21796, 21796, 21796],
+                       [21796, 21796, 21796, 21796],
+                       [21796, 21796, 21796, 21796]], dtype=np.uint16)
+
+    xflags = ctth_convert_flags(sflags, cflags, qflags)
