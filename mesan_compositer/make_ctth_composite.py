@@ -328,18 +328,20 @@ class ctthComposite(mesanComposite):
                 comp_w = get_weight_ctth(x_flag, lat,
                                          abs(self.obstime - scene.timeslot),
                                          idx_MSG)
-                # # fix to cope with unprocessed data
-                # ii = (x_height.mask == True) | (x_height == 0)
-                # comp_w[ii] = 0
+                # fix to cope with unprocessed data
+                #ii = (x_height.mask == True) | (x_height == 0)
+                ii = np.isnan(x_height)
+                comp_w[ii] = 0
             else:
                 # compare with quality of current CTTH
                 x_w = get_weight_ctth(x_flag, lat,
                                       abs(self.obstime - scene.timeslot),
                                       idx_MSG)
 
-                # # fix to cope with unprocessed data
+                # fix to cope with unprocessed data
                 # ii = (x_height.mask == True) | (x_height == 0)
-                # x_w[ii] = 0
+                ii = np.isnan(x_height)
+                x_w[ii] = 0
 
                 # replace info where current CTTH data is best
                 ii = x_w > comp_w
