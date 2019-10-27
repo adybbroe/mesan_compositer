@@ -20,13 +20,18 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Main module
+"""Package file for the mesan_compositer
 """
-
 
 # import version
 
 # __version__ = version.__version__
+
+import yaml
+try:
+    from yaml import UnsafeLoader
+except ImportError:
+    from yaml import Loader as UnsafeLoader
 
 import logging
 LOG = logging.getLogger(__name__)
@@ -38,6 +43,20 @@ class ProjectException(Exception):
 
 class LoadException(Exception):
     pass
+
+
+def get_config(configfile):
+    """Get the configuration from file"""
+
+    with open(configfile, 'r') as fp_:
+        config = yaml.load(fp_, Loader=UnsafeLoader)
+
+    options = {}
+    for item in config:
+        if not isinstance(config[item], dict):
+            options[item] = config[item]
+
+    return options
 
 
 def cms_modified():
