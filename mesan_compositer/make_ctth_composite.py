@@ -54,6 +54,12 @@ import logging
 
 LOG = logging.getLogger(__name__)
 
+#: Default time format
+_DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
+
+#: Default log format
+_DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
+
 
 def get_arguments():
     """
@@ -106,8 +112,6 @@ def ctth_pps(pps, areaid):
     """Load PPS CTTH and reproject"""
 
     from satpy.scene import Scene
-    from satpy.utils import debug_on
-    debug_on()
 
     scene = Scene(filenames=[pps.uri, pps.geofilename], reader='nwcsaf-pps_nc')
     scene.load(['ctth_alti', 'ctth_pres', 'ctth_tempe', 'ctth_quality',
@@ -121,8 +125,6 @@ def ctth_msg(msg, areaid):
     """Load MSG paralax corrected ctth and reproject"""
 
     from satpy.scene import Scene
-    from satpy.utils import debug_on
-    debug_on()
 
     scene = Scene(filenames=[msg.uri, ], reader='nwcsaf-msg2013-hdf5')
     scene.load(['ctth_alti', 'ctth_pres', 'ctth_tempe', 'ctth_quality', 'ctth_effective_cloudiness'])
@@ -423,7 +425,7 @@ if __name__ == "__main__":
 
     logging.getLogger('').addHandler(handler)
     logging.getLogger('').setLevel(logging.DEBUG)
-    logging.getLogger('satpy').setLevel(logging.DEBUG)
+    logging.getLogger('satpy').setLevel(logging.INFO)
 
     LOG = logging.getLogger('make_ctth_composite')
 
