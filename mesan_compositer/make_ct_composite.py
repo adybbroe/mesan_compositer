@@ -139,17 +139,7 @@ class ctCompositer(object):
 
     """The Cloud Type Composite generator class"""
 
-    def __init__(self, obstime, tdiff, areaid, **kwargs):
-
-        conf = configparser.ConfigParser()
-        configfile = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
-        if not os.path.exists(configfile):
-            raise IOError('Config file %s does not exist!' % configfile)
-        conf.read(configfile)
-
-        options = {}
-        for option, value in conf.items(MODE, raw=True):
-            options[option] = value
+    def __init__(self, obstime, tdiff, areaid, config_options, **kwargs):
 
         values = {"area": areaid, }
 
@@ -160,8 +150,8 @@ class ctCompositer(object):
             # specifcations in the config file:
             LOG.info("Output file name is generated from observation " +
                      "time and info in config file:")
-            bname = obstime.strftime(options['ct_composite_filename']) % values
-            path = options['composite_output_dir']
+            bname = obstime.strftime(config_options['ct_composite_filename']) % values
+            path = config_options['composite_output_dir']
             self.filename = os.path.join(path, bname)
 
         LOG.info('Filename = ' + str(self.filename))
@@ -172,18 +162,18 @@ class ctCompositer(object):
         self.time_window = (obstime - tdiff, obstime + tdiff)
         LOG.debug("Time window: " + str(self.time_window[0]) +
                   " - " + str(self.time_window[1]))
-        self.polar_satellites = options['polar_satellites'].split()
+        self.polar_satellites = config_options['polar_satellites'].split()
         LOG.debug("Polar satellites supported: %s", str(self.polar_satellites))
 
-        self.msg_satellites = options['msg_satellites'].split()
-        self.msg_areaname = options['msg_areaname']
+        self.msg_satellites = config_options['msg_satellites'].split()
+        self.msg_areaname = config_options['msg_areaname']
         self.areaid = areaid
         self.longitude = None
         self.latitude = None
         # An mpop-scene area object:
         self.area = None
 
-        self._options = options
+        self._options = config_options
 
         self.pps_scenes = []
         self.msg_scenes = []
@@ -203,14 +193,16 @@ class ctCompositer(object):
         LOG.debug('pps_dr_dir = ' + str(pps_dr_dir))
         pps_gds_dir = self._options['pps_metop_gds_dir']
 
+        min_num_of_pps_dr_files = int(self._options.get('min_num_of_pps_dr_files', '0'))
+
         # Example: S_NWC_CT_metopb_14320_20150622T1642261Z_20150622T1654354Z.nc
         dr_list = glob(os.path.join(pps_dr_dir, 'S_NWC_CT_*nc'))
         LOG.info("Number of direct readout pps cloudtype files in dir: " +
                  str(len(dr_list)))
-        if len(dr_list) <= MIN_NUM_OF_PPS_DR_FILES:
+        if len(dr_list) <= min_num_of_pps_dr_files:
             LOG.critical("Too few PPS DR files found! (%d<=%d)\n" +
                          "pps_dr_dir = %s",
-                         len(dr_list), MIN_NUM_OF_PPS_DR_FILES,
+                         len(dr_list), min_num_of_pps_dr_files,
                          str(pps_dr_dir))
 
         ppsdr = get_ppslist(dr_list, self.time_window,
@@ -431,9 +423,7 @@ if __name__ == "__main__":
 
     OPTIONS = get_config(config_filename)
 
-    MIN_NUM_OF_PPS_DR_FILES = int(OPTIONS.get('min_num_of_pps_dr_files', '0'))
-
-    ctcomp = ctCompositer(time_of_analysis, delta_time_window, areaid)
+    ctcomp = ctCompositer(time_of_analysis, delta_time_window, areaid, OPTIONS)
     ctcomp.get_catalogue()
     ctcomp.make_composite()
     ctcomp.write()
