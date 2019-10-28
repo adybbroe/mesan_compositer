@@ -1,0 +1,26 @@
+[loggers]
+keys=root
+
+[handlers]
+keys=smtp
+
+[formatters]
+keys=debugFormatter
+
+[logger_root]
+level=ERROR
+handlers=smtp
+
+[handler_smtp]
+class=handlers.SMTPHandler
+level=CRITICAL
+formatter=debugFormatter
+args=('localhost', 'from_user@domain', [u'to_user@domain', ], 'Logger Subject')
+kwargs={'timeout': 10.0}
+
+[formatter_debugFormatter]
+format=[%(levelname)s: %(asctime)s : %(name)s] %(message)s
+datefmt=%Y-%m-%d %H:%M:%S
+
+
+

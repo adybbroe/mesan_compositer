@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2015, 2016, 2018, 2019 Adam.Dybbroe
+# Copyright (c) 2015 - 2019 Adam.Dybbroe
 
 # Author(s):
 
-#   Adam.Dybbroe <a000680@c20671.ad.smhi.se>
+#   Adam.Dybbroe <adam.dybbroe@smhi.se>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,42 +26,31 @@ observations of cloud height and print to stdout
 """
 
 import numpy as np
-from mesan_compositer.netcdf_io import ncCTTHComposite
 import argparse
 from datetime import datetime
 import os
 import sys
 import tempfile
 import shutil
-from six.moves import configparser
-
 import logging
+from logging import handlers
+
+from mesan_compositer.netcdf_io import ncCTTHComposite
+from mesan_compositer.pps_msg_conversions import get_bit_from_flags
+from mesan_compositer import get_config
+
 LOG = logging.getLogger(__name__)
+
+
+class cthError(Exception):
+    pass
+
 
 #: Default time format
 _DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 
 #: Default log format
 _DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
-
-CFG_DIR = os.environ.get('MESAN_COMPOSITE_CONFIG_DIR', './')
-MODE = os.environ.get("SMHI_MODE", 'offline')
-
-conf = configparser.ConfigParser()
-configfile = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
-if not os.path.exists(configfile):
-    raise IOError('Config file %s does not exist!' % configfile)
-conf.read(configfile)
-
-OPTIONS = {}
-for option, value in conf.items(MODE, raw=True):
-    OPTIONS[option] = value
-
-_MESAN_LOG_FILE = OPTIONS.get('mesan_log_file', None)
-
-
-class cthError(Exception):
-    pass
 
 
 # min 8 x 8 pixels in super obs
@@ -73,9 +62,53 @@ QPASS = 0.05  # min quality in a superobs
 OPASS = 0.25  # min fraction opaque in CT std calc
 
 
-def get_bit_from_flags(arr, nbit):
-    res = np.bitwise_and(np.right_shift(arr, nbit), 1)
-    return res.astype('b')
+def get_arguments():
+    """
+    Get command line arguments
+
+    args.logging_conf_file, args.config_file, obs_time, area_id, wsize
+
+    Return
+      File path of the logging.ini file
+      File path of the application configuration file
+      Observation/Analysis time
+      Area id
+      Window size
+    """
+
+    parser = argparse.ArgumentParser()
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--datetime', '-d', help='Date and time of observation - yyyymmddhh',
+                        required=True)
+    parser.add_argument('--area_id', '-a', help='Area id',
+                        required=True)
+    parser.add_argument('--size', '-s', help='Size of integration area in pixels',
+                        required=True)
+    parser.add_argument('-c', '--config_file',
+                        type=str,
+                        dest='config_file',
+                        required=True,
+                        help="The file containing configuration parameters e.g. mesan_sat_config.yaml")
+    parser.add_argument("-l", "--logging",
+                        help="The path to the log-configuration file (e.g. './logging.ini')",
+                        dest="logging_conf_file",
+                        type=str,
+                        required=False)
+    parser.add_argument("-v", "--verbose",
+                        help="print debug messages too",
+                        action="store_true")
+
+    args = parser.parse_args()
+
+    wsize = args.size
+    area_id = args.area_id
+    obs_time = datetime.strptime(args.datetime, '%Y%m%d%H')
+    if 'template' in args.config_file:
+        print("Template file given as master config, aborting!")
+        sys.exit()
+
+    return args.logging_conf_file, args.config_file, obs_time, area_id, wsize
 
 
 def cloudtop(so_CTH, so_w, so_flg, num_of_datapoints):
@@ -232,44 +265,32 @@ def derive_sobs(ctth_comp, npix, resultfile):
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--datetime', '-d', help='Date and time of observation - yyyymmddhh',
-                        required=True)
-    parser.add_argument('--area_id', '-a', help='Area id',
-                        required=True)
-    parser.add_argument('--size', '-s', help='Size of integration area in pixels',
-                        required=True)
-    args = parser.parse_args()
+    (logfile, config_filename, obstime, areaid, window_size) = get_arguments()
 
-    from logging import handlers
+    if logfile:
+        logging.config.fileConfig(logfile)
 
-    if _MESAN_LOG_FILE:
-        ndays = int(OPTIONS["log_rotation_days"])
-        ncount = int(OPTIONS["log_rotation_backup"])
-        handler = handlers.TimedRotatingFileHandler(_MESAN_LOG_FILE,
-                                                    when='midnight',
-                                                    interval=ndays,
-                                                    backupCount=ncount,
-                                                    encoding=None,
-                                                    delay=False,
-                                                    utc=True)
-
-        # handler.doRollover()
-    else:
-        handler = logging.StreamHandler(sys.stderr)
-
+    handler = logging.StreamHandler(sys.stderr)
     handler.setLevel(logging.DEBUG)
-    formatter = logging.Formatter(fmt=_DEFAULT_LOG_FORMAT,
-                                  datefmt=_DEFAULT_TIME_FORMAT)
-    handler.setFormatter(formatter)
+
+    if not logfile:
+        formatter = logging.Formatter(fmt=_DEFAULT_LOG_FORMAT,
+                                      datefmt=_DEFAULT_TIME_FORMAT)
+        handler.setFormatter(formatter)
+
     logging.getLogger('').addHandler(handler)
     logging.getLogger('').setLevel(logging.DEBUG)
-    logging.getLogger('mpop').setLevel(logging.DEBUG)
 
-    LOG = logging.getLogger('prt_nwcsaf_cloudamount')
+    LOG = logging.getLogger('prt_nwcsaf_cloudheight')
 
-    obstime = datetime.strptime(args.datetime, '%Y%m%d%H')
-    values = {"area": args.area_id, }
+    log_handlers = logging.getLogger('').handlers
+    for log_handle in log_handlers:
+        if type(log_handle) is handlers.SMTPHandler:
+            LOG.debug("Mail notifications to: %s", str(log_handle.toaddrs))
+
+    OPTIONS = get_config(config_filename)
+
+    values = {"area": areaid, }
     bname = obstime.strftime(OPTIONS['ctth_composite_filename']) % values
     path = OPTIONS['composite_output_dir']
     filename = os.path.join(path, bname) + '.nc'
@@ -281,7 +302,7 @@ if __name__ == "__main__":
     COMP = ncCTTHComposite()
     COMP.load(filename)
 
-    NPIX = int(args.size)
+    NPIX = int(window_size)
 
     bname = obstime.strftime(OPTIONS['cloudheight_filename']) % values
     path = OPTIONS['composite_output_dir']
