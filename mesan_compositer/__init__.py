@@ -23,17 +23,21 @@
 """Package file for the mesan_compositer
 """
 
-# import version
-
-# __version__ = version.__version__
-
+import logging
 import yaml
 try:
     from yaml import UnsafeLoader
 except ImportError:
     from yaml import Loader as UnsafeLoader
 
-import logging
+from pkg_resources import get_distribution, DistributionNotFound
+try:
+    __version__ = get_distribution(__name__).version
+except DistributionNotFound:
+    # package is not installed
+    pass
+
+
 LOG = logging.getLogger(__name__)
 
 
