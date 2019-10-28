@@ -5,7 +5,7 @@
 
 # Author(s):
 
-#   Adam.Dybbroe <a000680@c14526.ad.smhi.se>
+#   Adam.Dybbroe <adam.dybbroe@smhi.se>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,44 +22,35 @@
 
 """Make a Cloud Type composite
 """
+
 import argparse
 from datetime import datetime, timedelta
 import numpy as np
 import xarray as xr
 import tempfile
 import shutil
-
 from trollimage.xrimage import XRImage
 from mesan_compositer import cms_modified
 from satpy.composites import PaletteCompositor
-
 from utils import ctype_procflags2pps
-
 from mesan_compositer import (ProjectException, LoadException)
 from mesan_compositer.composite_tools import (get_msglist,
                                               get_ppslist,
                                               get_weight_cloudtype)
 from mesan_compositer.netcdf_io import ncCloudTypeComposite
-
 from nwcsaf_formats.pps_conversions import (map_cloudtypes,
                                             ctype_convert_flags)
-
-from mesan_compositer.composite_tools import SENSOR, METOPS
-
+from mesan_compositer.composite_tools import METOPS
+from mesan_compositer import get_config
 import sys
 import os
+import logging
+from logging import handlers
 
-CFG_DIR = os.environ.get('MESAN_COMPOSITE_CONFIG_DIR', './')
-DIST = os.environ.get("SMHI_DIST", 'elin4')
-if not DIST or DIST == 'linda4':
-    MODE = 'offline'
-else:
-    MODE = os.environ.get("SMHI_MODE", 'offline')
+LOG = logging.getLogger(__name__)
+
 
 PLATFORM_NAMES_FROM_PPS = {}
-
-import logging
-LOG = logging.getLogger(__name__)
 
 #: Default time format
 _DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
@@ -67,21 +58,56 @@ _DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 #: Default log format
 _DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
 
-from six.moves import configparser
 
-CONF = configparser.ConfigParser()
-CONFIGFILE = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
-if not os.path.exists(CONFIGFILE):
-    raise IOError('Config file %s does not exist!' % CONFIGFILE)
-CONF.read(CONFIGFILE)
+def get_arguments():
+    """
+    Get command line arguments
 
-OPTIONS = {}
-for opt, val in CONF.items(MODE, raw=True):
-    OPTIONS[opt] = val
+    args.logging_conf_file, args.config_file, obs_time, area_id, wsize
 
-MIN_NUM_OF_PPS_DR_FILES = int(OPTIONS.get('min_num_of_pps_dr_files', '0'))
+    Return
+      File path of the logging.ini file
+      File path of the application configuration file
+      Observation/Analysis time
+      Area id
+      Window size
+    """
 
-_MESAN_LOG_FILE = OPTIONS.get('mesan_log_file', None)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--datetime', '-d', help='Date and time of observation - yyyymmddhh',
+                        required=True)
+    parser.add_argument('--time_window', '-t', help='Number of minutes before and after time window',
+                        required=True)
+    parser.add_argument('--area_id', '-a', help='Area id',
+                        required=True)
+    parser.add_argument('-c', '--config_file',
+                        type=str,
+                        dest='config_file',
+                        required=True,
+                        help="The file containing configuration parameters e.g. mesan_sat_config.yaml")
+    parser.add_argument("-l", "--logging",
+                        help="The path to the log-configuration file (e.g. './logging.ini')",
+                        dest="logging_conf_file",
+                        type=str,
+                        required=False)
+    parser.add_argument("-v", "--verbose",
+                        help="print debug messages too",
+                        action="store_true")
+    parser.add_argument('--ctype_out', help='Mesan Cloudtype composite output',
+                        required=False)
+    parser.add_argument('--bagground_ctth', help='CTTH background...',
+                        required=False)
+
+    args = parser.parse_args()
+
+    tanalysis = datetime.strptime(args.datetime, '%Y%m%d%H')
+    delta_t = timedelta(minutes=int(args.time_window))
+    area_id = args.area_id
+    if 'template' in args.config_file:
+        print("Template file given as master config, aborting!")
+        sys.exit()
+
+    return args.logging_conf_file, args.config_file, tanalysis, area_id, delta_t
 
 
 def ctype_pps(pps, areaid):
@@ -113,17 +139,7 @@ class ctCompositer(object):
 
     """The Cloud Type Composite generator class"""
 
-    def __init__(self, obstime, tdiff, areaid, **kwargs):
-
-        conf = configparser.ConfigParser()
-        configfile = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
-        if not os.path.exists(configfile):
-            raise IOError('Config file %s does not exist!' % configfile)
-        conf.read(configfile)
-
-        options = {}
-        for option, value in conf.items(MODE, raw=True):
-            options[option] = value
+    def __init__(self, obstime, tdiff, areaid, config_options, **kwargs):
 
         values = {"area": areaid, }
 
@@ -134,8 +150,8 @@ class ctCompositer(object):
             # specifcations in the config file:
             LOG.info("Output file name is generated from observation " +
                      "time and info in config file:")
-            bname = obstime.strftime(options['ct_composite_filename']) % values
-            path = options['composite_output_dir']
+            bname = obstime.strftime(config_options['ct_composite_filename']) % values
+            path = config_options['composite_output_dir']
             self.filename = os.path.join(path, bname)
 
         LOG.info('Filename = ' + str(self.filename))
@@ -146,18 +162,18 @@ class ctCompositer(object):
         self.time_window = (obstime - tdiff, obstime + tdiff)
         LOG.debug("Time window: " + str(self.time_window[0]) +
                   " - " + str(self.time_window[1]))
-        self.polar_satellites = options['polar_satellites'].split()
+        self.polar_satellites = config_options['polar_satellites'].split()
         LOG.debug("Polar satellites supported: %s", str(self.polar_satellites))
 
-        self.msg_satellites = options['msg_satellites'].split()
-        self.msg_areaname = options['msg_areaname']
+        self.msg_satellites = config_options['msg_satellites'].split()
+        self.msg_areaname = config_options['msg_areaname']
         self.areaid = areaid
         self.longitude = None
         self.latitude = None
         # An mpop-scene area object:
         self.area = None
 
-        self._options = options
+        self._options = config_options
 
         self.pps_scenes = []
         self.msg_scenes = []
@@ -177,14 +193,16 @@ class ctCompositer(object):
         LOG.debug('pps_dr_dir = ' + str(pps_dr_dir))
         pps_gds_dir = self._options['pps_metop_gds_dir']
 
+        min_num_of_pps_dr_files = int(self._options.get('min_num_of_pps_dr_files', '0'))
+
         # Example: S_NWC_CT_metopb_14320_20150622T1642261Z_20150622T1654354Z.nc
         dr_list = glob(os.path.join(pps_dr_dir, 'S_NWC_CT_*nc'))
         LOG.info("Number of direct readout pps cloudtype files in dir: " +
                  str(len(dr_list)))
-        if len(dr_list) <= MIN_NUM_OF_PPS_DR_FILES:
+        if len(dr_list) <= min_num_of_pps_dr_files:
             LOG.critical("Too few PPS DR files found! (%d<=%d)\n" +
                          "pps_dr_dir = %s",
-                         len(dr_list), MIN_NUM_OF_PPS_DR_FILES,
+                         len(dr_list), min_num_of_pps_dr_files,
                          str(pps_dr_dir))
 
         ppsdr = get_ppslist(dr_list, self.time_window,
@@ -384,36 +402,9 @@ class ctCompositer(object):
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--datetime', '-d', help='Date and time of observation - yyyymmddhh',
-                        required=True)
-    parser.add_argument('--time_window', '-t', help='Number of minutes before and after analysis time',
-                        required=True)
-    parser.add_argument('--area_id', '-a', help='Area id',
-                        required=True)
-    parser.add_argument('--ctype_out', help='Mesan Cloudtype composite output',
-                        required=False)
-    parser.add_argument('--bagground_ctth', help='CTTH background...',
-                        required=False)
+    (logfile, config_filename, time_of_analysis, areaid, delta_time_window) = get_arguments()
 
-    args = parser.parse_args()
-
-    from logging import handlers
-
-    if _MESAN_LOG_FILE:
-        ndays = int(OPTIONS["log_rotation_days"])
-        ncount = int(OPTIONS["log_rotation_backup"])
-        handler = handlers.TimedRotatingFileHandler(_MESAN_LOG_FILE,
-                                                    when='midnight',
-                                                    interval=ndays,
-                                                    backupCount=ncount,
-                                                    encoding=None,
-                                                    delay=False,
-                                                    utc=True)
-
-        # handler.doRollover()
-    else:
-        handler = logging.StreamHandler(sys.stderr)
+    handler = logging.StreamHandler(sys.stderr)
 
     handler.setLevel(logging.DEBUG)
     formatter = logging.Formatter(fmt=_DEFAULT_LOG_FORMAT,
@@ -425,10 +416,14 @@ if __name__ == "__main__":
 
     LOG = logging.getLogger('make_ct_composite')
 
-    time_of_analysis = datetime.strptime(args.datetime, '%Y%m%d%H')
-    delta_t = timedelta(minutes=int(args.time_window))
+    log_handlers = logging.getLogger('').handlers
+    for log_handle in log_handlers:
+        if type(log_handle) is handlers.SMTPHandler:
+            LOG.debug("Mail notifications to: %s", str(log_handle.toaddrs))
 
-    ctcomp = ctCompositer(time_of_analysis, delta_t, args.area_id)
+    OPTIONS = get_config(config_filename)
+
+    ctcomp = ctCompositer(time_of_analysis, delta_time_window, areaid, OPTIONS)
     ctcomp.get_catalogue()
     ctcomp.make_composite()
     ctcomp.write()

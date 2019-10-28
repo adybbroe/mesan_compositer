@@ -79,26 +79,7 @@ SENSOR = {'NOAA-19': 'avhrr/3',
           'NOAA-20': 'viirs'}
 
 
-CFG_DIR = os.environ.get('MESAN_COMPOSITE_CONFIG_DIR', './')
-DIST = os.environ.get("SMHI_DIST", 'elin4')
-if not DIST or DIST == 'linda4':
-    MODE = 'offline'
-else:
-    MODE = os.environ.get("SMHI_MODE", 'offline')
-
-
-CONF = configparser.ConfigParser()
-
-CONFIGFILE = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
-if not os.path.exists(CONFIGFILE):
-    raise IOError('Config file %s does not exist!' % CONFIGFILE)
-CONF.read(CONFIGFILE)
-
-OPTIONS = {}
-for opt, val in CONF.items(MODE, raw=True):
-    OPTIONS[opt] = val
-
-pps_filename = OPTIONS['pps_filename']
+PPS_FILENAME = "S_NWC_{product:s}_{platform_name:s}_{orbit:05d}_{start_time:%Y%m%dT%H%M%S%f}Z_{end_time:%Y%m%dT%H%M%S%f}Z.nc"
 
 
 class PpsMetaData(object):
@@ -189,7 +170,7 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
     but only for the satellites specified in the list *satellites* if given"""
 
     from trollsift import Parser
-    prod_p = Parser(pps_filename)
+    prod_p = Parser(PPS_FILENAME)
 
     LOG.debug("List of satellites: %s", str(satellites))
 

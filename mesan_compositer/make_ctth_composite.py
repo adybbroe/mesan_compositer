@@ -5,7 +5,7 @@
 
 # Author(s):
 
-#   Adam.Dybbroe <a000680@c14526.ad.smhi.se>
+#   Adam.Dybbroe <adam.dybbroe@smhi.se>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -36,9 +36,11 @@ from satpy.composites import PaletteCompositor
 from mesan_compositer import (ProjectException, LoadException)
 from mesan_compositer.pps_msg_conversions import ctth_procflags2pps
 from nwcsaf_formats.pps_conversions import ctth_convert_flags
-from mesan_compositer.composite_tools import SENSOR, METOPS
+from mesan_compositer.composite_tools import METOPS
 from mesan_compositer.netcdf_io import ncCTTHComposite
 from mesan_compositer.netcdf_io import get_nc_attributes_from_object
+
+from mesan_compositer import get_config
 
 from mesan_compositer.composite_tools import (get_msglist,
                                               get_ppslist,
@@ -47,16 +49,9 @@ import sys
 import os
 import tempfile
 import shutil
-
-CFG_DIR = os.environ.get('MESAN_COMPOSITE_CONFIG_DIR', './')
-DIST = os.environ.get("SMHI_DIST", 'elin4')
-if not DIST or DIST == 'linda4':
-    MODE = 'offline'
-else:
-    MODE = os.environ.get("SMHI_MODE", 'offline')
-
-
+from logging import handlers
 import logging
+
 LOG = logging.getLogger(__name__)
 
 #: Default time format
@@ -66,30 +61,61 @@ _DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 _DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
 
 
-from six.moves import configparser
+def get_arguments():
+    """
+    Get command line arguments
 
-conf = configparser.ConfigParser()
-configfile = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
-if not os.path.exists(configfile):
-    raise IOError('Config file %s does not exist!' % configfile)
-conf.read(configfile)
+    args.logging_conf_file, args.config_file, obs_time, area_id, wsize
 
-OPTIONS = {}
-for option, value in conf.items(MODE, raw=True):
-    OPTIONS[option] = value
+    Return
+      File path of the logging.ini file
+      File path of the application configuration file
+      Observation/Analysis time
+      Area id
+      Window size
+    """
 
-_MESAN_LOG_FILE = OPTIONS.get('mesan_log_file', None)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--datetime', '-d', help='Date and time of observation - yyyymmddhh',
+                        required=True)
+    parser.add_argument('--time_window', '-t', help='Number of minutes before and after time window',
+                        required=True)
+    parser.add_argument('--area_id', '-a', help='Area id',
+                        required=True)
+    parser.add_argument('-c', '--config_file',
+                        type=str,
+                        dest='config_file',
+                        required=True,
+                        help="The file containing configuration parameters e.g. mesan_sat_config.yaml")
+    parser.add_argument("-l", "--logging",
+                        help="The path to the log-configuration file (e.g. './logging.ini')",
+                        dest="logging_conf_file",
+                        type=str,
+                        required=False)
+    parser.add_argument("-v", "--verbose",
+                        help="print debug messages too",
+                        action="store_true")
+
+    args = parser.parse_args()
+
+    tanalysis = datetime.strptime(args.datetime, '%Y%m%d%H')
+    delta_t = timedelta(minutes=int(args.time_window))
+    area_id = args.area_id
+    if 'template' in args.config_file:
+        print("Template file given as master config, aborting!")
+        sys.exit()
+
+    return args.logging_conf_file, args.config_file, tanalysis, area_id, delta_t
 
 
 def ctth_pps(pps, areaid):
     """Load PPS CTTH and reproject"""
 
     from satpy.scene import Scene
-    from satpy.utils import debug_on
-    debug_on()
 
     scene = Scene(filenames=[pps.uri, pps.geofilename], reader='nwcsaf-pps_nc')
-    scene.load(['ctth_alti', 'ctth_pres', 'ctth_tempe', 'ctth_quality', 'ctth_conditions', 'ctth_status_flag'])
+    scene.load(['ctth_alti', 'ctth_pres', 'ctth_tempe', 'ctth_quality',
+                'ctth_conditions', 'ctth_status_flag'])
 
     retv = scene.resample(areaid, radius_of_influence=5000)
     return retv
@@ -99,8 +125,6 @@ def ctth_msg(msg, areaid):
     """Load MSG paralax corrected ctth and reproject"""
 
     from satpy.scene import Scene
-    from satpy.utils import debug_on
-    debug_on()
 
     scene = Scene(filenames=[msg.uri, ], reader='nwcsaf-msg2013-hdf5')
     scene.load(['ctth_alti', 'ctth_pres', 'ctth_tempe', 'ctth_quality', 'ctth_effective_cloudiness'])
@@ -198,18 +222,8 @@ class ctthComposite(mesanComposite):
 
     """The CTTH Composite generator class"""
 
-    def __init__(self, obstime, tdiff, areaid, **kwargs):
-        super(ctthComposite, self).__init__(obstime, tdiff, areaid, **kwargs)
-
-        conf = configparser.ConfigParser()
-        configfile = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
-        if not os.path.exists(configfile):
-            raise IOError('Config file %s does not exist!' % configfile)
-        conf.read(configfile)
-
-        options = {}
-        for option, value in conf.items(MODE, raw=True):
-            options[option] = value
+    def __init__(self, obstime, tdiff, areaid, config_options, **kwargs):
+        super(ctthComposite, self).__init__(obstime, tdiff, areaid,  **kwargs)
 
         values = {"area": areaid, }
 
@@ -219,20 +233,20 @@ class ctthComposite(mesanComposite):
             # Generate the filename from the observation time and the
             # specifcations in the config file:
             bname = obstime.strftime(
-                options['ctth_composite_filename']) % values
-            path = options['composite_output_dir']
+                config_options['ctth_composite_filename']) % values
+            path = config_options['composite_output_dir']
             self.filename = os.path.join(path, bname)
 
         self.description = "Cloud Top Temperature and Height composite for Mesan"
 
-        self._options = options
+        self._options = config_options
 
         self.pps_scenes = []
         self.msg_scenes = []
 
-        self.polar_satellites = options['polar_satellites'].split()
-        self.msg_satellites = options['msg_satellites'].split()
-        self.msg_areaname = options['msg_areaname']
+        self.polar_satellites = config_options['polar_satellites'].split()
+        self.msg_satellites = config_options['msg_satellites'].split()
+        self.msg_areaname = config_options['msg_areaname']
         self.areaid = areaid
 
         self.product_names = {'msg': 'CTTH', 'pps': 'CTTH'}
@@ -253,7 +267,7 @@ class ctthComposite(mesanComposite):
         comp_pressure = None
 
         if len(self.msg_scenes + self.pps_scenes) == 0:
-            LOG.error(
+            LOG.critical(
                 "Cannot make ctth composite when no Scenes have been found!")
             return False
 
@@ -285,8 +299,7 @@ class ctthComposite(mesanComposite):
                 try:
                     x_local = ctth_pps(scene, self.areaid)
                 except (ProjectException, LoadException) as err:
-                    LOG.warning("Couldn't load pps scene:\n" + str(scene))
-                    LOG.warning("Exception was: " + str(err))
+                    LOG.critical("Couldn't load pps scene: %s\nException was: %s", (str(scene), str(err)))
                     continue
 
                 # Temperature (K)', u'no_data_value': 255, u'intercept': 100.0,
@@ -397,49 +410,33 @@ class ctthComposite(mesanComposite):
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--datetime', '-d', help='Date and time of observation - yyyymmddhh',
-                        required=True)
-    parser.add_argument('--time_window', '-t', help='Number of minutes before and after time window',
-                        required=True)
-    parser.add_argument('--area_id', '-a', help='Area id',
-                        required=True)
-    parser.add_argument('--ctype_out', help='Mesan Cloudtype composite output',
-                        required=False)
-    parser.add_argument('--bagground_ctth', help='CTTH background...',
-                        required=False)
+    (logfile, config_filename, time_of_analysis, areaid, delta_time_window) = get_arguments()
 
-    args = parser.parse_args()
+    if logfile:
+        logging.config.fileConfig(logfile)
 
-    from logging import handlers
-
-    if _MESAN_LOG_FILE:
-        ndays = int(OPTIONS["log_rotation_days"])
-        ncount = int(OPTIONS["log_rotation_backup"])
-        handler = handlers.TimedRotatingFileHandler(_MESAN_LOG_FILE,
-                                                    when='midnight',
-                                                    interval=ndays,
-                                                    backupCount=ncount,
-                                                    encoding=None,
-                                                    delay=False,
-                                                    utc=True)
-    else:
-        handler = logging.StreamHandler(sys.stderr)
-
+    handler = logging.StreamHandler(sys.stderr)
     handler.setLevel(logging.DEBUG)
-    formatter = logging.Formatter(fmt=_DEFAULT_LOG_FORMAT,
-                                  datefmt=_DEFAULT_TIME_FORMAT)
-    handler.setFormatter(formatter)
+
+    if not logfile:
+        formatter = logging.Formatter(fmt=_DEFAULT_LOG_FORMAT,
+                                      datefmt=_DEFAULT_TIME_FORMAT)
+        handler.setFormatter(formatter)
+
     logging.getLogger('').addHandler(handler)
     logging.getLogger('').setLevel(logging.DEBUG)
-    logging.getLogger('mpop').setLevel(logging.DEBUG)
+    logging.getLogger('satpy').setLevel(logging.INFO)
 
     LOG = logging.getLogger('make_ctth_composite')
 
-    time_of_analysis = datetime.strptime(args.datetime, '%Y%m%d%H')
-    delta_t = timedelta(minutes=int(args.time_window))
+    log_handlers = logging.getLogger('').handlers
+    for log_handle in log_handlers:
+        if type(log_handle) is handlers.SMTPHandler:
+            LOG.debug("Mail notifications to: %s", str(log_handle.toaddrs))
 
-    ctth_comp = ctthComposite(time_of_analysis, delta_t, args.area_id)
+    OPTIONS = get_config(config_filename)
+
+    ctth_comp = ctthComposite(time_of_analysis, delta_time_window, areaid, OPTIONS)
     ctth_comp.get_catalogue()
     ctth_comp.make_composite()
     ctth_comp.write()
