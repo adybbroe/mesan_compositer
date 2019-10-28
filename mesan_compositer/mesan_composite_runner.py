@@ -5,7 +5,7 @@
 
 # Author(s):
 
-#   Adam.Dybbroe <a000680@c20671.ad.smhi.se>
+#   Adam.Dybbroe <adam.dybbroe@smhi.se>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -27,58 +27,29 @@ valid for the closest (whole) hour.
 """
 
 import os
-import ConfigParser
-import logging
-LOG = logging.getLogger(__name__)
-
-CFG_DIR = os.environ.get('MESAN_COMPOSITE_CONFIG_DIR', './')
-DIST = os.environ.get("SMHI_DIST", 'elin4')
-if not DIST or DIST == 'linda4':
-    MODE = 'offline'
-else:
-    MODE = os.environ.get("SMHI_MODE", 'offline')
-
-CONF = ConfigParser.ConfigParser()
-CFG_FILE = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
-LOG.debug("Config file = " + str(CFG_FILE))
-if not os.path.exists(CFG_FILE):
-    raise IOError('Config file %s does not exist!' % CFG_FILE)
-
-CONF.read(CFG_FILE)
-OPTIONS = {}
-for option, value in CONF.items(MODE, raw=True):
-    OPTIONS[option] = value
-
-TIME_WINDOW = int(OPTIONS.get('absolute_time_threshold_minutes', '30'))
-LOG.debug("Time window = " + str(TIME_WINDOW))
-
-MESAN_AREA_ID = OPTIONS.get('mesan_area_id', None)
-DEFAULT_AREA = "mesanX"
-if not MESAN_AREA_ID:
-    LOG.warning("No area id specified in config file. Using default = " +
-                str(DEFAULT_AREA))
-    MESAN_AREA_ID = DEFAULT_AREA
-
-NPIX = int(OPTIONS.get('number_of_pixels', 32))
-
-IPAR = OPTIONS.get('cloud_amount_ipar')
-if not IPAR:
-    raise IOError("No ipar value in config file!")
-
-servername = None
 import socket
-servername = socket.gethostname()
-SERVERNAME = OPTIONS.get('servername', servername)
+import argparse
+from logging import handlers
+import logging
+import sys
+import netifaces
+from urlparse import urlparse
+import posttroll.subscriber
+from posttroll.publisher import Publish
+from posttroll.message import Message
+from multiprocessing import Pool, Manager
+import threading
+from Queue import Empty
+from datetime import timedelta, datetime
 
-MAIL_HOST = 'localhost'
-SENDER = OPTIONS.get('mail_sender', 'safusr.u@smhi.se')
-MAIL_FROM = '"Mesan-compositer ALERT" <' + str(SENDER) + '>'
-try:
-    RECIPIENTS = OPTIONS.get("mail_subscribers").split()
-except AttributeError:
-    RECIPIENTS = "adam.dybbroe@smhi.se"
-MAIL_TO = RECIPIENTS
-MAIL_SUBJECT = 'New Critical Event From mesan_compositer'
+from mesan_compositer.composite_tools import get_analysis_time
+from mesan_compositer import make_ct_composite as mcc
+from mesan_compositer import make_ctth_composite
+from mesan_compositer.prt_nwcsaf_cloudamount import derive_sobs as derive_sobs_clamount
+from mesan_compositer.prt_nwcsaf_cloudheight import derive_sobs as derive_sobs_clheight
+from mesan_compositer import get_config
+
+LOG = logging.getLogger(__name__)
 
 
 #: Default time format
@@ -87,23 +58,6 @@ _DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 #: Default log format
 _DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
 
-import sys
-import netifaces
-from urlparse import urlparse
-import posttroll.subscriber
-from posttroll.publisher import Publish
-from posttroll.message import Message
-
-from multiprocessing import Pool, Manager
-import threading
-from Queue import Empty
-
-from datetime import timedelta, datetime
-from mesan_compositer.composite_tools import get_analysis_time
-from mesan_compositer import make_ct_composite as mcc
-from mesan_compositer import make_ctth_composite
-from mesan_compositer.prt_nwcsaf_cloudamount import derive_sobs as derive_sobs_clamount
-from mesan_compositer.prt_nwcsaf_cloudheight import derive_sobs as derive_sobs_clheight
 
 SENSOR = {'NOAA-19': 'avhrr/3',
           'NOAA-18': 'avhrr/3',
@@ -116,15 +70,43 @@ SENSOR = {'NOAA-19': 'avhrr/3',
           'Suomi-NPP': 'viirs',
           'NOAA-20': 'viirs'}
 
-POLSATS_STR = OPTIONS.get('polar_satellites')
-POLAR_SATELLITES = POLSATS_STR.split()
-
 
 GEO_SATS = ['Meteosat-10', 'Meteosat-9', 'Meteosat-8', 'Meteosat-11', ]
 MSG_NAME = {'Meteosat-10': 'MSG3', 'Meteosat-9': 'MSG2',
             'Meteosat-8': 'MSG1', 'Meteosat-11': 'MSG4'}
 
 PRODUCT_NAMES = ['CMA', 'CT', 'CTTH', 'PC', 'CPP']
+
+
+def get_arguments():
+    """
+    Get command line arguments
+
+    args.logging_conf_file, args.config_file, obs_time, area_id, wsize
+
+    Return
+      File path of the logging.ini file
+      File path of the application configuration file
+    """
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-c', '--config_file',
+                        type=str,
+                        dest='config_file',
+                        required=True,
+                        help="The file containing configuration parameters e.g. mesan_sat_config.yaml")
+    parser.add_argument("-l", "--logging",
+                        help="The path to the log-configuration file (e.g. './logging.ini')",
+                        dest="logging_conf_file",
+                        type=str,
+                        required=False)
+
+    args = parser.parse_args()
+    if 'template' in args.config_file:
+        print("Template file given as master config, aborting!")
+        sys.exit()
+
+    return args.logging_conf_file, args.config_file
 
 
 class MesanCompRunError(Exception):
@@ -467,8 +449,6 @@ def mesan_live_runner():
 
     LOG.info("*** Start the runner for the Mesan composite generator:")
     LOG.debug("os.environ = " + str(os.environ))
-    LOG.debug("DIST = " + str(DIST))
-    LOG.debug("MODE = " + str(MODE))
     LOG.debug("Number of pixels = " + str(NPIX))
 
     pool = Pool(processes=6, maxtasksperchild=1)
@@ -587,24 +567,54 @@ def mesan_live_runner():
 
 
 if __name__ == "__main__":
-    from logging import handlers
-    handler = logging.StreamHandler(sys.stderr)
 
+    (logfile, config_filename) = get_arguments()
+
+    if logfile:
+        logging.config.fileConfig(logfile)
+
+    handler = logging.StreamHandler(sys.stderr)
     handler.setLevel(logging.DEBUG)
-    formatter = logging.Formatter(fmt=_DEFAULT_LOG_FORMAT,
-                                  datefmt=_DEFAULT_TIME_FORMAT)
-    handler.setFormatter(formatter)
+
+    if not logfile:
+        formatter = logging.Formatter(fmt=_DEFAULT_LOG_FORMAT,
+                                      datefmt=_DEFAULT_TIME_FORMAT)
+        handler.setFormatter(formatter)
+
     logging.getLogger('').addHandler(handler)
     logging.getLogger('').setLevel(logging.DEBUG)
     logging.getLogger('posttroll').setLevel(logging.INFO)
 
-    smtp_handler = handlers.SMTPHandler(MAIL_HOST,
-                                        MAIL_FROM,
-                                        MAIL_TO,
-                                        MAIL_SUBJECT)
-    smtp_handler.setLevel(logging.CRITICAL)
-    logging.getLogger('').addHandler(smtp_handler)
-
     LOG = logging.getLogger('mesan_composite_runner')
+
+    log_handlers = logging.getLogger('').handlers
+    for log_handle in log_handlers:
+        if type(log_handle) is handlers.SMTPHandler:
+            LOG.debug("Mail notifications to: %s", str(log_handle.toaddrs))
+
+    OPTIONS = get_config(config_filename)
+
+    POLSATS_STR = OPTIONS.get('polar_satellites')
+    POLAR_SATELLITES = POLSATS_STR.split()
+
+    TIME_WINDOW = int(OPTIONS.get('absolute_time_threshold_minutes', '30'))
+    LOG.debug("Time window = " + str(TIME_WINDOW))
+
+    MESAN_AREA_ID = OPTIONS.get('mesan_area_id', None)
+    DEFAULT_AREA = "mesanX"
+    if not MESAN_AREA_ID:
+        LOG.warning("No area id specified in config file. Using default = " +
+                    str(DEFAULT_AREA))
+        MESAN_AREA_ID = DEFAULT_AREA
+
+    NPIX = int(OPTIONS.get('number_of_pixels', 32))
+
+    IPAR = OPTIONS.get('cloud_amount_ipar')
+    if not IPAR:
+        raise IOError("No ipar value in config file!")
+
+    servername = None
+    servername = socket.gethostname()
+    SERVERNAME = OPTIONS.get('servername', servername)
 
     mesan_live_runner()
