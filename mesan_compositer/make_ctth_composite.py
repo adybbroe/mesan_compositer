@@ -92,14 +92,14 @@ def get_arguments():
 
     args = parser.parse_args()
 
-    time_of_analysis = datetime.strptime(args.datetime, '%Y%m%d%H')
+    tanalysis = datetime.strptime(args.datetime, '%Y%m%d%H')
     delta_t = timedelta(minutes=int(args.time_window))
     area_id = args.area_id
     if 'template' in args.config_file:
         print("Template file given as master config, aborting!")
         sys.exit()
 
-    return args.logging_conf_file, args.config_file, time_of_analysis, area_id, delta_t
+    return args.logging_conf_file, args.config_file, tanalysis, area_id, delta_t
 
 
 def ctth_pps(pps, areaid):
@@ -414,8 +414,12 @@ if __name__ == "__main__":
         logging.config.fileConfig(logfile)
 
     handler = logging.StreamHandler(sys.stderr)
-
     handler.setLevel(logging.DEBUG)
+
+    if not logfile:
+        formatter = logging.Formatter(fmt=_DEFAULT_LOG_FORMAT,
+                                      datefmt=_DEFAULT_TIME_FORMAT)
+        handler.setFormatter(formatter)
 
     logging.getLogger('').addHandler(handler)
     logging.getLogger('').setLevel(logging.DEBUG)

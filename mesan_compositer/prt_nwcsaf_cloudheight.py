@@ -281,7 +281,7 @@ if __name__ == "__main__":
     logging.getLogger('').addHandler(handler)
     logging.getLogger('').setLevel(logging.DEBUG)
 
-    LOG = logging.getLogger('prt_nwcsaf_cloudamount')
+    LOG = logging.getLogger('prt_nwcsaf_cloudheight')
 
     log_handlers = logging.getLogger('').handlers
     for log_handle in log_handlers:
@@ -292,7 +292,6 @@ if __name__ == "__main__":
 
     values = {"area": areaid, }
     bname = obstime.strftime(OPTIONS['ctth_composite_filename']) % values
-
     path = OPTIONS['composite_output_dir']
     filename = os.path.join(path, bname) + '.nc'
     if not os.path.exists(filename):
