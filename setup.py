@@ -20,6 +20,18 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import sys
+from setuptools import setup
+import os.path
+import imp
+
+try:
+    # HACK: https://github.com/pypa/setuptools_scm/issues/190#issuecomment-351181286
+    # Stop setuptools_scm from including all repository files
+    import setuptools_scm.integration
+    setuptools_scm.integration.find_files = lambda _: []
+except ImportError:
+    pass
 
 try:
     with open('./README.md', 'r') as fd:
@@ -27,16 +39,16 @@ try:
 except IOError:
     long_description = ''
 
-
-from setuptools import setup
-import imp
+requires = ['docutils>=0.3',
+            'numpy>=1.5.1',
+            'satpy',
+            'pyresample', 'trollsift'],
 
 SHORT_DESC = ("Mesan satellite compositer")
 
-version = imp.load_source(
-    'mesan_compositer.version', 'mesan_compositer/version.py')
+NAME = 'mesan-compositer'
 
-setup(name='mesan-compositer',
+setup(name=NAME,
       version='0.1.0',
       description=SHORT_DESC,
       author='Adam Dybbroe, Tomas Landelius',
@@ -48,7 +60,7 @@ setup(name='mesan-compositer',
                    'Operating System :: OS Independent',
                    'Programming Language :: Python',
                    'Topic :: Scientific/Engineering'],
-      # url='https://github.com/adybbroe/py...',
+      url='https://github.com/adybbroe/mesan_compositer',
       # download_url="https://github.com/adybbroe/py....
       long_description=long_description,
       license='GPLv3',
@@ -58,13 +70,8 @@ setup(name='mesan-compositer',
 
       # Project should use reStructuredText, so ensure that the docutils get
       # installed or upgraded on the target machine
-      install_requires=['docutils>=0.3',
-                        'numpy>=1.5.1',
-                        'satpy',
-                        'pyresample'],
-      # 'pyorbital >= v0.2.3'],
+      install_requires=requires,
 
-      test_requires=["mock"],
       extras_require={'netcdf4-python': ['netCDF4']},
       scripts=['mesan_compositer/make_ct_composite.py',
                'mesan_compositer/make_ctth_composite.py',
@@ -73,9 +80,8 @@ setup(name='mesan-compositer',
                'mesan_compositer/ct_quicklooks.py',
                'mesan_compositer/ctth_quicklooks.py',
                'mesan_compositer/mesan_composite_runner.py'],
-      data_files=[('etc', ['etc/mesan_sat_config.cfg_template']),
-                  ],
       test_suite='tests.suite',
-      tests_require=[],
-      zip_safe=False
+      tests_requires=["mock"],
+      zip_safe=False,
+      use_scm_version=True
       )
