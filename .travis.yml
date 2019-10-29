@@ -42,7 +42,7 @@ deploy:
   provider: pypi
   user: adybbroe
   password:
-    secure: FznD38SHxuj1RoFXUqLstF//O3+pypF84hCOHO8A3Poa+ygh7X4a+9aimCeiuY9d+5tbE0ZlyG7LMcCOFA3JCvH7lUChmQbbn3pcFvJdJzzYQgxYNfvCL9YtjRF/n648bVdpN265hm07rmOe7DHbysw4q8hMlxtUH87MYctRg90=
+    secure: SY0qo7sZXDjDx0DHvuXrHvL9VTAulgU/T33d6UWXf469jT9DOexuZ2VYLgJbYQen5FSe5JmQE0ZMdId1cb8IPP/77qCgQK6f0lRDa43fSYXhcD+fHzlQskievJrwamkRYx6WBrJbwGAKBNinUgNSaTdbh9XUugziGFiOHUfVppM=
     distributions: sdist bdist_wheel
     skip_existing: true
   on:
