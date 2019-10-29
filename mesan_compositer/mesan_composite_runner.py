@@ -33,13 +33,19 @@ from logging import handlers
 import logging
 import sys
 import netifaces
-from urlparse import urlparse
+from six.moves.urllib.parse import urlparse
 import posttroll.subscriber
 from posttroll.publisher import Publish
 from posttroll.message import Message
 from multiprocessing import Pool, Manager
 import threading
-from Queue import Empty
+try:
+    # python 3
+    from queue import Empry
+except ImportError:
+    # python 2
+    from Queue import Empty
+
 from datetime import timedelta, datetime
 
 from mesan_compositer.composite_tools import get_analysis_time
