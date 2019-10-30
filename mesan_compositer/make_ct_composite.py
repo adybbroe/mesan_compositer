@@ -32,7 +32,7 @@ import shutil
 from trollimage.xrimage import XRImage
 from mesan_compositer import cms_modified
 from satpy.composites import PaletteCompositor
-from utils import ctype_procflags2pps
+from mesan_compositer.pps_msg_conversions import ctype_procflags2pps
 from mesan_compositer import (ProjectException, LoadException)
 from mesan_compositer.composite_tools import (get_msglist,
                                               get_ppslist,
