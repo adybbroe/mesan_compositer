@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 Adam.Dybbroe
+# Copyright (c) 2014, 2019 Adam.Dybbroe
 
 # Author(s):
 
@@ -26,9 +26,13 @@ format conversion is not a one-to-one mapping! There is information in the new
 format that cannot be transfered to the old format!
 """
 
-from mesan_compositer import version
 
-__version__ = version.__version__
+from pkg_resources import get_distribution, DistributionNotFound
+try:
+    __version__ = get_distribution(__name__).version
+except DistributionNotFound:
+    # package is not installed
+    pass
 
 import logging
 LOG = logging.getLogger(__name__)
