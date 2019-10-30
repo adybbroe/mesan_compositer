@@ -41,7 +41,7 @@ from multiprocessing import Pool, Manager
 import threading
 try:
     # python 3
-    from queue import Empry
+    from queue import Empty
 except ImportError:
     # python 2
     from Queue import Empty
