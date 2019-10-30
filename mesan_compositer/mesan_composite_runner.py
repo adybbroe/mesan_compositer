@@ -48,6 +48,7 @@ except ImportError:
 
 from datetime import timedelta, datetime
 
+from mesan_compositer.utils import check_uri
 from mesan_compositer.composite_tools import get_analysis_time
 from mesan_compositer import make_ct_composite as mcc
 from mesan_compositer import make_ctth_composite
@@ -265,8 +266,6 @@ def create_message(resultfile, scene):
 
 def ready2run(msg, files4comp, job_register, sceneid, product='CT'):
     """Check whether we can start a composite generation on scene"""
-
-    from trollduction.producer import check_uri
 
     LOG.debug("Ready to run?")
     LOG.info("Got message: " + str(msg))

@@ -23,6 +23,9 @@
 """Miscellaneous tools/utilities taken from mpop
 """
 
+import os
+import socket
+from six.moves.urllib.parse import urlparse
 import numpy as np
 import logging
 LOG = logging.getLogger(__name__)
@@ -378,3 +381,28 @@ def aeqd2cf(proj_dict):
                       longitude_of_central_meridian="lon_0",
                       false_easting="x_0",
                       false_northing="y_0")
+
+
+def check_uri(uri):
+    """Check that the provided *uri* is on the local host and return the
+    file path.
+    """
+    if isinstance(uri, (list, set, tuple)):
+        paths = [check_uri(ressource) for ressource in uri]
+        return paths
+    url = urlparse(uri)
+    try:
+        if url.hostname:
+            url_ip = socket.gethostbyname(url.hostname)
+
+            if url_ip not in get_local_ips():
+                try:
+                    os.stat(url.path)
+                except OSError:
+                    raise IOError(
+                        "Data file %s unaccessible from this host" % uri)
+
+    except socket.gaierror:
+        LOGGER.warning("Couldn't check file location, running anyway")
+
+    return url.path
