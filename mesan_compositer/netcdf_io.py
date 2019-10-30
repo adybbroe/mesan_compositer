@@ -25,7 +25,7 @@
 
 import logging
 import numpy as np
-from utils import proj2cf
+from mesan_compositer.utils import proj2cf
 import xarray as xr
 from datetime import datetime
 
