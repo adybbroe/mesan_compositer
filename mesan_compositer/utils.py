@@ -25,6 +25,7 @@
 
 import os
 import socket
+import netifaces
 from six.moves.urllib.parse import urlparse
 import numpy as np
 import logging
@@ -406,3 +407,14 @@ def check_uri(uri):
         LOGGER.warning("Couldn't check file location, running anyway")
 
     return url.path
+
+
+def get_local_ips():
+    inet_addrs = [netifaces.ifaddresses(iface).get(netifaces.AF_INET)
+                  for iface in netifaces.interfaces()]
+    ips = []
+    for addr in inet_addrs:
+        if addr is not None:
+            for add in addr:
+                ips.append(add['addr'])
+    return ips

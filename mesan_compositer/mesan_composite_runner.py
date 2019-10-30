@@ -32,7 +32,6 @@ import argparse
 from logging import handlers
 import logging
 import sys
-import netifaces
 from six.moves.urllib.parse import urlparse
 import posttroll.subscriber
 from posttroll.publisher import Publish
@@ -49,6 +48,7 @@ except ImportError:
 from datetime import timedelta, datetime
 
 from mesan_compositer.utils import check_uri
+from mesan_compositer.utils import get_local_ips
 from mesan_compositer.composite_tools import get_analysis_time
 from mesan_compositer import make_ct_composite as mcc
 from mesan_compositer import make_ctth_composite
@@ -118,17 +118,6 @@ def get_arguments():
 
 class MesanCompRunError(Exception):
     pass
-
-
-def get_local_ips():
-    inet_addrs = [netifaces.ifaddresses(iface).get(netifaces.AF_INET)
-                  for iface in netifaces.interfaces()]
-    ips = []
-    for addr in inet_addrs:
-        if addr is not None:
-            for add in addr:
-                ips.append(add['addr'])
-    return ips
 
 
 def reset_job_registry(objdict, key):
