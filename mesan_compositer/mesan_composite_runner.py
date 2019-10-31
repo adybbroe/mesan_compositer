@@ -561,14 +561,14 @@ def mesan_live_runner(config_options):
                                   publisher_q,
                                   config_options))
 
-            # elif product == 'CTTH':
-            #     LOG.debug("Product is CTTH")
-            #     pool.apply_async(ctth_composite_worker,
-            #                      (scene,
-            #                       jobs_dict[
-            #                           keyname],
-            #                       publisher_q,
-            #                       config_options))
+            elif product == 'CTTH':
+                LOG.debug("Product is CTTH")
+                pool.apply_async(ctth_composite_worker,
+                                 (scene,
+                                  jobs_dict[
+                                      keyname],
+                                  publisher_q,
+                                  config_options))
 
             else:
                 LOG.warning("Product %s not supported!", str(product))
