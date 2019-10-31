@@ -293,7 +293,7 @@ class ctthComposite(mesanComposite):
                 # The weight for masked data is set further down
                 x_flag = np.ma.filled(ctth_procflags2pps(x_local['ctth_quality'].data.compute()),
                                       fill_value=65535)
-                x_id = 1 * np.ones(np.shape(x_temperature))
+                x_id = 1 * np.ones(x_temperature.shape)
             else:
                 is_MSG = False
                 try:
@@ -321,13 +321,13 @@ class ctthComposite(mesanComposite):
                 # x_flag = np.ma.filled(oldflags, fill_value=65535)
                 x_flag = oldflags
 
-                x_id = 0 * np.ones(np.shape(x_temperature))
-                lat = 0 * np.ones(np.shape(x_temperature))
+                x_id = 0 * np.ones(x_temperature.shape)
+                lat = 0 * np.ones(x_temperature.shape)
 
             # time identifier is seconds since 1970-01-01 00:00:00
             x_time = time.mktime(scene.timeslot.timetuple()) * \
-                np.ones(np.shape(x_temperature))
-            idx_MSG = is_MSG * np.ones(np.shape(x_temperature), dtype=np.bool)
+                np.ones(x_temperature.shape)
+            idx_MSG = is_MSG * np.ones(x_temperature.shape, dtype=np.bool)
 
             if comp_temperature is None:
                 # initialize field with current CTTH

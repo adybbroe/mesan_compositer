@@ -227,7 +227,7 @@ def derive_sobs(ct_comp, ipar, npix, resultfile):
     # lon, lat = area.get_lonlats()
     lon, lat = ct_comp.area_def.get_lonlats()
 
-    ctype = ct_comp.cloudtype.data.astype('int')
+    ctype = ct_comp.cloudtype.data.compute().astype('int')
     weight = ct_comp.weight.data
     #obstime = ct_comp.time.data
     #id = ct_comp.id.data
@@ -243,7 +243,7 @@ def derive_sobs(ct_comp, ipar, npix, resultfile):
     LOG.info('\tUsing %d x %d pixels in a superobservation', dx, dy)
 
     # initialize superobs data */
-    ny, nx = np.shape(ctype)
+    ny, nx = ctype.shape
 
     # indices to super obs "midpoints"
     lx = np.arange(dlen, nx - dlen + 1, dx)
