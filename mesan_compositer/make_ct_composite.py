@@ -113,8 +113,8 @@ def get_arguments():
 def ctype_pps(pps, areaid):
     """Load PPS Cloudtype and reproject"""
     from satpy.scene import Scene
-    from satpy.utils import debug_on
-    debug_on()
+    #from satpy.utils import debug_on
+    # debug_on()
 
     scene = Scene(filenames=[pps.uri, pps.geofilename], reader='nwcsaf-pps_nc')
     scene.load(['cloudtype', 'ct', 'ct_quality', 'ct_status_flag', 'ct_conditions'])
@@ -127,8 +127,8 @@ def ctype_msg(msg, areaid):
     """Load MSG paralax corrected cloud type and reproject"""
 
     from satpy.scene import Scene
-    from satpy.utils import debug_on
-    debug_on()
+    #from satpy.utils import debug_on
+    # debug_on()
 
     scene = Scene(filenames=[msg.uri, ], reader='nwcsaf-msg2013-hdf5')
     scene.load(['cloudtype', 'ct', 'ct_quality'])
@@ -293,7 +293,7 @@ class ctCompositer(object):
 
                 # convert msg flags to pps
                 x_flag = ctype_procflags2pps(x_local['ct_quality'].data.compute())
-                x_id = 1 * np.ones(np.shape(x_CT))
+                x_id = 1 * np.ones(x_CT.shape)
             else:
                 is_MSG = False
                 try:
@@ -311,12 +311,12 @@ class ctCompositer(object):
                 cflags = x_local['ct_conditions']
                 qflags = x_local['ct_quality']
                 x_flag = ctype_convert_flags(sflags, cflags, qflags)
-                x_id = 0 * np.ones(np.shape(x_CT))
-                lat = 0 * np.ones(np.shape(x_CT))
+                x_id = 0 * np.ones(x_CT.shape)
+                lat = 0 * np.ones(x_CT.shape)
 
             # time identifier is seconds since 1970-01-01 00:00:00
-            x_time = time.mktime(scene.timeslot.timetuple()) * np.ones(np.shape(x_CT))
-            idx_MSG = is_MSG * np.ones(np.shape(x_CT), dtype=np.bool)
+            x_time = time.mktime(scene.timeslot.timetuple()) * np.ones(x_CT.shape)
+            idx_MSG = is_MSG * np.ones(x_CT.shape, dtype=np.bool)
             if comp_CT is None:
                 # initialize field with current CT
                 comp_lon, comp_lat = x_local['ct'].area.get_lonlats()
@@ -411,7 +411,7 @@ if __name__ == "__main__":
                                   datefmt=_DEFAULT_TIME_FORMAT)
     handler.setFormatter(formatter)
     logging.getLogger('').addHandler(handler)
-    logging.getLogger('').setLevel(logging.DEBUG)
+    # logging.getLogger('').setLevel(logging.DEBUG)
     logging.getLogger('satpy').setLevel(logging.DEBUG)
 
     LOG = logging.getLogger('make_ct_composite')

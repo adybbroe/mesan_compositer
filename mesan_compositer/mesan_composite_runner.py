@@ -241,12 +241,9 @@ def create_message(resultfile, scene):
     to_send['type'] = 'netCDF'
     to_send['format'] = 'MESAN'
     to_send['data_processing_level'] = '3'
-    environment = MODE
     to_send['start_time'], to_send['end_time'] = scene[
         'starttime'], scene['endtime']
-    # Hardcoded station! Norrkoping. FIXME!
     pub_message = Message('/' + to_send['format'] + '/' + to_send['data_processing_level'] +
-                          '/norrköping/' + environment +
                           '/polar/direct_readout/',
                           "file", to_send).encode()
 
@@ -362,7 +359,7 @@ def ctype_composite_worker(scene, job_id, publish_q, config_options):
             "Make ctype composite for area id = " + str(mesan_area_id))
 
         npix = int(config_options.get('number_of_pixels', DEFAULT_SUPEROBS_WINDOW_SIZE_NPIX))
-        ipar = config_options.get('cloud_amount_ipar')
+        ipar = str(config_options.get('cloud_amount_ipar'))
         if not ipar:
             raise IOError("No ipar value in config file!")
 
@@ -564,14 +561,14 @@ def mesan_live_runner(config_options):
                                   publisher_q,
                                   config_options))
 
-            elif product == 'CTTH':
-                LOG.debug("Product is CTTH")
-                pool.apply_async(ctth_composite_worker,
-                                 (scene,
-                                  jobs_dict[
-                                      keyname],
-                                  publisher_q,
-                                  config_options))
+            # elif product == 'CTTH':
+            #     LOG.debug("Product is CTTH")
+            #     pool.apply_async(ctth_composite_worker,
+            #                      (scene,
+            #                       jobs_dict[
+            #                           keyname],
+            #                       publisher_q,
+            #                       config_options))
 
             else:
                 LOG.warning("Product %s not supported!", str(product))
@@ -594,7 +591,7 @@ if __name__ == "__main__":
     (logfile, config_filename) = get_arguments()
 
     if logfile:
-        logging.config.fileConfig(logfile)
+        logging.config.fileConfig(logfile, disable_existing_loggers=False)
 
     handler = logging.StreamHandler(sys.stderr)
     formatter = logging.Formatter(fmt=_DEFAULT_LOG_FORMAT,
@@ -621,5 +618,18 @@ if __name__ == "__main__":
     servername = None
     servername = socket.gethostname()
     SERVERNAME = OPTIONS.get('servername', servername)
+
+    #
+    # time_of_analysis = datetime.strptime("2019-10-31 09:00:00", "%Y-%m-%d %H:%M:%S")
+    # delta_time_window = timedelta(seconds=35*60)
+    # areaid = "mesanX"
+    # ctcomp = mcc.ctCompositer(time_of_analysis, delta_time_window, areaid, OPTIONS)
+    # ctcomp.get_catalogue()
+    # ctcomp.make_composite()
+    # values = {"area": areaid, }
+    # bname = time_of_analysis.strftime(OPTIONS['cloudamount_filename']) % values
+    # path = OPTIONS['composite_output_dir']
+    # filename = os.path.join(path, bname + '.dat')
+    # derive_sobs_clamount(ctcomp.composite, '71', 24, filename)
 
     mesan_live_runner(OPTIONS)
