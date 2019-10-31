@@ -173,11 +173,11 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
     prod_p = Parser(PPS_FILENAME)
 
     LOG.debug("List of satellites: %s", str(satellites))
-
     plist = []
     files_old = True
     latest_file = None
     latest_file_time = datetime(1970, 1, 1)
+    LOG.info("Going through file list with %d files", len(filelist))
     for filename in filelist:
         bname = os.path.basename(filename)
         try:
@@ -224,6 +224,7 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
                      "Latest file is more than 4 hours from time-window\n",
                      os.path.basename(latest_file), str(latest_file_time))
     elif len(plist) == 0:
+        LOG.debug("No pps products found at all in directory!")
         LOG.critical("No pps products found at all in directory!")
 
     return plist

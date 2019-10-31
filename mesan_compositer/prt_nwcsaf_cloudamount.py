@@ -227,7 +227,11 @@ def derive_sobs(ct_comp, ipar, npix, resultfile):
     # lon, lat = area.get_lonlats()
     lon, lat = ct_comp.area_def.get_lonlats()
 
-    ctype = ct_comp.cloudtype.data.compute().astype('int')
+    try:
+        ctype = ct_comp.cloudtype.data.compute().astype('int')
+    except AttributeError:
+        ctype = ct_comp.cloudtype.data.astype('int')
+
     weight = ct_comp.weight.data
     #obstime = ct_comp.time.data
     #id = ct_comp.id.data

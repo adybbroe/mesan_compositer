@@ -187,7 +187,11 @@ def derive_sobs(ctth_comp, npix, resultfile):
     # Get the lon,lat:
     lon, lat = ctth_comp.area_def.get_lonlats()
 
-    ctth_height = ctth_comp.height.data.astype('int')
+    try:
+        ctth_height = ctth_comp.height.data.compute().astype('int')
+    except AttributeError:
+        ctth_height = ctth_comp.height.data.astype('int')
+
     flags = ctth_comp.flags.data
     weight = ctth_comp.weight.data
 
