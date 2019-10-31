@@ -267,10 +267,8 @@ class ctthComposite(mesanComposite):
         comp_pressure = None
 
         if len(self.msg_scenes + self.pps_scenes) == 0:
-            LOG.warning(
+            LOG.critical(
                 "Cannot make ctth composite when no Scenes have been found!")
-            # LOG.critical(
-            #    "Cannot make ctth composite when no Scenes have been found!")
             return False
 
         # Loop over all polar scenes:
@@ -301,8 +299,8 @@ class ctthComposite(mesanComposite):
                 try:
                     x_local = ctth_pps(scene, self.areaid)
                 except (ProjectException, LoadException) as err:
-                    LOG.warning("Couldn't load pps scene: %s\nException was: %s", (str(scene), str(err)))
-                    # LOG.critical("Couldn't load pps scene: %s\nException was: %s", (str(scene), str(err)))
+                    LOG.critical("Couldn't load pps scene: %s\nException was: %s",
+                                 (str(scene), str(err)))
                     continue
 
                 # Temperature (K)', u'no_data_value': 255, u'intercept': 100.0,

@@ -195,7 +195,7 @@ def derive_sobs(ctth_comp, npix, resultfile):
     flags = ctth_comp.flags.data
     weight = ctth_comp.weight.data
 
-    # non overlapping superobservations
+    # non overlapping super observations
     # min 8x8 pixels = ca 8x8 km = 2*dlen x 2*dlen pixels for a
     # superobservation
     dlen = int(np.ceil(float(npix) / 2.0))

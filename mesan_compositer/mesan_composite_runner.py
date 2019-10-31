@@ -30,7 +30,7 @@ import os
 import socket
 import argparse
 from logging import handlers
-import logging
+import logging.config
 import sys
 from six.moves.urllib.parse import urlparse
 import posttroll.subscriber
