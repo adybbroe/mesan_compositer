@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2015, 2018, 2019 Adam.Dybbroe
+# Copyright (c) 2014 - 2019 Adam.Dybbroe
 
 # Author(s):
 
-#   Adam.Dybbroe <a000680@c14526.ad.smhi.se>
+#   Adam.Dybbroe <adam.dybbroe@smhi.se>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -362,7 +362,7 @@ class ncCTTHComposite(ncCloudTypeComposite):
                                  "var_data": self.temperature.data,
                                  'var_dim_names': dim_names,
                                  "standard_name": "Temperature",
-                                 "_FillValue": 0.0,
+                                 "_FillValue": np.nan,
                                  "scale_factor": 1.0,
                                  "add_offset": 0.0,
                                  "valid_range": np.array([valid_min, valid_max]),
@@ -377,7 +377,7 @@ class ncCTTHComposite(ncCloudTypeComposite):
                             "var_data": self.height.data,
                             'var_dim_names': dim_names,
                             "standard_name": "Height",
-                            "_FillValue": 0.0,
+                            "_FillValue": np.nan,
                             "scale_factor": 1.0,
                             "add_offset": 0.0,
                             "valid_range": np.array([valid_min, valid_max]),
@@ -392,7 +392,7 @@ class ncCTTHComposite(ncCloudTypeComposite):
                               "var_data": self.pressure.data,
                               'var_dim_names': dim_names,
                               "standard_name": "Pressure",
-                              "_FillValue": 0.0,
+                              "_FillValue": np.nan,
                               "scale_factor": 1.0,
                               "add_offset": 0.0,
                               "valid_range": np.array([valid_min, valid_max]),

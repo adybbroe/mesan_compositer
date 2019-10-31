@@ -154,9 +154,9 @@ def cloudtop(so_CTH, so_w, so_flg, num_of_datapoints):
         (0 == get_bit_from_flags(flgs, 2)) & get_bit_from_flags(flgs, 8))
 
     if (ntop != (nopaque + nwindow)):
-        LOG.warning("Inconsistency in opaque and window flags: " +
-                    "ntop=%d, nopaque=%d nwindow=%d", ntop, nopaque, nwindow)
-        LOG.info("No super obs will be generated...")
+        # LOG.warning("Inconsistency in opaque and window flags: " +
+        #            "ntop=%d, nopaque=%d nwindow=%d", ntop, nopaque, nwindow)
+        #LOG.info("No super obs will be generated...")
         return 0, 0
     else:
         fopaque = nopaque / np.float(ntop)
@@ -188,9 +188,9 @@ def derive_sobs(ctth_comp, npix, resultfile):
     lon, lat = ctth_comp.area_def.get_lonlats()
 
     try:
-        ctth_height = ctth_comp.height.data.compute().astype('int')
+        ctth_height = ctth_comp.height.data.compute()
     except AttributeError:
-        ctth_height = ctth_comp.height.data.astype('int')
+        ctth_height = ctth_comp.height.data
 
     flags = ctth_comp.flags.data
     weight = ctth_comp.weight.data
@@ -229,17 +229,21 @@ def derive_sobs(ctth_comp, npix, resultfile):
                 so_cth = ctth_height[np.ix_(so_y, so_x)]
                 so_w = weight[np.ix_(so_y, so_x)]
                 so_flg = flags[np.ix_(so_y, so_x)]
-                so_cth.fill_value = 255
-                ii = (so_cth.filled() != 255) & (
+                #so_cth.fill_value = 255
+                # ii = (so_cth.filled() != 255) & (
+                ii = (so_cth.filled() != so_cth.fill_value) & (
                     get_bit_from_flags(so_flg, 0) != 1)
 
                 # any valid data?
                 if np.sum(ii) == 0:
                     continue
 
+                if so_cth[ii].compressed().shape[0] == 0:
+                    continue
+
                 # calculate top and std
                 cth, sd = cloudtop(
-                    so_cth[ii], so_w[ii], so_flg[ii], np.prod(np.shape(so_w)))
+                    so_cth[ii], so_w[ii], so_flg[ii], np.prod(so_w.shape))
 
                 # if not sd:
                 #     LOG.debug("iy, ix, so_y, so_x, so_lat, so_lon: %d %d %d %d %f %f",
