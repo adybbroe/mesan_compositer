@@ -170,7 +170,7 @@ class ctCompositer(object):
         self.areaid = areaid
         self.longitude = None
         self.latitude = None
-        # An mpop-scene area object:
+        # A Satpy-scene area object:
         self.area = None
 
         self._options = config_options
@@ -412,7 +412,7 @@ if __name__ == "__main__":
     handler.setFormatter(formatter)
     logging.getLogger('').addHandler(handler)
     logging.getLogger('').setLevel(logging.DEBUG)
-    logging.getLogger('mpop').setLevel(logging.DEBUG)
+    logging.getLogger('satpy').setLevel(logging.DEBUG)
 
     LOG = logging.getLogger('make_ct_composite')
 

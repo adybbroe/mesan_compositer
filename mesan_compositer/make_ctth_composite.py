@@ -150,7 +150,7 @@ class mesanComposite(object):
         self.msg_areaname = 'unknown'
         self.longitude = None
         self.latitude = None
-        # An mpop-scene area object:
+        # A Satpy-scene area object:
         self.area = None
 
         self._options = {}
@@ -276,7 +276,7 @@ class ctthComposite(mesanComposite):
         LOG.info(
             "CTTH composite - Loop over all polar and geostationary scenes:")
         for scene in self.msg_scenes + self.pps_scenes:
-            LOG.info("Scene:\n" + str(scene))
+            LOG.info("Scene: " + str(scene))
             if (scene.platform_name.startswith("Meteosat") and
                     not hasattr(scene, 'orbit')):
                 is_MSG = True
@@ -416,12 +416,10 @@ if __name__ == "__main__":
         logging.config.fileConfig(logfile)
 
     handler = logging.StreamHandler(sys.stderr)
+    formatter = logging.Formatter(fmt=_DEFAULT_LOG_FORMAT,
+                                  datefmt=_DEFAULT_TIME_FORMAT)
+    handler.setFormatter(formatter)
     handler.setLevel(logging.DEBUG)
-
-    if not logfile:
-        formatter = logging.Formatter(fmt=_DEFAULT_LOG_FORMAT,
-                                      datefmt=_DEFAULT_TIME_FORMAT)
-        handler.setFormatter(formatter)
 
     logging.getLogger('').addHandler(handler)
     logging.getLogger('').setLevel(logging.DEBUG)

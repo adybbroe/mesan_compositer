@@ -597,12 +597,10 @@ if __name__ == "__main__":
         logging.config.fileConfig(logfile)
 
     handler = logging.StreamHandler(sys.stderr)
+    formatter = logging.Formatter(fmt=_DEFAULT_LOG_FORMAT,
+                                  datefmt=_DEFAULT_TIME_FORMAT)
+    handler.setFormatter(formatter)
     handler.setLevel(logging.DEBUG)
-
-    if not logfile:
-        formatter = logging.Formatter(fmt=_DEFAULT_LOG_FORMAT,
-                                      datefmt=_DEFAULT_TIME_FORMAT)
-        handler.setFormatter(formatter)
 
     logging.getLogger('').addHandler(handler)
     logging.getLogger('').setLevel(logging.DEBUG)
