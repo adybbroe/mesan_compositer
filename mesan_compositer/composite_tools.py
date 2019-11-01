@@ -196,7 +196,11 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
         product = res['product']
         geofilename = filename.replace(product, 'CMA')
         orbit = '%05d' % res['orbit']
-        timeslot = res['start_time']
+        if 'end_time' in res.keys():
+            timeslot = res['start_time'] + (res['end_time']-res['start_time'])/2.
+        else:
+            timeslot = res['start_time']
+
         if timeslot > latest_file_time:
             latest_file_time = timeslot
             latest_file = filename
@@ -224,7 +228,7 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
                      "Latest file is more than 4 hours from time-window\n",
                      os.path.basename(latest_file), str(latest_file_time))
     elif len(plist) == 0:
-        LOG.critical("No pps products found at all in directory!")
+        LOG.debug("No pps valid products found in directory!")
 
     return plist
 
