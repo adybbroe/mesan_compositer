@@ -25,6 +25,7 @@
 import os
 from datetime import datetime, timedelta
 from six.moves import configparser
+import six
 from mesan_compositer.pps_msg_conversions import get_bit_from_flags
 import logging
 
@@ -197,7 +198,12 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
         geofilename = filename.replace(product, 'CMA')
         orbit = '%05d' % res['orbit']
         if 'end_time' in res.keys():
-            timeslot = res['start_time'] + (res['end_time']-res['start_time'])/2.
+            if six.PY2:
+                # Requires Python 2.7:
+                delta_seconds = (res['end_time']-res['start_time']).total_second
+                timeslot = res['start_time'] + timedelta(seconds=delta_seconds/2.)
+            else:
+                timeslot = res['start_time'] + (res['end_time']-res['start_time'])/2.
         else:
             timeslot = res['start_time']
 
