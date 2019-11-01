@@ -192,6 +192,10 @@ def derive_sobs(ctth_comp, npix, resultfile):
     except AttributeError:
         ctth_height = ctth_comp.height.data
 
+    if not np.ma.is_masked(ctth_height):
+        ctth_height = np.ma.masked_invalid(ctth_height, np.nan)
+        ctth_height.fill_value = np.nan
+
     flags = ctth_comp.flags.data
     weight = ctth_comp.weight.data
 
@@ -227,6 +231,7 @@ def derive_sobs(ctth_comp, npix, resultfile):
                 so_x = np.arange(x - dlen, x + dlen - 1 + 1)
                 so_y = np.arange(y - dlen, y + dlen - 1 + 1)
                 so_cth = ctth_height[np.ix_(so_y, so_x)]
+
                 so_w = weight[np.ix_(so_y, so_x)]
                 so_flg = flags[np.ix_(so_y, so_x)]
                 #so_cth.fill_value = 255
