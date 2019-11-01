@@ -619,17 +619,4 @@ if __name__ == "__main__":
     servername = socket.gethostname()
     SERVERNAME = OPTIONS.get('servername', servername)
 
-    #
-    # time_of_analysis = datetime.strptime("2019-10-31 09:00:00", "%Y-%m-%d %H:%M:%S")
-    # delta_time_window = timedelta(seconds=35*60)
-    # areaid = "mesanX"
-    # ctcomp = mcc.ctCompositer(time_of_analysis, delta_time_window, areaid, OPTIONS)
-    # ctcomp.get_catalogue()
-    # ctcomp.make_composite()
-    # values = {"area": areaid, }
-    # bname = time_of_analysis.strftime(OPTIONS['cloudamount_filename']) % values
-    # path = OPTIONS['composite_output_dir']
-    # filename = os.path.join(path, bname + '.dat')
-    # derive_sobs_clamount(ctcomp.composite, '71', 24, filename)
-
     mesan_live_runner(OPTIONS)
