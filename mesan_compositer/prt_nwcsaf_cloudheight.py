@@ -156,7 +156,7 @@ def cloudtop(so_CTH, so_w, so_flg, num_of_datapoints):
     if (ntop != (nopaque + nwindow)):
         # LOG.warning("Inconsistency in opaque and window flags: " +
         #            "ntop=%d, nopaque=%d nwindow=%d", ntop, nopaque, nwindow)
-        #LOG.info("No super obs will be generated...")
+        # LOG.info("No super obs will be generated...")
         return 0, 0
     else:
         fopaque = nopaque / np.float(ntop)
@@ -234,8 +234,6 @@ def derive_sobs(ctth_comp, npix, resultfile):
 
                 so_w = weight[np.ix_(so_y, so_x)]
                 so_flg = flags[np.ix_(so_y, so_x)]
-                #so_cth.fill_value = 255
-                # ii = (so_cth.filled() != 255) & (
                 ii = (so_cth.filled() != so_cth.fill_value) & (
                     get_bit_from_flags(so_flg, 0) != 1)
 

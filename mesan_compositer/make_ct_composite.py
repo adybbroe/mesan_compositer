@@ -113,8 +113,6 @@ def get_arguments():
 def ctype_pps(pps, areaid):
     """Load PPS Cloudtype and reproject"""
     from satpy.scene import Scene
-    #from satpy.utils import debug_on
-    # debug_on()
 
     scene = Scene(filenames=[pps.uri, pps.geofilename], reader='nwcsaf-pps_nc')
     scene.load(['cloudtype', 'ct', 'ct_quality', 'ct_status_flag', 'ct_conditions'])
@@ -127,8 +125,6 @@ def ctype_msg(msg, areaid):
     """Load MSG paralax corrected cloud type and reproject"""
 
     from satpy.scene import Scene
-    #from satpy.utils import debug_on
-    # debug_on()
 
     scene = Scene(filenames=[msg.uri, ], reader='nwcsaf-msg2013-hdf5')
     scene.load(['cloudtype', 'ct', 'ct_quality'])

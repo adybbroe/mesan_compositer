@@ -404,7 +404,7 @@ def check_uri(uri):
                         "Data file %s unaccessible from this host" % uri)
 
     except socket.gaierror:
-        LOGGER.warning("Couldn't check file location, running anyway")
+        LOG.warning("Couldn't check file location, running anyway")
 
     return url.path
 
