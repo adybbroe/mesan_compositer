@@ -173,11 +173,11 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
     prod_p = Parser(PPS_FILENAME)
 
     LOG.debug("List of satellites: %s", str(satellites))
-
     plist = []
     files_old = True
     latest_file = None
     latest_file_time = datetime(1970, 1, 1)
+    LOG.info("Going through file list with %d files", len(filelist))
     for filename in filelist:
         bname = os.path.basename(filename)
         try:

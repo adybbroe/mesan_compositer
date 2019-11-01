@@ -30,18 +30,25 @@ import os
 import socket
 import argparse
 from logging import handlers
-import logging
+import logging.config
 import sys
-import netifaces
-from urlparse import urlparse
+from six.moves.urllib.parse import urlparse
 import posttroll.subscriber
 from posttroll.publisher import Publish
 from posttroll.message import Message
 from multiprocessing import Pool, Manager
 import threading
-from Queue import Empty
+try:
+    # python 3
+    from queue import Empty
+except ImportError:
+    # python 2
+    from Queue import Empty
+
 from datetime import timedelta, datetime
 
+from mesan_compositer.utils import check_uri
+from mesan_compositer.utils import get_local_ips
 from mesan_compositer.composite_tools import get_analysis_time
 from mesan_compositer import make_ct_composite as mcc
 from mesan_compositer import make_ctth_composite
@@ -51,6 +58,8 @@ from mesan_compositer import get_config
 
 LOG = logging.getLogger(__name__)
 
+DEFAULT_AREA = "mesanX"
+DEFAULT_SUPEROBS_WINDOW_SIZE_NPIX = 32
 
 #: Default time format
 _DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
@@ -111,17 +120,6 @@ def get_arguments():
 
 class MesanCompRunError(Exception):
     pass
-
-
-def get_local_ips():
-    inet_addrs = [netifaces.ifaddresses(iface).get(netifaces.AF_INET)
-                  for iface in netifaces.interfaces()]
-    ips = []
-    for addr in inet_addrs:
-        if addr is not None:
-            for add in addr:
-                ips.append(add['addr'])
-    return ips
 
 
 def reset_job_registry(objdict, key):
@@ -203,11 +201,9 @@ class FileListener(threading.Thread):
             return False
 
         urlobj = urlparse(msg.data['uri'])
-        server = urlobj.netloc
         url_ip = socket.gethostbyname(urlobj.netloc)
         if urlobj.netloc and (url_ip not in get_local_ips()):
-            LOG.warning("Server %s not the current one: %s" % (str(urlobj.netloc),
-                                                               socket.gethostname()))
+            LOG.warning("Server %s not the current one: %s", str(urlobj.netloc), socket.gethostname())
             return False
 
         if ('platform_name' not in msg.data or
@@ -245,12 +241,9 @@ def create_message(resultfile, scene):
     to_send['type'] = 'netCDF'
     to_send['format'] = 'MESAN'
     to_send['data_processing_level'] = '3'
-    environment = MODE
     to_send['start_time'], to_send['end_time'] = scene[
         'starttime'], scene['endtime']
-    # Hardcoded station! Norrkoping. FIXME!
     pub_message = Message('/' + to_send['format'] + '/' + to_send['data_processing_level'] +
-                          '/norrköping/' + environment +
                           '/polar/direct_readout/',
                           "file", to_send).encode()
 
@@ -259,8 +252,6 @@ def create_message(resultfile, scene):
 
 def ready2run(msg, files4comp, job_register, sceneid, product='CT'):
     """Check whether we can start a composite generation on scene"""
-
-    from trollduction.producer import check_uri
 
     LOG.debug("Ready to run?")
     LOG.info("Got message: " + str(msg))
@@ -346,7 +337,7 @@ def ready2run(msg, files4comp, job_register, sceneid, product='CT'):
     return True
 
 
-def ctype_composite_worker(scene, job_id, publish_q):
+def ctype_composite_worker(scene, job_id, publish_q, config_options):
     """Spawn/Start a Mesan composite generation on a new thread if available"""
 
     try:
@@ -354,11 +345,25 @@ def ctype_composite_worker(scene, job_id, publish_q):
         # Get the time of analysis from start and end times:
         time_of_analysis = get_analysis_time(
             scene['starttime'], scene['endtime'])
-        delta_t = timedelta(minutes=TIME_WINDOW)
+        twindow = int(config_options.get('absolute_time_threshold_minutes', '30'))
+        delta_t = timedelta(minutes=twindow)
+        LOG.debug("Time window = " + str(twindow))
+
+        mesan_area_id = config_options.get('mesan_area_id', None)
+        if not mesan_area_id:
+            LOG.warning("No area id specified in config file. Using default = " +
+                        str(DEFAULT_AREA))
+            mesan_area_id = DEFAULT_AREA
 
         LOG.info(
-            "Make ctype composite for area id = " + str(MESAN_AREA_ID))
-        ctcomp = mcc.ctCompositer(time_of_analysis, delta_t, MESAN_AREA_ID)
+            "Make ctype composite for area id = " + str(mesan_area_id))
+
+        npix = int(config_options.get('number_of_pixels', DEFAULT_SUPEROBS_WINDOW_SIZE_NPIX))
+        ipar = str(config_options.get('cloud_amount_ipar'))
+        if not ipar:
+            raise IOError("No ipar value in config file!")
+
+        ctcomp = mcc.ctCompositer(time_of_analysis, delta_t, mesan_area_id, config_options)
         ctcomp.get_catalogue()
         if not ctcomp.make_composite():
             LOG.error("Failed creating ctype composite...")
@@ -369,12 +374,12 @@ def ctype_composite_worker(scene, job_id, publish_q):
             # Make Super observations:
             LOG.info("Make Cloud Type super observations")
 
-            values = {"area": MESAN_AREA_ID, }
+            values = {"area": mesan_area_id, }
             bname = time_of_analysis.strftime(
-                OPTIONS['cloudamount_filename']) % values
-            path = OPTIONS['composite_output_dir']
+                config_options['cloudamount_filename']) % values
+            path = config_options['composite_output_dir']
             filename = os.path.join(path, bname + '.dat')
-            derive_sobs_clamount(ctcomp.composite, IPAR, NPIX, filename)
+            derive_sobs_clamount(ctcomp.composite, ipar, npix, filename)
 
             result_file = ctcomp.filename
 
@@ -395,7 +400,7 @@ def ctype_composite_worker(scene, job_id, publish_q):
         raise
 
 
-def ctth_composite_worker(scene, job_id, publish_q):
+def ctth_composite_worker(scene, job_id, publish_q, config_options):
     """Spawn/Start a Mesan cloud height composite generation on a new thread if
     available"""
 
@@ -404,12 +409,24 @@ def ctth_composite_worker(scene, job_id, publish_q):
         # Get the time of analysis from start and end times:
         time_of_analysis = get_analysis_time(
             scene['starttime'], scene['endtime'])
-        delta_t = timedelta(minutes=TIME_WINDOW)
+        twindow = int(config_options.get('absolute_time_threshold_minutes', '30'))
+        delta_t = timedelta(minutes=twindow)
+        LOG.debug("Time window = " + str(twindow))
 
-        LOG.info(
-            "Make cloud height composite for area id = " + str(MESAN_AREA_ID))
-        ctth_comp = make_ctth_composite.ctthComposite(
-            time_of_analysis, delta_t, MESAN_AREA_ID)
+        mesan_area_id = config_options.get('mesan_area_id', None)
+        if not mesan_area_id:
+            LOG.warning("No area id specified in config file. Using default = " +
+                        str(DEFAULT_AREA))
+            mesan_area_id = DEFAULT_AREA
+
+        LOG.info("Make cloud height composite for area id = " + str(mesan_area_id))
+
+        npix = int(config_options.get('number_of_pixels', DEFAULT_SUPEROBS_WINDOW_SIZE_NPIX))
+        ipar = config_options.get('cloud_amount_ipar')
+        if not ipar:
+            raise IOError("No ipar value in config file!")
+
+        ctth_comp = make_ctth_composite.ctthComposite(time_of_analysis, delta_t, mesan_area_id, config_options)
         ctth_comp.get_catalogue()
         if not ctth_comp.make_composite():
             LOG.error("Failed creating ctth composite...")
@@ -418,12 +435,12 @@ def ctth_composite_worker(scene, job_id, publish_q):
             ctth_comp.make_quicklooks()
 
             # Make Super observations:
-            values = {"area": MESAN_AREA_ID, }
+            values = {"area": mesan_area_id, }
             bname = time_of_analysis.strftime(OPTIONS['cloudheight_filename']) % values
-            path = OPTIONS['composite_output_dir']
+            path = config_options['composite_output_dir']
             filename = os.path.join(path, bname + '.dat')
             LOG.info("Make Cloud Height super observations. Output file = %s", str(filename))
-            derive_sobs_clheight(ctth_comp.composite, NPIX, filename)
+            derive_sobs_clheight(ctth_comp.composite, npix, filename)
 
             result_file = ctth_comp.filename
 
@@ -444,12 +461,13 @@ def ctth_composite_worker(scene, job_id, publish_q):
         raise
 
 
-def mesan_live_runner():
+def mesan_live_runner(config_options):
     """Listens and triggers processing"""
 
     LOG.info("*** Start the runner for the Mesan composite generator:")
     LOG.debug("os.environ = " + str(os.environ))
-    LOG.debug("Number of pixels = " + str(NPIX))
+    npix = int(config_options.get('number_of_pixels', DEFAULT_SUPEROBS_WINDOW_SIZE_NPIX))
+    LOG.debug("Number of pixels = " + str(npix))
 
     pool = Pool(processes=6, maxtasksperchild=1)
     manager = Manager()
@@ -540,7 +558,8 @@ def mesan_live_runner():
                                  (scene,
                                   jobs_dict[
                                       keyname],
-                                  publisher_q))
+                                  publisher_q,
+                                  config_options))
 
             elif product == 'CTTH':
                 LOG.debug("Product is CTTH")
@@ -548,7 +567,8 @@ def mesan_live_runner():
                                  (scene,
                                   jobs_dict[
                                       keyname],
-                                  publisher_q))
+                                  publisher_q,
+                                  config_options))
 
             else:
                 LOG.warning("Product %s not supported!", str(product))
@@ -571,15 +591,13 @@ if __name__ == "__main__":
     (logfile, config_filename) = get_arguments()
 
     if logfile:
-        logging.config.fileConfig(logfile)
+        logging.config.fileConfig(logfile, disable_existing_loggers=False)
 
     handler = logging.StreamHandler(sys.stderr)
+    formatter = logging.Formatter(fmt=_DEFAULT_LOG_FORMAT,
+                                  datefmt=_DEFAULT_TIME_FORMAT)
+    handler.setFormatter(formatter)
     handler.setLevel(logging.DEBUG)
-
-    if not logfile:
-        formatter = logging.Formatter(fmt=_DEFAULT_LOG_FORMAT,
-                                      datefmt=_DEFAULT_TIME_FORMAT)
-        handler.setFormatter(formatter)
 
     logging.getLogger('').addHandler(handler)
     logging.getLogger('').setLevel(logging.DEBUG)
@@ -597,24 +615,8 @@ if __name__ == "__main__":
     POLSATS_STR = OPTIONS.get('polar_satellites')
     POLAR_SATELLITES = POLSATS_STR.split()
 
-    TIME_WINDOW = int(OPTIONS.get('absolute_time_threshold_minutes', '30'))
-    LOG.debug("Time window = " + str(TIME_WINDOW))
-
-    MESAN_AREA_ID = OPTIONS.get('mesan_area_id', None)
-    DEFAULT_AREA = "mesanX"
-    if not MESAN_AREA_ID:
-        LOG.warning("No area id specified in config file. Using default = " +
-                    str(DEFAULT_AREA))
-        MESAN_AREA_ID = DEFAULT_AREA
-
-    NPIX = int(OPTIONS.get('number_of_pixels', 32))
-
-    IPAR = OPTIONS.get('cloud_amount_ipar')
-    if not IPAR:
-        raise IOError("No ipar value in config file!")
-
     servername = None
     servername = socket.gethostname()
     SERVERNAME = OPTIONS.get('servername', servername)
 
-    mesan_live_runner()
+    mesan_live_runner(OPTIONS)

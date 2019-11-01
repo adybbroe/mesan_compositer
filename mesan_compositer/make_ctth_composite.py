@@ -150,7 +150,7 @@ class mesanComposite(object):
         self.msg_areaname = 'unknown'
         self.longitude = None
         self.latitude = None
-        # An mpop-scene area object:
+        # A Satpy-scene area object:
         self.area = None
 
         self._options = {}
@@ -276,7 +276,7 @@ class ctthComposite(mesanComposite):
         LOG.info(
             "CTTH composite - Loop over all polar and geostationary scenes:")
         for scene in self.msg_scenes + self.pps_scenes:
-            LOG.info("Scene:\n" + str(scene))
+            LOG.info("Scene: " + str(scene))
             if (scene.platform_name.startswith("Meteosat") and
                     not hasattr(scene, 'orbit')):
                 is_MSG = True
@@ -293,13 +293,14 @@ class ctthComposite(mesanComposite):
                 # The weight for masked data is set further down
                 x_flag = np.ma.filled(ctth_procflags2pps(x_local['ctth_quality'].data.compute()),
                                       fill_value=65535)
-                x_id = 1 * np.ones(np.shape(x_temperature))
+                x_id = 1 * np.ones(x_temperature.shape)
             else:
                 is_MSG = False
                 try:
                     x_local = ctth_pps(scene, self.areaid)
                 except (ProjectException, LoadException) as err:
-                    LOG.critical("Couldn't load pps scene: %s\nException was: %s", (str(scene), str(err)))
+                    LOG.critical("Couldn't load pps scene: %s\nException was: %s",
+                                 (str(scene), str(err)))
                     continue
 
                 # Temperature (K)', u'no_data_value': 255, u'intercept': 100.0,
@@ -321,13 +322,13 @@ class ctthComposite(mesanComposite):
                 # x_flag = np.ma.filled(oldflags, fill_value=65535)
                 x_flag = oldflags
 
-                x_id = 0 * np.ones(np.shape(x_temperature))
-                lat = 0 * np.ones(np.shape(x_temperature))
+                x_id = 0 * np.ones(x_temperature.shape)
+                lat = 0 * np.ones(x_temperature.shape)
 
             # time identifier is seconds since 1970-01-01 00:00:00
             x_time = time.mktime(scene.timeslot.timetuple()) * \
-                np.ones(np.shape(x_temperature))
-            idx_MSG = is_MSG * np.ones(np.shape(x_temperature), dtype=np.bool)
+                np.ones(x_temperature.shape)
+            idx_MSG = is_MSG * np.ones(x_temperature.shape, dtype=np.bool)
 
             if comp_temperature is None:
                 # initialize field with current CTTH
@@ -416,12 +417,10 @@ if __name__ == "__main__":
         logging.config.fileConfig(logfile)
 
     handler = logging.StreamHandler(sys.stderr)
+    formatter = logging.Formatter(fmt=_DEFAULT_LOG_FORMAT,
+                                  datefmt=_DEFAULT_TIME_FORMAT)
+    handler.setFormatter(formatter)
     handler.setLevel(logging.DEBUG)
-
-    if not logfile:
-        formatter = logging.Formatter(fmt=_DEFAULT_LOG_FORMAT,
-                                      datefmt=_DEFAULT_TIME_FORMAT)
-        handler.setFormatter(formatter)
 
     logging.getLogger('').addHandler(handler)
     logging.getLogger('').setLevel(logging.DEBUG)

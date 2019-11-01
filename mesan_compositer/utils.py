@@ -23,6 +23,10 @@
 """Miscellaneous tools/utilities taken from mpop
 """
 
+import os
+import socket
+import netifaces
+from six.moves.urllib.parse import urlparse
 import numpy as np
 import logging
 LOG = logging.getLogger(__name__)
@@ -174,92 +178,6 @@ def ctth_procflags2pps(data):
     retv = np.add(retv, arr)
     del is_bit12_set
     del is_bit13_set
-
-    return retv.astype('h')
-
-
-def ctype_procflags2pps(data):
-    """Converting cloud type processing flags to
-    the PPS format, in order to have consistency between
-    PPS and MSG cloud type contents.
-    """
-
-    ones = np.ones(data.shape, "h")
-
-    # msg illumination bit 0,1,2 (undefined,night,twilight,day,sunglint) maps
-    # to pps bits 2, 3 and 4:
-    is_bit0_set = get_bit_from_flags(data, 0)
-    is_bit1_set = get_bit_from_flags(data, 1)
-    is_bit2_set = get_bit_from_flags(data, 2)
-    illum = is_bit0_set * np.left_shift(ones, 0) + \
-        is_bit1_set * np.left_shift(ones, 1) + \
-        is_bit2_set * np.left_shift(ones, 2)
-    del is_bit0_set
-    del is_bit1_set
-    del is_bit2_set
-    # Night?
-    # If night in msg then set pps night bit and nothing else.
-    # If twilight in msg then set pps twilight bit and nothing else.
-    # If day in msg then unset both the pps night and twilight bits.
-    # If sunglint in msg unset both the pps night and twilight bits and set the
-    # pps sunglint bit.
-    arr = np.where(np.equal(illum, 1), np.left_shift(ones, 2), 0)
-    arr = np.where(np.equal(illum, 2), np.left_shift(ones, 3), arr)
-    arr = np.where(np.equal(illum, 3), 0, arr)
-    arr = np.where(np.equal(illum, 4), np.left_shift(ones, 4), arr)
-    retv = np.array(arr)
-    del illum
-
-    # msg nwp-input bit 3 (nwp present?) maps to pps bit 7:
-    # msg nwp-input bit 4 (low level inversion?) maps to pps bit 6:
-    is_bit3_set = get_bit_from_flags(data, 3)
-    is_bit4_set = get_bit_from_flags(data, 4)
-    nwp = (is_bit3_set * np.left_shift(ones, 0) +
-           is_bit4_set * np.left_shift(ones, 1))
-    del is_bit3_set
-    del is_bit4_set
-
-    arr = np.where(np.equal(nwp, 1), np.left_shift(ones, 7), 0)
-    arr = np.where(np.equal(nwp, 2), np.left_shift(ones, 7) +
-                   np.left_shift(ones, 6), arr)
-    arr = np.where(np.equal(nwp, 3), 0, arr)
-    retv = np.add(arr, retv)
-    del nwp
-
-    # msg seviri-input bits 5&6 maps to pps bit 8:
-    is_bit5_set = get_bit_from_flags(data, 5)
-    is_bit6_set = get_bit_from_flags(data, 6)
-    seviri = (is_bit5_set * np.left_shift(ones, 0) +
-              is_bit6_set * np.left_shift(ones, 1))
-    del is_bit5_set
-    del is_bit6_set
-
-    retv = np.add(retv,
-                  np.where(np.logical_or(np.equal(seviri, 2),
-                                         np.equal(seviri, 3)),
-                           np.left_shift(ones, 8), 0))
-    del seviri
-
-    # msg quality bits 7&8 maps to pps bit 9&10:
-    is_bit7_set = get_bit_from_flags(data, 7)
-    is_bit8_set = get_bit_from_flags(data, 8)
-    quality = (is_bit7_set * np.left_shift(ones, 0) +
-               is_bit8_set * np.left_shift(ones, 1))
-    del is_bit7_set
-    del is_bit8_set
-
-    arr = np.where(np.equal(quality, 2), np.left_shift(ones, 9), 0)
-    arr = np.where(np.equal(quality, 3), np.left_shift(ones, 10), arr)
-    retv = np.add(arr, retv)
-    del quality
-
-    # msg bit 9 (stratiform-cumuliform distinction?) maps to pps bit 11:
-    is_bit9_set = get_bit_from_flags(data, 9)
-    retv = np.add(retv,
-                  np.where(is_bit9_set,
-                           np.left_shift(ones, 11),
-                           0))
-    del is_bit9_set
 
     return retv.astype('h')
 
@@ -464,3 +382,39 @@ def aeqd2cf(proj_dict):
                       longitude_of_central_meridian="lon_0",
                       false_easting="x_0",
                       false_northing="y_0")
+
+
+def check_uri(uri):
+    """Check that the provided *uri* is on the local host and return the
+    file path.
+    """
+    if isinstance(uri, (list, set, tuple)):
+        paths = [check_uri(ressource) for ressource in uri]
+        return paths
+    url = urlparse(uri)
+    try:
+        if url.hostname:
+            url_ip = socket.gethostbyname(url.hostname)
+
+            if url_ip not in get_local_ips():
+                try:
+                    os.stat(url.path)
+                except OSError:
+                    raise IOError(
+                        "Data file %s unaccessible from this host" % uri)
+
+    except socket.gaierror:
+        LOG.warning("Couldn't check file location, running anyway")
+
+    return url.path
+
+
+def get_local_ips():
+    inet_addrs = [netifaces.ifaddresses(iface).get(netifaces.AF_INET)
+                  for iface in netifaces.interfaces()]
+    ips = []
+    for addr in inet_addrs:
+        if addr is not None:
+            for add in addr:
+                ips.append(add['addr'])
+    return ips
