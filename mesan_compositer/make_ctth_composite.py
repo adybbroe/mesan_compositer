@@ -176,21 +176,25 @@ class mesanComposite(object):
         # Get all polar satellite scenes:
         pps_dr_dir = self._options.get('pps_direct_readout_dir', None)
         LOG.debug('pps_dr_dir = ' + str(pps_dr_dir))
-        pps_gds_dir = self._options.get('pps_metop_gds_dir', None)
+        pps_gds_dir = self._options.get('pps_metop_gds_dir')
         prodn = self.product_names['pps']
         dr_list = glob(
             os.path.join(pps_dr_dir, 'S_NWC_' + str(prodn) + '*.nc'))
         ppsdr = get_ppslist(dr_list, self.time_window,
                             satellites=self.polar_satellites)
 
-        now = datetime.utcnow()
-        gds_list = glob(os.path.join(pps_gds_dir, '*' + str(prodn) + '*.nc'))
-        LOG.info("Number of Metop GDS files in dir: " + str(len(gds_list)))
-        ppsgds = get_ppslist(gds_list, self.time_window,
-                             satellites=METOPS, variant='global')
-        tic = datetime.utcnow()
-        LOG.info("Retrieve the metop-gds list took " +
-                 str((tic - now).seconds) + " sec")
+        ppsgds = []
+        if pps_gds_dir:
+            now = datetime.utcnow()
+            gds_list = glob(os.path.join(pps_gds_dir, '*' + str(prodn) + '*.nc'))
+            if len(gds_list) > 0:
+                LOG.info("Number of Metop GDS files in dir: " + str(len(gds_list)))
+                ppsgds = get_ppslist(gds_list, self.time_window,
+                                     satellites=METOPS, variant='global')
+                tic = datetime.utcnow()
+                LOG.info("Retrieve the metop-gds list took " +
+                         str((tic - now).seconds) + " sec")
+
         self.pps_scenes = ppsdr + ppsgds
         self.pps_scenes.sort()
         LOG.info(str(len(self.pps_scenes)) + " Polar scenes located")

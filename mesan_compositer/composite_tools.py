@@ -228,7 +228,8 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
                      "Latest file is more than 4 hours from time-window\n",
                      os.path.basename(latest_file), str(latest_file_time))
     elif len(plist) == 0:
-        LOG.debug("No pps valid products found in directory!")
+        LOG.debug("No valid pps products found for filelist with %d files.\n\tFirst and last file in list: %s %s",
+                  len(filelist), filelist[0], filelist[-1])
 
     return plist
 
