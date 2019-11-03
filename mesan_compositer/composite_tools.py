@@ -200,7 +200,7 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
         if 'end_time' in res.keys():
             if six.PY2:
                 # Requires Python 2.7:
-                delta_seconds = (res['end_time']-res['start_time']).total_second
+                delta_seconds = (res['end_time']-res['start_time']).total_seconds()
                 timeslot = res['start_time'] + timedelta(seconds=delta_seconds/2.)
             else:
                 timeslot = res['start_time'] + (res['end_time']-res['start_time'])/2.
