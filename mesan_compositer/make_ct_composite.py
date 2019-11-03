@@ -31,7 +31,7 @@ import tempfile
 import shutil
 from trollimage.xrimage import XRImage
 from mesan_compositer import cms_modified
-from satpy.composites import PaletteCompositor
+from satpy.composites import ColormapCompositor
 from mesan_compositer.pps_msg_conversions import ctype_procflags2pps
 from mesan_compositer import (ProjectException, LoadException)
 from mesan_compositer.composite_tools import (get_msglist,
@@ -371,29 +371,29 @@ class ctCompositer(object):
         attrs = {'_FillValue': np.nan}
 
         # Cloud type field:
-        pimage = PaletteCompositor('MesanComposite')
-        xdata = xr.DataArray(self.composite.cloudtype.data, dims=['y', 'x'], attrs=attrs)
-        ximg = XRImage(pimage((xdata, palette)))
+        cmap = ColormapCompositor('mesan_cloudtype_composite')
+        colors, sqpal = cmap.build_colormap(palette, np.uint8, {})
 
-        filename = self.filename.strip('.nc') + '_cloudtype.png'
-        ximg.save(filename)
+        xdata = xr.DataArray(self.composite.cloudtype.data, dims=['y', 'x'], attrs=attrs).astype('uint8')
+        ximg = XRImage(xdata)
+        ximg.palettize(colors)
+        ximg.save(self.filename.strip('.nc') + '_cloudtype.png')
 
         # Id field:
-        pimage = PaletteCompositor('MesanComposite')
-        xdata = xr.DataArray(self.composite.id.data * 13, dims=['y', 'x'], attrs=attrs)
-        ximg = XRImage(pimage((xdata, palette)))
-
-        filename = self.filename.strip('.nc') + '_id.png'
-        ximg.save(filename)
+        cmap = ColormapCompositor('mesan_cloudtype_composite')
+        colors, sqpal = cmap.build_colormap(palette, np.uint8, {})
+        xdata = xr.DataArray(self.composite.id.data * 13, dims=['y', 'x'], attrs=attrs).astype('uint8')
+        ximg = XRImage(xdata)
+        ximg.palettize(colors)
+        ximg.save(self.filename.strip('.nc') + '_id.png')
 
         # Weight field:
-        pimage = PaletteCompositor('MesanComposite')
+        cmap = ColormapCompositor('mesan_cloudtype_composite')
         data = (self.composite.weight.data * 20).astype(np.dtype('uint8'))
-        xdata = xr.DataArray(data, dims=['y', 'x'], attrs=attrs)
-        ximg = XRImage(pimage((xdata, palette)))
-
-        filename = self.filename.strip('.nc') + '_weight.png'
-        ximg.save(filename)
+        xdata = xr.DataArray(data, dims=['y', 'x'], attrs=attrs).astype('uint8')
+        ximg = XRImage(xdata)
+        ximg.palettize(colors)
+        ximg.save(self.filename.strip('.nc') + '_weight.png')
 
 
 if __name__ == "__main__":
