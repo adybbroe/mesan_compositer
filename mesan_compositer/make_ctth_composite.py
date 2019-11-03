@@ -31,7 +31,7 @@ import xarray as xr
 
 from trollimage.xrimage import XRImage
 from mesan_compositer import ctth_height
-from satpy.composites import PaletteCompositor
+from satpy.composites import ColormapCompositor
 
 from mesan_compositer import (ProjectException, LoadException)
 from mesan_compositer.pps_msg_conversions import ctth_procflags2pps
@@ -400,13 +400,21 @@ class ctthComposite(mesanComposite):
         palette = ctth_height()
         filename = self.filename.strip('.nc') + '_height.png'
 
-        attrs = get_nc_attributes_from_object(self.composite.height.info)
-        attrs['_FillValue'] = np.nan
-        pimage = PaletteCompositor('MesanComposite')
-        xdata = xr.DataArray(self.composite.height.data, dims=['y', 'x'], attrs=attrs)
-        ximg = XRImage(pimage((xdata, palette)))
+        ctth_data = self.composite.height.data
+        cloud_free = self.composite.height.data == 0
+        ctth_data = ctth_data / 500.0 + 1
+        ctth_data[cloud_free] = 0
+        ctth_data = ctth_data.astype(np.uint8)
 
-        ximg.save(filename)
+        cmap = ColormapCompositor('mesan_cloudheight_composite')
+        colors, sqpal = cmap.build_colormap(palette, np.uint8, {})
+
+        attrs = {'_FillValue': 0}
+        xdata = xr.DataArray(ctth_data, dims=['y', 'x'], attrs=attrs).astype('uint8')
+        pimage = XRImage(xdata)
+        pimage.palettize(colors)
+
+        pimage.save(filename)
 
 
 if __name__ == "__main__":
