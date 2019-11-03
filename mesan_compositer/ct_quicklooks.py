@@ -29,7 +29,6 @@ import numpy as np
 import xarray as xr
 from trollimage.xrimage import XRImage
 from mesan_compositer import get_config
-#from satpy.composites import PaletteCompositor
 from satpy.composites import ColormapCompositor
 from mesan_compositer import cms_modified
 from mesan_compositer.netcdf_io import ncCloudTypeComposite
@@ -141,7 +140,7 @@ if __name__ == "__main__":
     ximg.save(filename.strip('.nc') + '_cloudtype.png')
 
     # Id field:
-    pimage = ColormapCompositor('mesan_cloudtype_composite')
+    cmap = ColormapCompositor('mesan_cloudtype_composite')
     colors, sqpal = cmap.build_colormap(palette, np.uint8, {})
     attrs = {'_FillValue': 0}
     xdata = xr.DataArray(comp.id.data * 13, dims=['y', 'x'], attrs=attrs).astype('uint8')
@@ -150,7 +149,7 @@ if __name__ == "__main__":
     ximg.save(filename.strip('.nc') + '_id.png')
 
     # Weight field:
-    pimage = ColormapCompositor('mesan_cloudtype_composite')
+    cmap = ColormapCompositor('mesan_cloudtype_composite')
     data = (comp.weight.data * 20).astype(np.dtype('uint8'))
     xdata = xr.DataArray(data, dims=['y', 'x'], attrs=attrs).astype('uint8')
     ximg = XRImage(xdata)
