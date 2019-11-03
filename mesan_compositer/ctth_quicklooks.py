@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2015 Adam.Dybbroe
+# Copyright (c) 2014, 2015, 2019 Adam.Dybbroe
 
 # Author(s):
 
@@ -22,13 +22,21 @@
 
 """Make quick look images of the ctth composite
 """
+
 import argparse
 from datetime import datetime
+import numpy as np
+import xarray as xr
+from trollimage.xrimage import XRImage
+from mesan_compositer import ctth_height
 from mesan_compositer.netcdf_io import ncCTTHComposite
+from mesan_compositer import get_config
+from satpy.composites import ColormapCompositor
 import sys
 import os
-
+from logging import handlers
 import logging
+
 LOG = logging.getLogger(__name__)
 
 #: Default time format
@@ -37,62 +45,79 @@ _DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 #: Default log format
 _DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
 
-import ConfigParser
 
-CFG_DIR = os.environ.get('MESAN_COMPOSITE_CONFIG_DIR', './')
-MODE = os.environ.get("SMHI_MODE", 'offline')
+def get_arguments():
+    """
+    Get command line arguments
 
-CONF = ConfigParser.ConfigParser()
-CONFIGFILE = os.path.join(CFG_DIR, "mesan_sat_config.cfg")
-if not os.path.exists(CONFIGFILE):
-    raise IOError('Config file %s does not exist!' % CONFIGFILE)
-CONF.read(CONFIGFILE)
+    args.logging_conf_file, args.config_file, obs_time, area_id, wsize
 
-OPTIONS = {}
-for option, value in CONF.items(MODE, raw=True):
-    OPTIONS[option] = value
-
-_MESAN_LOG_FILE = OPTIONS.get('mesan_log_file', None)
-
-
-if __name__ == "__main__":
+    Return
+      File path of the logging.ini file
+      File path of the application configuration file
+      Observation/Analysis time
+      Area id
+      Window size
+    """
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--datetime', '-d', help='Date and time of observation - yyyymmddhh',
                         required=True)
     parser.add_argument('--area_id', '-a', help='Area id',
                         required=True)
+    parser.add_argument('-c', '--config_file',
+                        type=str,
+                        dest='config_file',
+                        required=True,
+                        help="The file containing configuration parameters e.g. mesan_sat_config.yaml")
+    parser.add_argument("-l", "--logging",
+                        help="The path to the log-configuration file (e.g. './logging.ini')",
+                        dest="logging_conf_file",
+                        type=str,
+                        required=False)
+    parser.add_argument("-v", "--verbose",
+                        help="print debug messages too",
+                        action="store_true")
 
     args = parser.parse_args()
 
-    from logging import handlers
+    tanalysis = datetime.strptime(args.datetime, '%Y%m%d%H')
+    area_id = args.area_id
+    if 'template' in args.config_file:
+        print("Template file given as master config, aborting!")
+        sys.exit()
 
-    if _MESAN_LOG_FILE:
-        ndays = int(OPTIONS["log_rotation_days"])
-        ncount = int(OPTIONS["log_rotation_backup"])
-        handler = handlers.TimedRotatingFileHandler(_MESAN_LOG_FILE,
-                                                    when='midnight',
-                                                    interval=ndays,
-                                                    backupCount=ncount,
-                                                    encoding=None,
-                                                    delay=False,
-                                                    utc=True)
-    else:
-        handler = logging.StreamHandler(sys.stderr)
+    return args.logging_conf_file, args.config_file, tanalysis, area_id
 
-    handler.setLevel(logging.DEBUG)
+
+if __name__ == "__main__":
+
+    (logfile, config_filename, time_of_analysis, areaid) = get_arguments()
+
+    if logfile:
+        logging.config.fileConfig(logfile)
+
+    handler = logging.StreamHandler(sys.stderr)
     formatter = logging.Formatter(fmt=_DEFAULT_LOG_FORMAT,
                                   datefmt=_DEFAULT_TIME_FORMAT)
     handler.setFormatter(formatter)
+    handler.setLevel(logging.DEBUG)
+
     logging.getLogger('').addHandler(handler)
     logging.getLogger('').setLevel(logging.DEBUG)
-    logging.getLogger('mpop').setLevel(logging.DEBUG)
+    logging.getLogger('satpy').setLevel(logging.INFO)
 
     LOG = logging.getLogger('ctth_quicklooks')
 
-    obstime = datetime.strptime(args.datetime, '%Y%m%d%H')
-    values = {"area": args.area_id, }
-    bname = obstime.strftime(OPTIONS['ctth_composite_filename']) % values
+    log_handlers = logging.getLogger('').handlers
+    for log_handle in log_handlers:
+        if type(log_handle) is handlers.SMTPHandler:
+            LOG.debug("Mail notifications to: %s", str(log_handle.toaddrs))
+
+    OPTIONS = get_config(config_filename)
+
+    values = {"area": areaid, }
+    bname = time_of_analysis.strftime(OPTIONS['ctth_composite_filename']) % values
     path = OPTIONS['composite_output_dir']
     filename = os.path.join(path, bname) + '.nc'
     if not os.path.exists(filename):
@@ -102,13 +127,17 @@ if __name__ == "__main__":
     comp = ncCTTHComposite()
     comp.load(filename)
 
-    import mpop.imageo.palettes
-    palette = mpop.imageo.palettes.ctth_height()
-    from mpop.imageo import geo_image
-    img = geo_image.GeoImage(comp.height.data,
-                             args.area_id,
-                             None,
-                             fill_value=(0),
-                             mode="P",
-                             palette=palette)
-    img.save(filename.strip('.nc') + '_height.png')
+    palette = ctth_height()
+
+    ctth_data = comp.height.data
+    ctth_data = ctth_data / 500.0 + 1
+    ctth_data = ctth_data.astype(np.uint8)
+
+    cmap = ColormapCompositor('mesan_cloudheight_composite')
+    colors, sqpal = cmap.build_colormap(palette, np.uint8, {})
+
+    attrs = {'_FillValue': 0}
+    xdata = xr.DataArray(ctth_data, dims=['y', 'x'], attrs=attrs).astype('uint8')
+    pimage = XRImage(xdata)
+    pimage.palettize(colors)
+    pimage.save(filename.strip('.nc') + '_height.png')
