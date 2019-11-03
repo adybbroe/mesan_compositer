@@ -25,6 +25,7 @@
 import os
 from datetime import datetime, timedelta
 from six.moves import configparser
+import six
 from mesan_compositer.pps_msg_conversions import get_bit_from_flags
 import logging
 
@@ -196,7 +197,16 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
         product = res['product']
         geofilename = filename.replace(product, 'CMA')
         orbit = '%05d' % res['orbit']
-        timeslot = res['start_time']
+        if 'end_time' in res.keys():
+            if six.PY2:
+                # Requires Python 2.7:
+                delta_seconds = (res['end_time']-res['start_time']).total_seconds()
+                timeslot = res['start_time'] + timedelta(seconds=delta_seconds/2.)
+            else:
+                timeslot = res['start_time'] + (res['end_time']-res['start_time'])/2.
+        else:
+            timeslot = res['start_time']
+
         if timeslot > latest_file_time:
             latest_file_time = timeslot
             latest_file = filename
@@ -224,7 +234,8 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
                      "Latest file is more than 4 hours from time-window\n",
                      os.path.basename(latest_file), str(latest_file_time))
     elif len(plist) == 0:
-        LOG.critical("No pps products found at all in directory!")
+        LOG.debug("No valid pps products found for filelist with %d files.\n\tFirst and last file in list: %s %s",
+                  len(filelist), filelist[0], filelist[-1])
 
     return plist
 

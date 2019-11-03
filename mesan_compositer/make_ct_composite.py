@@ -187,7 +187,7 @@ class ctCompositer(object):
         # Get all polar satellite scenes:
         pps_dr_dir = self._options['pps_direct_readout_dir']
         LOG.debug('pps_dr_dir = ' + str(pps_dr_dir))
-        pps_gds_dir = self._options['pps_metop_gds_dir']
+        pps_gds_dir = self._options.get('pps_metop_gds_dir')
 
         min_num_of_pps_dr_files = int(self._options.get('min_num_of_pps_dr_files', '0'))
 
@@ -204,16 +204,19 @@ class ctCompositer(object):
         ppsdr = get_ppslist(dr_list, self.time_window,
                             satellites=self.polar_satellites)
 
-        now = datetime.utcnow()
-        gds_list = glob(os.path.join(pps_gds_dir, 'S_NWC_CT_*nc'))
-        LOG.info("Number of Metop GDS files in dir: " + str(len(gds_list)))
         ppsgds = []
-        if len(gds_list) > 0:
-            ppsgds = get_ppslist(gds_list, self.time_window,
-                                 satellites=METOPS, variant='global')
-            tic = datetime.utcnow()
-            LOG.info("Retrieve the metop-gds list took " +
-                     str((tic - now).seconds) + " sec")
+        if pps_gds_dir:
+            now = datetime.utcnow()
+            gds_list = glob(os.path.join(pps_gds_dir, 'S_NWC_CT_*nc'))
+            LOG.info("Number of Metop GDS files in dir: " + str(len(gds_list)))
+            if len(gds_list) > 0:
+                ppsgds = get_ppslist(gds_list, self.time_window,
+                                     satellites=METOPS, variant='global')
+                tic = datetime.utcnow()
+                LOG.info("Retrieve the metop-gds list took " +
+                         str((tic - now).seconds) + " sec")
+        else:
+            LOG.info("No check for Metop GDS files is done!")
 
         self.pps_scenes = ppsdr + ppsgds
         self.pps_scenes.sort()
