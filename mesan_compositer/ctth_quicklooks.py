@@ -22,13 +22,13 @@
 
 """Make quick look images of the ctth composite
 """
+
 import argparse
 from datetime import datetime
 import numpy as np
 import xarray as xr
 from trollimage.xrimage import XRImage
 from mesan_compositer import ctth_height
-from mesan_compositer.netcdf_io import get_nc_attributes_from_object
 from mesan_compositer.netcdf_io import ncCTTHComposite
 from mesan_compositer import get_config
 from satpy.composites import ColormapCompositor
@@ -36,7 +36,6 @@ import sys
 import os
 from logging import handlers
 import logging
-import argparse
 
 LOG = logging.getLogger(__name__)
 
@@ -131,10 +130,7 @@ if __name__ == "__main__":
     palette = ctth_height()
 
     ctth_data = comp.height.data
-    #cloud_free = comp.height.data.filled(255) == 255
-    #cloud_free = comp.height.data.mask
     ctth_data = ctth_data / 500.0 + 1
-    #ctth_data[cloud_free] = 0
     ctth_data = ctth_data.astype(np.uint8)
 
     cmap = ColormapCompositor('mesan_cloudheight_composite')
