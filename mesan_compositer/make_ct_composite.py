@@ -32,6 +32,7 @@ import shutil
 from trollimage.xrimage import XRImage
 from mesan_compositer import cms_modified
 from satpy.composites import ColormapCompositor
+from satpy.composites import PaletteCompositor
 from mesan_compositer.pps_msg_conversions import ctype_procflags2pps
 from mesan_compositer import (ProjectException, LoadException)
 from mesan_compositer.composite_tools import (get_msglist,
@@ -116,8 +117,8 @@ def ctype_pps(pps, areaid):
 
     scene = Scene(filenames=[pps.uri, pps.geofilename], reader='nwcsaf-pps_nc')
     scene.load(['cloudtype', 'ct', 'ct_quality', 'ct_status_flag', 'ct_conditions'])
-
     retv = scene.resample(areaid, radius_of_influence=5000)
+
     return retv
 
 
@@ -128,7 +129,11 @@ def ctype_msg(msg, areaid):
 
     scene = Scene(filenames=[msg.uri, ], reader='nwcsaf-msg2013-hdf5')
     scene.load(['cloudtype', 'ct', 'ct_quality'])
-    return scene.resample(areaid, radius_of_influence=20000)
+    retv = scene.resample(areaid, radius_of_influence=20000)
+
+    # Save a temporary cloudtype image:
+    # retv.save_dataset('cloudtype', filename='/tmp/ctype.png')
+    return retv
 
 
 class ctCompositer(object):
@@ -324,11 +329,11 @@ class ctCompositer(object):
                 comp_time = x_time
                 comp_id = x_id
                 comp_w = get_weight_cloudtype(
-                    x_CT, x_flag, lat, abs(self.obstime - scene.timeslot), idx_MSG)
+                    x_CT, x_flag, lat, abs(self.obstime - scene.timeslot), idx_MSG, fill_value=255)
             else:
                 # compare with quality of current CT
                 x_w = get_weight_cloudtype(
-                    x_CT, x_flag, lat, abs(self.obstime - scene.timeslot), idx_MSG)
+                    x_CT, x_flag, lat, abs(self.obstime - scene.timeslot), idx_MSG, fill_value=255)
 
                 # replace info where current CT data is best
                 ii = x_w > comp_w
@@ -371,15 +376,17 @@ class ctCompositer(object):
         """Make quicklook images"""
 
         palette = cms_modified()
-        attrs = {'_FillValue': np.nan}
+        attrs = {'_FillValue': np.nan, 'valid_range': (0, 20)}
+        palette_attrs = {'palette_meanings': list(range(21))}
 
         # Cloud type field:
-        cmap = ColormapCompositor('mesan_cloudtype_composite')
-        colors, sqpal = cmap.build_colormap(palette, np.uint8, {})
+        pdata = xr.DataArray(palette, attrs=palette_attrs)
 
-        xdata = xr.DataArray(self.composite.cloudtype.data, dims=['y', 'x'], attrs=attrs).astype('uint8')
-        ximg = XRImage(xdata)
-        ximg.palettize(colors)
+        masked_data = np.ma.masked_outside(self.composite.cloudtype.data, 0, 20)
+        xdata = xr.DataArray(masked_data, dims=['y', 'x'], attrs=attrs)
+        pcol = PaletteCompositor('mesan_cloudtype_composite')((xdata, pdata))
+        ximg = XRImage(pcol)
+
         ximg.save(self.filename.strip('.nc') + '_cloudtype.png')
 
         # Id field:
