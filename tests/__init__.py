@@ -20,23 +20,22 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""The unit test package
-"""
+"""The unit test package."""
 
 from tests import test_input
 from tests import test_pps_msg_converter
 from tests import test_compositer
 from tests import test_pps_conversions
+from tests import test_color_legends
+
 import unittest
-import doctest
 
 import os
 TRAVIS = os.environ.get("TRAVIS", False)
 
 
 def suite():
-    """The global test suite.
-    """
+    """Run the global test suite."""
     mysuite = unittest.TestSuite()
     if not TRAVIS:
         # Test sphinx documentation pages:
@@ -50,6 +49,7 @@ def suite():
     mysuite.addTests(test_pps_msg_converter.suite())
     mysuite.addTests(test_compositer.suite())
     mysuite.addTests(test_pps_conversions.suite())
+    mysuite.addTests(test_color_legends.suite())
 
     return mysuite
 

@@ -20,8 +20,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Make a Cloud Type composite
-"""
+"""Make a Cloud Type composite."""
 
 import argparse
 from datetime import datetime, timedelta
@@ -30,7 +29,7 @@ import xarray as xr
 import tempfile
 import shutil
 from trollimage.xrimage import XRImage
-from mesan_compositer import cms_modified
+from mesan_compositer import nwcsaf_cloudtype
 from satpy.composites import ColormapCompositor
 from satpy.composites import PaletteCompositor
 from mesan_compositer.pps_msg_conversions import ctype_procflags2pps
@@ -48,6 +47,8 @@ import os
 import logging
 from logging import handlers
 
+from mesan_compositer.prt_nwcsaf_cloudamount import derive_sobs
+
 LOG = logging.getLogger(__name__)
 
 
@@ -62,7 +63,7 @@ _DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
 
 def get_arguments():
     """
-    Get command line arguments
+    Get command line arguments.
 
     args.logging_conf_file, args.config_file, obs_time, area_id, wsize
 
@@ -72,8 +73,8 @@ def get_arguments():
       Observation/Analysis time
       Area id
       Window size
-    """
 
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument('--datetime', '-d', help='Date and time of observation - yyyymmddhh',
                         required=True)
@@ -112,7 +113,7 @@ def get_arguments():
 
 
 def ctype_pps(pps, areaid):
-    """Load PPS Cloudtype and reproject"""
+    """Load PPS Cloudtype and reproject."""
     from satpy.scene import Scene
 
     scene = Scene(filenames=[pps.uri, pps.geofilename], reader='nwcsaf-pps_nc')
@@ -123,25 +124,21 @@ def ctype_pps(pps, areaid):
 
 
 def ctype_msg(msg, areaid):
-    """Load MSG paralax corrected cloud type and reproject"""
-
+    """Load MSG paralax corrected cloud type and reproject."""
     from satpy.scene import Scene
 
     scene = Scene(filenames=[msg.uri, ], reader='nwcsaf-msg2013-hdf5')
     scene.load(['cloudtype', 'ct', 'ct_quality'])
     retv = scene.resample(areaid, radius_of_influence=20000)
 
-    # Save a temporary cloudtype image:
-    # retv.save_dataset('cloudtype', filename='/tmp/ctype.png')
     return retv
 
 
 class ctCompositer(object):
-
-    """The Cloud Type Composite generator class"""
+    """The Cloud Type Composite generator class."""
 
     def __init__(self, obstime, tdiff, areaid, config_options, **kwargs):
-
+        """Initialize the cloud type composite instance."""
         values = {"area": areaid, }
 
         if 'filename' in kwargs:
@@ -182,11 +179,14 @@ class ctCompositer(object):
         self.composite = ncCloudTypeComposite()
 
     def get_catalogue(self):
-        """Get the meta data (start-time, satellite, orbit number etc) for all
+        """Get the catalougue of input data files.
+
+        Get the meta data (start-time, satellite, orbit number etc) for all
         available satellite scenes (both polar and geostationary) within the
         time window specified. For the time being this catalouge generation
-        will be done by simple file globbing. In a later stage this will be
-        done by doing a DB search"""
+        will be done by simple file globbing. In the future this might be
+        done by doing a DB search.
+        """
         from glob import glob
 
         # Get all polar satellite scenes:
@@ -249,8 +249,7 @@ class ctCompositer(object):
             LOG.debug("Geo scene:\n" + str(scene))
 
     def make_composite(self):
-        """Make the Cloud Type composite"""
-
+        """Make the Cloud Type composite."""
         # Reference time for time stamp in composite file
         # sec1970 = datetime(1970, 1, 1)
         import time
@@ -359,8 +358,7 @@ class ctCompositer(object):
         return True
 
     def write(self):
-        """Write the composite to a netcdf file"""
-
+        """Write the composite to a netcdf file."""
         tmpfname = tempfile.mktemp(suffix=os.path.basename(self.filename),
                                    dir=os.path.dirname(self.filename))
         self.composite.write(tmpfname)
@@ -373,9 +371,8 @@ class ctCompositer(object):
         return
 
     def make_quicklooks(self):
-        """Make quicklook images"""
-
-        palette = cms_modified()
+        """Make quicklook images."""
+        palette = nwcsaf_cloudtype()
         attrs = {'_FillValue': np.nan, 'valid_range': (0, 20)}
         palette_attrs = {'palette_meanings': list(range(21))}
 
@@ -432,5 +429,17 @@ if __name__ == "__main__":
     ctcomp = ctCompositer(time_of_analysis, delta_time_window, areaid, OPTIONS)
     ctcomp.get_catalogue()
     ctcomp.make_composite()
-    ctcomp.write()
-    ctcomp.make_quicklooks()
+    # ctcomp.write()
+    # ctcomp.make_quicklooks()
+
+    iparam = 71
+    window_size = 24
+
+    IPAR = str(iparam)
+    NPIX = int(window_size)
+
+    values = {"area": areaid, }
+    bname = time_of_analysis.strftime(OPTIONS['cloudamount_filename']) % values
+    path = OPTIONS['composite_output_dir']
+    filename = os.path.join(path, bname + '.dat')
+    derive_sobs(ctcomp.composite, IPAR, NPIX, filename)

@@ -20,9 +20,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Make a CTTH composite
-"""
-
+"""Make a CTTH composite."""
 
 import argparse
 from datetime import datetime, timedelta
@@ -38,10 +36,7 @@ from mesan_compositer.pps_msg_conversions import ctth_procflags2pps
 from nwcsaf_formats.pps_conversions import ctth_convert_flags
 from mesan_compositer.composite_tools import METOPS
 from mesan_compositer.netcdf_io import ncCTTHComposite
-from mesan_compositer.netcdf_io import get_nc_attributes_from_object
-
 from mesan_compositer import get_config
-
 from mesan_compositer.composite_tools import (get_msglist,
                                               get_ppslist,
                                               get_weight_ctth)
@@ -62,8 +57,7 @@ _DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
 
 
 def get_arguments():
-    """
-    Get command line arguments
+    """Get command line arguments.
 
     args.logging_conf_file, args.config_file, obs_time, area_id, wsize
 
@@ -73,8 +67,8 @@ def get_arguments():
       Observation/Analysis time
       Area id
       Window size
-    """
 
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument('--datetime', '-d', help='Date and time of observation - yyyymmddhh',
                         required=True)
@@ -109,8 +103,7 @@ def get_arguments():
 
 
 def ctth_pps(pps, areaid):
-    """Load PPS CTTH and reproject"""
-
+    """Load PPS CTTH and reproject."""
     from satpy.scene import Scene
 
     scene = Scene(filenames=[pps.uri, pps.geofilename], reader='nwcsaf-pps_nc')
@@ -122,8 +115,7 @@ def ctth_pps(pps, areaid):
 
 
 def ctth_msg(msg, areaid):
-    """Load MSG paralax corrected ctth and reproject"""
-
+    """Load MSG paralax corrected ctth and reproject."""
     from satpy.scene import Scene
 
     scene = Scene(filenames=[msg.uri, ], reader='nwcsaf-msg2013-hdf5')
@@ -134,11 +126,10 @@ def ctth_msg(msg, areaid):
 
 
 class mesanComposite(object):
-
-    """Master class for the Mesan cloud product composite generators"""
+    """Master class for the Mesan cloud product composite generators."""
 
     def __init__(self, obstime, tdiff, areaid, **kwargs):
-
+        """Initialize the Mesan Composite instance."""
         self.description = "Unknown composite"
         self.obstime = obstime
         self.timediff = tdiff
@@ -152,9 +143,7 @@ class mesanComposite(object):
         self.latitude = None
         # A Satpy-scene area object:
         self.area = None
-
         self._options = {}
-
         self.pps_scenes = []
         self.msg_scenes = []
 
@@ -162,14 +151,15 @@ class mesanComposite(object):
         self.composite = None
 
     def get_catalogue(self, product):
-        """Get the meta data (start-time, satellite, orbit number etc) for all
+        """Get a list of meta-data for all input scenes to process.
+
+        Get the meta data (start-time, satellite, orbit number etc) for all
         available satellite scenes (both polar and geostationary) within the
         time window specified. For the time being this catalouge generation
         will be done by simple file globbing. In a later stage this will be
         done by doing a DB search.
 
         *product* can be either 'cloudtype' or 'ctth'
-
         """
         from glob import glob
 
@@ -223,10 +213,10 @@ class mesanComposite(object):
 
 
 class ctthComposite(mesanComposite):
-
-    """The CTTH Composite generator class"""
+    """The CTTH Composite generator class."""
 
     def __init__(self, obstime, tdiff, areaid, config_options, **kwargs):
+        """Initialize the CTTH composite instance."""
         super(ctthComposite, self).__init__(obstime, tdiff, areaid,  **kwargs)
 
         values = {"area": areaid, }
@@ -257,11 +247,11 @@ class ctthComposite(mesanComposite):
         self.composite = ncCTTHComposite()
 
     def get_catalogue(self, product='ctth'):
+        """Get a list with meta-data for all inout scenes."""
         super(ctthComposite, self).get_catalogue(product)
 
     def make_composite(self):
-        """Make the CTTH composite"""
-
+        """Make the CTTH composite."""
         # Reference time for time stamp in composite file
         # sec1970 = datetime(1970, 1, 1)
         import time
@@ -309,8 +299,8 @@ class ctthComposite(mesanComposite):
 
                 # Temperature (K)', u'no_data_value': 255, u'intercept': 100.0,
                 # u'gain': 1.0
-                LOG.debug("scale and offset: %s %s", str(x_local['ctth_tempe'].attrs['scale_factor']),
-                          str(x_local['ctth_tempe'].attrs['add_offset']))
+                # LOG.debug("scale and offset: %s %s", str(x_local['ctth_tempe'].attrs['scale_factor']),
+                #          str(x_local['ctth_tempe'].attrs['add_offset']))
 
                 x_temperature = x_local['ctth_tempe'].data.compute()
                 x_pressure = x_local['ctth_pres'].data.compute()
@@ -347,7 +337,7 @@ class ctthComposite(mesanComposite):
                                          abs(self.obstime - scene.timeslot),
                                          idx_MSG)
                 # fix to cope with unprocessed data
-                #ii = (x_height.mask == True) | (x_height == 0)
+                # ii = (x_height.mask == True) | (x_height == 0)
                 ii = np.isnan(x_height)
                 comp_w[ii] = 0
             else:
@@ -387,7 +377,7 @@ class ctthComposite(mesanComposite):
         return True
 
     def write(self):
-        """Write the composite to a netcdf file"""
+        """Write the composite to a netcdf file."""
         tmpfname = tempfile.mktemp(suffix=os.path.basename(self.filename),
                                    dir=os.path.dirname(self.filename))
         self.composite.write(tmpfname)
@@ -400,7 +390,7 @@ class ctthComposite(mesanComposite):
         return
 
     def make_quicklooks(self):
-        """Make quicklook images"""
+        """Make quicklook images."""
         palette = ctth_height()
         filename = self.filename.strip('.nc') + '_height.png'
 

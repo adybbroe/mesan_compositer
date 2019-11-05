@@ -20,8 +20,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Make quick look images of the cloudtype composite
-"""
+"""Make quick look images of the cloudtype composite."""
 
 import argparse
 from datetime import datetime
@@ -30,7 +29,7 @@ import xarray as xr
 from trollimage.xrimage import XRImage
 from mesan_compositer import get_config
 from satpy.composites import PaletteCompositor
-from mesan_compositer import cms_modified
+from mesan_compositer import nwcsaf_cloudtype
 from mesan_compositer.netcdf_io import ncCloudTypeComposite
 import sys
 import os
@@ -48,7 +47,7 @@ _DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
 
 def get_arguments():
     """
-    Get command line arguments
+    Get command line arguments.
 
     args.logging_conf_file, args.config_file, obs_time, area_id, wsize
 
@@ -58,8 +57,8 @@ def get_arguments():
       Observation/Analysis time
       Area id
       Window size
-    """
 
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument('--datetime', '-d', help='Date and time of observation - yyyymmddhh',
                         required=True)
@@ -127,7 +126,7 @@ if __name__ == "__main__":
     comp = ncCloudTypeComposite()
     comp.load(filename)
 
-    palette = cms_modified()
+    palette = nwcsaf_cloudtype()
 
     # Cloud type field:
     attrs = {'_FillValue': np.nan, 'valid_range': (0, 20)}
