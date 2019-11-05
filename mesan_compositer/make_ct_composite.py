@@ -47,8 +47,6 @@ import os
 import logging
 from logging import handlers
 
-from mesan_compositer.prt_nwcsaf_cloudamount import derive_sobs
-
 LOG = logging.getLogger(__name__)
 
 
@@ -429,17 +427,5 @@ if __name__ == "__main__":
     ctcomp = ctCompositer(time_of_analysis, delta_time_window, areaid, OPTIONS)
     ctcomp.get_catalogue()
     ctcomp.make_composite()
-    # ctcomp.write()
-    # ctcomp.make_quicklooks()
-
-    iparam = 71
-    window_size = 24
-
-    IPAR = str(iparam)
-    NPIX = int(window_size)
-
-    values = {"area": areaid, }
-    bname = time_of_analysis.strftime(OPTIONS['cloudamount_filename']) % values
-    path = OPTIONS['composite_output_dir']
-    filename = os.path.join(path, bname + '.dat')
-    derive_sobs(ctcomp.composite, IPAR, NPIX, filename)
+    ctcomp.write()
+    ctcomp.make_quicklooks()
