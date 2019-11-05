@@ -25,13 +25,9 @@
 import argparse
 from datetime import datetime, timedelta
 import numpy as np
-import xarray as xr
+from glob import glob
 import tempfile
 import shutil
-from trollimage.xrimage import XRImage
-from mesan_compositer import nwcsaf_cloudtype
-from satpy.composites import ColormapCompositor
-from satpy.composites import PaletteCompositor
 from mesan_compositer.pps_msg_conversions import ctype_procflags2pps
 from mesan_compositer import (ProjectException, LoadException)
 from mesan_compositer.composite_tools import (get_msglist,
@@ -40,6 +36,8 @@ from mesan_compositer.composite_tools import (get_msglist,
 from mesan_compositer.netcdf_io import ncCloudTypeComposite
 from nwcsaf_formats.pps_conversions import (map_cloudtypes,
                                             ctype_convert_flags)
+from mesan_compositer.ct_quicklooks import make_quicklooks
+
 from mesan_compositer.composite_tools import METOPS
 from mesan_compositer import get_config
 import sys
@@ -176,6 +174,23 @@ class ctCompositer(object):
 
         self.composite = ncCloudTypeComposite()
 
+    def _get_all_pps_files(self, pps_dir):
+        """Return list of pps files in directory."""
+        if pps_dir is None:
+            return []
+
+        LOG.debug('Get all PPS files in this directory = ' + str(pps_dir))
+        # Example: S_NWC_CT_metopb_14320_20150622T1642261Z_20150622T1654354Z.nc
+        return glob(os.path.join(pps_dir, 'S_NWC_CT_*nc'))
+
+    def _get_all_geo_files(self, geo_dir):
+        """Return list of NWCSAF/Geo files in directory."""
+        if geo_dir is None:
+            return []
+
+        LOG.debug('Get all NWCSAF/Geo files in this directory = ' + str(geo_dir))
+        return glob(os.path.join(geo_dir, '*_CT___*.PLAX.CTTH.0.h5'))
+
     def get_catalogue(self):
         """Get the catalougue of input data files.
 
@@ -185,19 +200,13 @@ class ctCompositer(object):
         will be done by simple file globbing. In the future this might be
         done by doing a DB search.
         """
-        from glob import glob
+        min_num_of_pps_dr_files = int(self._options.get('min_num_of_pps_dr_files', '0'))
 
         # Get all polar satellite scenes:
         pps_dr_dir = self._options['pps_direct_readout_dir']
-        LOG.debug('pps_dr_dir = ' + str(pps_dr_dir))
-        pps_gds_dir = self._options.get('pps_metop_gds_dir')
+        dr_list = self._get_all_pps_files(pps_dr_dir)
+        LOG.info("Number of direct readout pps cloudtype files in dir: %s", str(len(dr_list)))
 
-        min_num_of_pps_dr_files = int(self._options.get('min_num_of_pps_dr_files', '0'))
-
-        # Example: S_NWC_CT_metopb_14320_20150622T1642261Z_20150622T1654354Z.nc
-        dr_list = glob(os.path.join(pps_dr_dir, 'S_NWC_CT_*nc'))
-        LOG.info("Number of direct readout pps cloudtype files in dir: " +
-                 str(len(dr_list)))
         if len(dr_list) <= min_num_of_pps_dr_files:
             LOG.critical("Too few PPS DR files found! (%d<=%d)\n" +
                          "pps_dr_dir = %s",
@@ -208,18 +217,15 @@ class ctCompositer(object):
                             satellites=self.polar_satellites)
 
         ppsgds = []
-        if pps_gds_dir:
+        gds_list = self._get_all_pps_files(self._options.get('pps_metop_gds_dir'))
+        if len(gds_list) > 0:
             now = datetime.utcnow()
-            gds_list = glob(os.path.join(pps_gds_dir, 'S_NWC_CT_*nc'))
             LOG.info("Number of Metop GDS files in dir: " + str(len(gds_list)))
-            if len(gds_list) > 0:
-                ppsgds = get_ppslist(gds_list, self.time_window,
-                                     satellites=METOPS, variant='global')
-                tic = datetime.utcnow()
-                LOG.info("Retrieve the metop-gds list took " +
-                         str((tic - now).seconds) + " sec")
-        else:
-            LOG.info("No check for Metop GDS files is done!")
+            ppsgds = get_ppslist(gds_list, self.time_window,
+                                 satellites=METOPS, variant='global')
+            tic = datetime.utcnow()
+            LOG.info("Retrieve the metop-gds list took " +
+                     str((tic - now).seconds) + " sec")
 
         self.pps_scenes = ppsdr + ppsgds
         self.pps_scenes.sort()
@@ -229,10 +235,8 @@ class ctCompositer(object):
 
         # Get all geostationary satellite scenes:
         msg_dir = self._options['msg_dir'] % {"number": "02"}
-        # ext = self._options['msg_cty_file_ext']
-        # SAFNWC_MSG2_CT___201206252345_EuropeCanary.h5
         # What about EuropeCanary and possible other areas!? FIXME!
-        msg_list = glob(os.path.join(msg_dir, '*_CT___*.PLAX.CTTH.0.h5'))
+        msg_list = self._get_all_geo_files(msg_dir)
         LOG.debug(
             "MSG files in directory " + str(msg_dir) + " : " + str(msg_list))
         LOG.info("Get files inside time window: " +
@@ -370,35 +374,8 @@ class ctCompositer(object):
 
     def make_quicklooks(self):
         """Make quicklook images."""
-        palette = nwcsaf_cloudtype()
-        attrs = {'_FillValue': np.nan, 'valid_range': (0, 20)}
-        palette_attrs = {'palette_meanings': list(range(21))}
-
-        # Cloud type field:
-        pdata = xr.DataArray(palette, attrs=palette_attrs)
-
-        masked_data = np.ma.masked_outside(self.composite.cloudtype.data, 0, 20)
-        xdata = xr.DataArray(masked_data, dims=['y', 'x'], attrs=attrs)
-        pcol = PaletteCompositor('mesan_cloudtype_composite')((xdata, pdata))
-        ximg = XRImage(pcol)
-
-        ximg.save(self.filename.strip('.nc') + '_cloudtype.png')
-
-        # Id field:
-        cmap = ColormapCompositor('mesan_cloudtype_composite')
-        colors, sqpal = cmap.build_colormap(palette, np.uint8, {})
-        xdata = xr.DataArray(self.composite.id.data * 13, dims=['y', 'x'], attrs=attrs).astype('uint8')
-        ximg = XRImage(xdata)
-        ximg.palettize(colors)
-        ximg.save(self.filename.strip('.nc') + '_id.png')
-
-        # Weight field:
-        cmap = ColormapCompositor('mesan_cloudtype_composite')
-        data = (self.composite.weight.data * 20).astype(np.dtype('uint8'))
-        xdata = xr.DataArray(data, dims=['y', 'x'], attrs=attrs).astype('uint8')
-        ximg = XRImage(xdata)
-        ximg.palettize(colors)
-        ximg.save(self.filename.strip('.nc') + '_weight.png')
+        make_quicklooks(self.filename, self.composite.cloudtype,
+                        self.composite.id, self.composite.weight)
 
 
 if __name__ == "__main__":
