@@ -20,8 +20,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Package file for the mesan_compositer
-"""
+"""Package file for the mesan_compositer."""
 
 import logging
 import yaml
@@ -42,16 +41,19 @@ LOG = logging.getLogger(__name__)
 
 
 class ProjectException(Exception):
+    """Exception class for reprojections."""
+
     pass
 
 
 class LoadException(Exception):
+    """Exception class for loading data."""
+
     pass
 
 
 def get_config(configfile):
-    """Get the configuration from file"""
-
+    """Get the configuration from file."""
     with open(configfile, 'r') as fp_:
         config = yaml.load(fp_, Loader=UnsafeLoader)
 
@@ -63,15 +65,8 @@ def get_config(configfile):
     return options
 
 
-def cms_modified():
-    """Palette for regular cloud classification.
-    """
-    return nwcsaf_cloudtype()
-
-
 def nwcsaf_cloudtype():
-    """Palette for regular cloud classification.
-    """
+    """Palette for regular cloud classification."""
     legend = []
     legend.append((100, 100, 100))  # Unprocessed: Grey
     legend.append((0, 120,   0))
@@ -101,8 +96,7 @@ def nwcsaf_cloudtype():
 
 
 def ctth_height():
-    """CTTH height palette.
-    """
+    """CTTH height palette."""
     legend = []
     legend.append((0,   0,   0))
     legend.append((255,   0, 216))  # 0 meters
@@ -124,7 +118,7 @@ def ctth_height():
     legend.append((238, 214, 210))
     legend.append((239, 239, 223))
     legend.append((255, 255, 255))  # 10,000 meters
-    for i in range(79):
+    for _i in range(79):
         legend.append((255, 255, 255))
     legend.append((224, 224, 224))
 
@@ -132,10 +126,9 @@ def ctth_height():
 
 
 def convert_palette(palette):
-    """Convert palette from [0,255] range to [0,1].
-    """
+    """Convert palette from [0,255] range to [0,1]."""
     new_palette = []
-    #norm = 255.
+    # norm = 255.
     norm = 1.
     for i in palette:
         new_palette.append((i[0] / norm,

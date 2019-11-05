@@ -20,8 +20,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""From the cloud type composite retrieve super observations of cloud
-amount/cover and print to stdout
+"""Generate and print cloud amount super observations to ascii.
+
+From the cloud type composite retrieve super observations of cloud
+amount/cover and print to stdout.
 """
 
 import numpy as np
@@ -163,7 +165,7 @@ nctypecl = {'71': ntctypecl, '73': nlctypecl, '74': nmctypecl, '75': nhctypecl}
 
 def get_arguments():
     """
-    Get command line arguments
+    Get command line arguments.
 
     args.logging_conf_file, args.config_file, obs_time, area_id, wsize
 
@@ -173,8 +175,8 @@ def get_arguments():
       Observation/Analysis time
       Area id
       Window size
-    """
 
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument('--datetime', '-d', help='Date and time of observation - yyyymmddhh',
                         required=True)
@@ -212,8 +214,7 @@ def get_arguments():
 
 
 def derive_sobs(ct_comp, ipar, npix, resultfile):
-    """Derive the super observations and print data to file"""
-
+    """Derive the super observations and print data to file."""
     import tempfile
     import shutil
 
@@ -221,20 +222,20 @@ def derive_sobs(ct_comp, ipar, npix, resultfile):
                                dir=os.path.dirname(resultfile))
 
     # Get the lon,lat:
-    # from pyresample import utils
-    # area = utils.load_area(
-    #     '/local_disk/laptop/Satsa/Mesan/mesan-sat-preproc/etc/areas.def', 'mesanX')
-    # lon, lat = area.get_lonlats()
     lon, lat = ct_comp.area_def.get_lonlats()
 
     try:
         ctype = ct_comp.cloudtype.data.compute().astype('int')
+        # Put the nodata (255) to zero (non-processed):
+        ctype = np.where(np.equal(ctype, 255), 0, ctype)
     except AttributeError:
         ctype = ct_comp.cloudtype.data.astype('int')
+        # Put the nodata (255) to zero (non-processed):
+        ctype = ctype.filled(0)
 
     weight = ct_comp.weight.data
-    #obstime = ct_comp.time.data
-    #id = ct_comp.id.data
+    # obstime = ct_comp.time.data
+    # id = ct_comp.id.data
 
     # non overlapping superobservations
     # min 8x8 pixels = ca 8x8 km = 2*dlen x 2*dlen pixels for a
@@ -242,7 +243,6 @@ def derive_sobs(ct_comp, ipar, npix, resultfile):
     dlen = int(np.ceil(float(npix) / 2.0))
     dx = int(max(2 * DLENMIN, 2 * dlen))
     dy = dx
-    #fpt = open(resultfile, 'w')
     fpt = open(tmpfname, 'w')
     LOG.info('\tUsing %d x %d pixels in a superobservation', dx, dy)
 

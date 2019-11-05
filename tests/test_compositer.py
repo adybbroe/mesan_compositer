@@ -1,8 +1,7 @@
-
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2015 Adam.Dybbroe
+# Copyright (c) 2014 - 2019 Adam.Dybbroe
 
 # Author(s):
 
@@ -21,13 +20,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Unit testing the composite generation
-"""
+"""Unit testing the composite generation."""
 
 import unittest
 import numpy as np
 from mesan_compositer.composite_tools import get_weight_cloudtype
 from mesan_compositer.composite_tools import get_analysis_time
+from mesan_compositer.composite_tools import PpsMetaData
+from mesan_compositer.composite_tools import MsgMetaData
 
 from datetime import datetime, timedelta
 
@@ -118,16 +118,14 @@ WEIGHT_MSG2 = np.array([[0.65217391,  0.65217391,  0.65217391,  0.65217391,  0.6
 
 
 class TestCloudTypeWeights(unittest.TestCase):
-
-    """Unit testing the functions to convert msg flags to pps (old) flags"""
+    """Unit testing the functions to convert msg flags to pps (old) flags."""
 
     def setUp(self):
-        """Set up"""
+        """Set up."""
         return
 
     def test_cloudtype_weights(self):
-        """Test the derivation of weights for a given cloudtype , flags, obs times etc"""
-
+        """Test the derivation of weights for a given cloudtype, flags, obs times etc."""
         retv = get_weight_cloudtype(
             CTYPE_MSG, CTYPE_MSG_FLAG, LAT_MSG, TDIFF_MSG, IS_MSG_MSG)
         self.assertTrue(np.allclose(retv, WEIGHT_MSG))
@@ -137,23 +135,88 @@ class TestCloudTypeWeights(unittest.TestCase):
         self.assertTrue(np.allclose(retv, WEIGHT_MSG2))
 
     def tearDown(self):
-        """Clean up"""
+        """Clean up."""
         return
 
 
 class TestTimeTools(unittest.TestCase):
-
-    """Unit testing the determination of the analysis time from two times 
-    defining a time-window (interval)"""
+    """Test (time) arithmetics for observation time and listing/sorting of PPS/MSG scenes."""
 
     def setUp(self):
-        """Set it up"""
+        """Set it up."""
         return
 
-    def test_get_analysis_time(self):
-        """Unit testing the determination of the analysis time from two times 
-        defining a time-window (interval)"""
+    def test_pps_metadata(self):
+        """Test operations on the PPS meta data class."""
+        filename = '/tmp/my_pps_testfile.nc'
+        geofilename = '/tmp/my_pps_geo_testfile.nc'
+        platform_name = 'NOAA-20'
+        orbit = "00102"
+        timeslot1 = datetime(2019, 11, 5, 12, 0)
+        variant = None
+        pm1 = PpsMetaData(filename, geofilename, platform_name, orbit, timeslot1, variant)
 
+        timeslot2 = datetime(2019, 11, 5, 13, 30)
+        orbit = "00103"
+        pm2 = PpsMetaData(filename, geofilename, platform_name, orbit, timeslot2, variant)
+
+        timeslot3 = datetime(2019, 11, 5, 10, 30)
+        orbit = "00101"
+        pm3 = PpsMetaData(filename, geofilename, platform_name, orbit, timeslot3, variant)
+
+        timeslot4 = datetime(2019, 11, 5, 12, 0)
+        orbit = "00999"
+        platform_name = 'EOS-Aqua'
+        pm4 = PpsMetaData(filename, geofilename, platform_name, orbit, timeslot4, variant)
+
+        pmlist = [pm1, pm2, pm3, pm4]
+        pmlist.sort()
+        tslots = [p.timeslot for p in pmlist]
+        norbits = [int(p.orbit) for p in pmlist]
+
+        self.assertListEqual([101, 102, 999, 103], norbits)
+        self.assertTrue(tslots[0] <= tslots[1])
+        self.assertTrue(tslots[1] <= tslots[2])
+        self.assertTrue(tslots[2] <= tslots[3])
+
+    def test_msg_metadata(self):
+        """Test operations on the MSG meta data class."""
+        filename = '/tmp/my_msg_testfile.nc'
+        platform_name = 'Meteosat-11'
+        timeslot1 = datetime(2019, 11, 5, 18, 0)
+        areaid = 'area1'
+        mm1 = MsgMetaData(filename, platform_name, areaid, timeslot1)
+
+        timeslot2 = datetime(2019, 11, 4, 18, 0)
+        areaid = 'area2'
+        mm2 = MsgMetaData(filename, platform_name, areaid, timeslot2)
+
+        timeslot3 = datetime(2019, 11, 5, 18, 15)
+        areaid = 'area3'
+        mm3 = MsgMetaData(filename, platform_name, areaid, timeslot3)
+
+        timeslot4 = datetime(2019, 11, 3, 12, 0)
+        areaid = 'area4'
+        mm4 = MsgMetaData(filename, platform_name, areaid, timeslot4)
+
+        timeslot5 = datetime(2019, 11, 5, 18, 15)
+        areaid = 'area5'
+        platform_name = 'Meteosat-9'
+        mm5 = MsgMetaData(filename, platform_name, areaid, timeslot5)
+
+        mmlist = [mm1, mm2, mm3, mm4, mm5]
+        mmlist.sort()
+        tslots = [m.timeslot for m in mmlist]
+        areas = [m.areaid for m in mmlist]
+
+        self.assertListEqual(['area4', 'area2', 'area1', 'area3', 'area5'], areas)
+        self.assertTrue(tslots[0] <= tslots[1])
+        self.assertTrue(tslots[1] <= tslots[2])
+        self.assertTrue(tslots[2] <= tslots[3])
+        self.assertTrue(tslots[3] <= tslots[4])
+
+    def test_get_analysis_time(self):
+        """Test the determination of the analysis time from two times defining a time interval."""
         dtime_eps = timedelta(seconds=1)
 
         t1_ = datetime(2015, 6, 23, 12, 22)
@@ -177,13 +240,12 @@ class TestTimeTools(unittest.TestCase):
         self.assertTrue(res - datetime(2015, 6, 23, 13, 0) < dtime_eps)
 
     def tearDown(self):
-        """Clean up"""
+        """Clean up."""
         return
 
 
 def suite():
-    """The suite for test_compositer.
-    """
+    """Run all the tests for the compositer tools."""
     loader = unittest.TestLoader()
     mysuite = unittest.TestSuite()
     mysuite.addTest(loader.loadTestsFromTestCase(TestCloudTypeWeights))

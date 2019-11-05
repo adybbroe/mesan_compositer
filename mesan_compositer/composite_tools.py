@@ -358,7 +358,7 @@ def get_weight_ctth(ctth_flag, lat, tdiff, is_msg):
     return weight
 
 
-def get_weight_cloudtype(ctype, ctype_flag, lat, tdiff, is_msg):
+def get_weight_cloudtype(ctype, ctype_flag, lat, tdiff, is_msg, fill_value=20):
     """Weights for given ctype, ctype flag, time diff and latitude (only MSG).
     """
     #
@@ -390,7 +390,8 @@ def get_weight_cloudtype(ctype, ctype_flag, lat, tdiff, is_msg):
     ])
     #
     # weight factors per ctype class
-    weights_ctype_class = np.array([
+    weights_ctype_class = np.zeros((256,))
+    weights_ctype_class_values = np.array([
         0.0,  # 00 Not processed
         0.95,  # 01 Cloud free land
         1.0,  # 02 Cloud free sea
@@ -413,6 +414,8 @@ def get_weight_cloudtype(ctype, ctype_flag, lat, tdiff, is_msg):
         0.95,  # 19 Fractional or sub-pixel cloud
         0.0   # 20 Undefined
     ])
+    for idx in range(21):
+        weights_ctype_class[idx] = weights_ctype_class_values[idx]
     #
 
     #
@@ -453,9 +456,9 @@ def get_weight_cloudtype(ctype, ctype_flag, lat, tdiff, is_msg):
     ii = (ctype >= 9) * (ctype <= 18) * (b == 0)
     weight[ii] = 1.0
     #
-    # all ctype above 20 are set to 20 (undefined with weight 0)
+    # all ctype above 20 are set to fill_value (undefined with weight 0)
     # howto index with x_ctype.astype('int') from masked array ?
-    ctype[ctype > 20] = 20
+    ctype[ctype > 20] = fill_value
     #
     # dependence on cloud type
     weight *= weights_ctype_class[ctype.astype('int')]
