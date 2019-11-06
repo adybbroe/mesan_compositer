@@ -224,6 +224,18 @@ def derive_sobs(ct_comp, ipar, npix, resultfile):
     # Get the lon,lat:
     lon, lat = ct_comp.area_def.get_lonlats()
 
+    # Seems the cloudtype data can be three types of arrays at this stage:
+    # 1) a dask array (with 255 for no data)
+    # 2) a masked data array with fill-value = 255
+    # 3) a non masked numpy array with 255 for nodata
+    #
+    # This happens:
+    # 3. when only MSG data are present in the composite!
+    # 2. when data are read from netCDF file
+    # 1. when both MSG and PPS data are persent in the composite and
+    # when data are coming directly from the compositor
+    #
+    # FIXME!
     try:
         ctype = ct_comp.cloudtype.data.compute().astype('int')
         # Put the nodata (255) to zero (non-processed):
@@ -231,7 +243,10 @@ def derive_sobs(ct_comp, ipar, npix, resultfile):
     except AttributeError:
         ctype = ct_comp.cloudtype.data.astype('int')
         # Put the nodata (255) to zero (non-processed):
-        ctype = ctype.filled(0)
+        try:
+            ctype = ctype.filled(0)
+        except AttributeError:
+            ctype = np.where(np.equal(ctype, 255), 0, ctype)
 
     weight = ct_comp.weight.data
     # obstime = ct_comp.time.data

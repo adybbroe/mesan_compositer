@@ -411,5 +411,20 @@ if __name__ == "__main__":
     ctcomp = ctCompositer(time_of_analysis, delta_time_window, area_id, OPTIONS)
     ctcomp.get_catalogue()
     ctcomp.make_composite()
+
+    # Just for testing purposes:
+    # values = {"area": area_id, }
+    # iparam = 71
+    # window_size = 24
+    # IPAR = str(iparam)
+    # NPIX = int(window_size)
+
+    # bname = time_of_analysis.strftime(OPTIONS['cloudamount_filename']) % values
+    # path = OPTIONS['composite_output_dir']
+    # filename = os.path.join(path, bname + '.dat')
+
+    # from mesan_compositer.prt_nwcsaf_cloudamount import derive_sobs
+    # derive_sobs(ctcomp.composite, IPAR, NPIX, filename)
+
     ctcomp.write()
     ctcomp.make_quicklooks()
