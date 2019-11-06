@@ -24,8 +24,8 @@
 
 import argparse
 from datetime import datetime, timedelta
-import numpy as np
 from glob import glob
+import numpy as np
 import tempfile
 import shutil
 from mesan_compositer.pps_msg_conversions import ctype_procflags2pps
@@ -100,12 +100,11 @@ def get_arguments():
 
     tanalysis = datetime.strptime(args.datetime, '%Y%m%d%H')
     delta_t = timedelta(minutes=int(args.time_window))
-    area_id = args.area_id
     if 'template' in args.config_file:
         print("Template file given as master config, aborting!")
         sys.exit()
 
-    return args.logging_conf_file, args.config_file, tanalysis, area_id, delta_t
+    return args.logging_conf_file, args.config_file, tanalysis, args.area_id, delta_t
 
 
 def ctype_pps(pps, areaid):
@@ -191,6 +190,17 @@ class ctCompositer(object):
         LOG.debug('Get all NWCSAF/Geo files in this directory = ' + str(geo_dir))
         return glob(os.path.join(geo_dir, '*_CT___*.PLAX.CTTH.0.h5'))
 
+    def get_pps_scenes(self, pps_file_list, satellites=None, variant=None):
+        """Get the list of valid pps scenes from file list."""
+        if satellites is None:
+            satellites = self.polar_satellites
+        return get_ppslist(pps_file_list, self.time_window,
+                           satellites=satellites, variant=variant)
+
+    def get_geo_scenes(self, geo_file_list):
+        """Get the list of valid NWCSAF/Geo scenes from file list."""
+        return get_msglist(geo_file_list, self.time_window, self.msg_areaname)  # satellites=self.msg_satellites)
+
     def get_catalogue(self):
         """Get the catalougue of input data files.
 
@@ -213,16 +223,14 @@ class ctCompositer(object):
                          len(dr_list), min_num_of_pps_dr_files,
                          str(pps_dr_dir))
 
-        ppsdr = get_ppslist(dr_list, self.time_window,
-                            satellites=self.polar_satellites)
+        ppsdr = self.get_pps_scenes(dr_list)
 
         ppsgds = []
         gds_list = self._get_all_pps_files(self._options.get('pps_metop_gds_dir'))
         if len(gds_list) > 0:
             now = datetime.utcnow()
             LOG.info("Number of Metop GDS files in dir: " + str(len(gds_list)))
-            ppsgds = get_ppslist(gds_list, self.time_window,
-                                 satellites=METOPS, variant='global')
+            ppsgds = self.get_pps_scenes(gds_list, satellites=METOPS, variant='global')
             tic = datetime.utcnow()
             LOG.info("Retrieve the metop-gds list took " +
                      str((tic - now).seconds) + " sec")
@@ -243,8 +251,7 @@ class ctCompositer(object):
                  str(self.time_window[0]) + " - " +
                  str(self.time_window[1]))
 
-        self.msg_scenes = get_msglist(msg_list, self.time_window,
-                                      self.msg_areaname)  # satellites=self.msg_satellites)
+        self.msg_scenes = self.get_geo_scenes(msg_list)
         self.msg_scenes.sort()
         LOG.info(str(len(self.msg_scenes)) + " MSG scenes located")
         for scene in self.msg_scenes:
@@ -380,7 +387,7 @@ class ctCompositer(object):
 
 if __name__ == "__main__":
 
-    (logfile, config_filename, time_of_analysis, areaid, delta_time_window) = get_arguments()
+    (logfile, config_filename, time_of_analysis, area_id, delta_time_window) = get_arguments()
 
     handler = logging.StreamHandler(sys.stderr)
 
@@ -401,7 +408,7 @@ if __name__ == "__main__":
 
     OPTIONS = get_config(config_filename)
 
-    ctcomp = ctCompositer(time_of_analysis, delta_time_window, areaid, OPTIONS)
+    ctcomp = ctCompositer(time_of_analysis, delta_time_window, area_id, OPTIONS)
     ctcomp.get_catalogue()
     ctcomp.make_composite()
     ctcomp.write()
