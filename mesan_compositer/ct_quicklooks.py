@@ -89,6 +89,47 @@ def get_arguments():
     return args.logging_conf_file, args.config_file, tanalysis, area_id
 
 
+def make_quicklooks(netcdf_filename, cloudtype, ids, weights):
+    """Make Cloudtype composite quicklook imagery.
+
+    A cloudtype composite image is created along side images of the id's (MSG
+    or PPS) and pixel weights.
+
+    """
+    palette = nwcsaf_cloudtype()
+
+    # Cloud type field:
+    attrs = {'_FillValue': np.nan, 'valid_range': (0, 20)}
+    palette_attrs = {'palette_meanings': list(range(21))}
+
+    pdata = xr.DataArray(palette, attrs=palette_attrs)
+
+    # xdata = xr.DataArray(cloudtype.data, dims=['y', 'x'], attrs=attrs)
+    masked_data = np.ma.masked_outside(cloudtype.data, 0, 20)
+    xdata = xr.DataArray(masked_data, dims=['y', 'x'], attrs=attrs)
+    pcol = PaletteCompositor('mesan_cloudtype_composite')((xdata, pdata))
+    ximg = XRImage(pcol)
+    ximg.save(netcdf_filename.strip('.nc') + '_cloudtype.png')
+
+    # Id field:
+    pdata = xr.DataArray(palette, attrs=palette_attrs)
+    data = (ids.data * 13).astype(np.dtype('uint8'))
+    xdata = xr.DataArray(data, dims=['y', 'x'], attrs=attrs)
+    pcol = PaletteCompositor('mesan_cloudtype_composite')((xdata, pdata))
+    ximg = XRImage(pcol)
+    ximg.save(netcdf_filename.strip('.nc') + '_id.png')
+
+    # Weight field:
+    pdata = xr.DataArray(palette, attrs=palette_attrs)
+    data = (weights.data * 20).astype(np.dtype('uint8'))
+    xdata = xr.DataArray(data, dims=['y', 'x'], attrs=attrs)
+    pcol = PaletteCompositor('mesan_cloudtype_composite')((xdata, pdata))
+    ximg = XRImage(pcol)
+    ximg.save(netcdf_filename.strip('.nc') + '_weight.png')
+
+    return
+
+
 if __name__ == "__main__":
 
     (logfile, config_filename, time_of_analysis, areaid) = get_arguments()
@@ -118,38 +159,12 @@ if __name__ == "__main__":
     values = {"area": areaid, }
     bname = time_of_analysis.strftime(OPTIONS['ct_composite_filename']) % values
     path = OPTIONS['composite_output_dir']
-    filename = os.path.join(path, bname) + '.nc'
-    if not os.path.exists(filename):
-        LOG.error("File " + str(filename) + " does not exist!")
+    FILENAME = os.path.join(path, bname) + '.nc'
+    if not os.path.exists(FILENAME):
+        LOG.error("File " + str(FILENAME) + " does not exist!")
         sys.exit(-1)
 
     comp = ncCloudTypeComposite()
-    comp.load(filename)
+    comp.load(FILENAME)
 
-    palette = nwcsaf_cloudtype()
-
-    # Cloud type field:
-    attrs = {'_FillValue': np.nan, 'valid_range': (0, 20)}
-    palette_attrs = {'palette_meanings': list(range(21))}
-
-    pdata = xr.DataArray(palette, attrs=palette_attrs)
-    xdata = xr.DataArray(comp.cloudtype.data, dims=['y', 'x'], attrs=attrs)
-    pcol = PaletteCompositor('mesan_cloudtype_composite')((xdata, pdata))
-    ximg = XRImage(pcol)
-    ximg.save(filename.strip('.nc') + '_cloudtype.png')
-
-    # Id field:
-    pdata = xr.DataArray(palette, attrs=palette_attrs)
-    data = (comp.id.data * 13).astype(np.dtype('uint8'))
-    xdata = xr.DataArray(data, dims=['y', 'x'], attrs=attrs)
-    pcol = PaletteCompositor('mesan_cloudtype_composite')((xdata, pdata))
-    ximg = XRImage(pcol)
-    ximg.save(filename.strip('.nc') + '_id.png')
-
-    # Weight field:
-    pdata = xr.DataArray(palette, attrs=palette_attrs)
-    data = (comp.weight.data * 20).astype(np.dtype('uint8'))
-    xdata = xr.DataArray(data, dims=['y', 'x'], attrs=attrs)
-    pcol = PaletteCompositor('mesan_cloudtype_composite')((xdata, pdata))
-    ximg = XRImage(pcol)
-    ximg.save(filename.strip('.nc') + '_weight.png')
+    make_quicklooks(FILENAME, comp.cloudtype, comp.id, comp.weight)

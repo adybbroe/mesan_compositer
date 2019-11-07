@@ -110,7 +110,7 @@ def ctth_pps(pps, areaid):
     scene.load(['ctth_alti', 'ctth_pres', 'ctth_tempe', 'ctth_quality',
                 'ctth_conditions', 'ctth_status_flag'])
 
-    retv = scene.resample(areaid, radius_of_influence=5000)
+    retv = scene.resample(areaid, radius_of_influence=8000)
     return retv
 
 

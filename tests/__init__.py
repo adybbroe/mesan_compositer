@@ -27,6 +27,7 @@ from tests import test_pps_msg_converter
 from tests import test_compositer
 from tests import test_pps_conversions
 from tests import test_color_legends
+from tests import test_make_ct_composite
 
 import unittest
 
@@ -50,6 +51,7 @@ def suite():
     mysuite.addTests(test_compositer.suite())
     mysuite.addTests(test_pps_conversions.suite())
     mysuite.addTests(test_color_legends.suite())
+    mysuite.addTests(test_make_ct_composite.suite())
 
     return mysuite
 
