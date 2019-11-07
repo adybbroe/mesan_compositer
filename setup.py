@@ -19,11 +19,9 @@
 
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""Setup the project."""
 
-import sys
 from setuptools import setup
-import os.path
-import imp
 
 try:
     # HACK: https://github.com/pypa/setuptools_scm/issues/190#issuecomment-351181286
@@ -41,15 +39,20 @@ except IOError:
 
 requires = ['docutils>=0.3',
             'numpy>=1.5.1',
-            'satpy',
-            'pyresample', 'trollsift'],
+            'satpy>=0.18.0',
+            'pyresample',
+            'trollsift',
+            'posttrol',
+            'netifaces',
+            'six',
+            'multiprocessing',
+            'setuptools_scm']
 
 SHORT_DESC = ("Mesan satellite compositer")
 
 NAME = 'mesan-compositer'
 
 setup(name=NAME,
-      version='0.1.0',
       description=SHORT_DESC,
       author='Adam Dybbroe, Tomas Landelius',
       author_email='adam.dybbroe@smhi.se, tomas.landelius@smhi.se',
