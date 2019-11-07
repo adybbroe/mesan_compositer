@@ -42,10 +42,9 @@ requires = ['docutils>=0.3',
             'satpy>=0.18.0',
             'pyresample',
             'trollsift',
-            'posttrol',
+            'posttroll',
             'netifaces',
             'six',
-            'multiprocessing',
             'setuptools_scm']
 
 SHORT_DESC = ("Mesan satellite compositer")

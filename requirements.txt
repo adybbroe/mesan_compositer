@@ -2,5 +2,6 @@ numpy>=1.5.1
 pyresample>=1.0
 satpy>=0.18.0
 trollsift
+posttroll
 netifaces
 six
