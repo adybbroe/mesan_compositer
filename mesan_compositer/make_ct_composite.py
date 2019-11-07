@@ -113,7 +113,7 @@ def ctype_pps(pps, areaid):
 
     scene = Scene(filenames=[pps.uri, pps.geofilename], reader='nwcsaf-pps_nc')
     scene.load(['cloudtype', 'ct', 'ct_quality', 'ct_status_flag', 'ct_conditions'])
-    retv = scene.resample(areaid, radius_of_influence=5000)
+    retv = scene.resample(areaid, radius_of_influence=8000)
 
     return retv
 
