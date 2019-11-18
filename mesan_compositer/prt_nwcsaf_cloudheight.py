@@ -20,9 +20,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""From the cloud top temperature and height composite retrieve super
-observations of cloud height and print to stdout
+"""Make cloud height super observations.
 
+From the cloud top temperature and height composite retrieve super
+observations of cloud height and print to stdout
 """
 
 import numpy as np
@@ -34,16 +35,18 @@ import tempfile
 import shutil
 import logging
 from logging import handlers
-
 from mesan_compositer.netcdf_io import ncCTTHComposite
 from mesan_compositer.pps_msg_conversions import get_bit_from_flags
 from mesan_compositer import get_config
 
-LOG = logging.getLogger(__name__)
-
 
 class cthError(Exception):
+    """Cloud Top Height exception."""
+
     pass
+
+
+LOG = logging.getLogger(__name__)
 
 
 #: Default time format
@@ -63,8 +66,7 @@ OPASS = 0.25  # min fraction opaque in CT std calc
 
 
 def get_arguments():
-    """
-    Get command line arguments
+    """Get command line arguments.
 
     args.logging_conf_file, args.config_file, obs_time, area_id, wsize
 
@@ -74,8 +76,8 @@ def get_arguments():
       Observation/Analysis time
       Area id
       Window size
-    """
 
+    """
     parser = argparse.ArgumentParser()
 
     parser = argparse.ArgumentParser()
@@ -111,82 +113,98 @@ def get_arguments():
     return args.logging_conf_file, args.config_file, obs_time, area_id, wsize
 
 
-def cloudtop(so_CTH, so_w, so_flg, num_of_datapoints):
+def new_cloudtop(so_CTH, so_w):
+    """Derive cloud top super observations with a new simplified approach.
 
-    # cloud top observation error [m] sd= a*top+b
-    SDct_01a = 0.065  # 50  Opaque cloud
-    SDct_01b = 385    # 50  Opaque cloud
-    SDct_02a = 0.212  # 150 Windowing technique applied
-    SDct_02b = 1075   # 150 Windowing technique applied
-
+    The weigting is done independent of the flags.
+    """
     # Get rid of data points which are masked out:
-    so_flg = np.repeat(so_flg, so_CTH.mask == False)
-    # Corresponds to where the weight is 0:
-    so_w = np.repeat(so_w, so_CTH.mask == False)
+    so_w = np.repeat(so_w, so_CTH.mask is False)
     so_CTH = so_CTH.compressed()
 
-    nfound = len(so_CTH)
+    top = np.sum(so_w*so_CTH)/np.sum(so_w)
+
+    return top, 999.9
+
+
+def cloudtop(so_CTH, so_w, so_flg, num_of_datapoints):
+    """Derive cloud top height super observations using the old method but not using the flags."""
+    # cloud top observation error [m] sd= a*top+b
+    # SDct_01a = 0.065  # 50  Opaque cloud
+    # SDct_01b = 385    # 50  Opaque cloud
+    # SDct_02a = 0.212  # 150 Windowing technique applied
+    # SDct_02b = 1075   # 150 Windowing technique applied
+
+    # Get rid of data points which are masked out:
+    so_flg = np.repeat(so_flg, so_CTH.mask is False)
+    # Corresponds to where the weight is 0:
+    so_w = np.repeat(so_w, so_CTH.mask is False)
+    so_CTH = so_CTH.compressed()
+
+    # nfound = len(so_CTH)
 
     # unique top values
     u_cth = np.unique(so_CTH)
 
     # weight sum for each unique height
     w_cth = [np.sum(so_w[so_CTH == u_cth[i]]) for i in range(len(u_cth))]
-    n_cth = [np.sum(so_CTH == u_cth[i]) for i in range(len(u_cth))]
+    # n_cth = [np.sum(so_CTH == u_cth[i]) for i in range(len(u_cth))]
 
     # top value associated with largest weight sum
-    wsmax = np.max(w_cth)
+    # wsmax = np.max(w_cth)
     imax = np.argmax(w_cth)
     top = u_cth[imax]
 
-    # nof obs with this cloud height
-    ntop = n_cth[imax]
+    return top, 999.9
 
-    # observation quality
-    q = wsmax / (nfound + 1e-6)
+    # # nof obs with this cloud height
+    # ntop = n_cth[imax]
 
-    # flags associated with largest weight sum
-    flgs = so_flg[so_CTH == u_cth[imax]]
+    # # observation quality
+    # q = wsmax / (nfound + 1e-6)
 
-    # find dominating method, opaque or non-opaque but window
-    nopaque = np.sum(get_bit_from_flags(flgs, 2))
-    nwindow = np.sum(
-        (0 == get_bit_from_flags(flgs, 2)) & get_bit_from_flags(flgs, 8))
+    # # flags associated with largest weight sum
+    # flgs = so_flg[so_CTH == u_cth[imax]]
 
-    if (ntop != (nopaque + nwindow)):
-        # LOG.warning("Inconsistency in opaque and window flags: " +
-        #            "ntop=%d, nopaque=%d nwindow=%d", ntop, nopaque, nwindow)
-        # LOG.info("No super obs will be generated...")
-        return 0, 0
-    else:
-        fopaque = nopaque / np.float(ntop)
+    # # find dominating method, opaque or non-opaque but window
+    # nopaque = np.sum(get_bit_from_flags(flgs, 2))
+    # nwindow = np.sum(
+    #     (0 == get_bit_from_flags(flgs, 2)) & get_bit_from_flags(flgs, 8))
 
-    # check statistics and quality
-    if (nfound / np.float(num_of_datapoints) > FPASS) and (q >= QPASS):
-        if (fopaque > OPASS):
-            # opaque
-            sd = SDct_01a * top + SDct_01b
-        else:
-            # windowing technique
-            sd = SDct_02a * top + SDct_02b
-    else:
-        top = 0
-        sd = 0
+    # if (ntop != (nopaque + nwindow)):
+    #     # LOG.warning("Inconsistency in opaque and window flags: " +
+    #     #            "ntop=%d, nopaque=%d nwindow=%d", ntop, nopaque, nwindow)
+    #     # LOG.info("No super obs will be generated...")
+    #     return 0, 0
+    # else:
+    #     fopaque = nopaque / np.float(ntop)
 
-    # LOG.debug('wsmax=%.3f, top=%.1f, fopaque=%.3f, q=%f, nfound=%d',
-    #          wsmax, top, fopaque, q, nfound)
-    return top, sd
+    # # check statistics and quality
+    # if (nfound / np.float(num_of_datapoints) > FPASS) and (q >= QPASS):
+    #     if (fopaque > OPASS):
+    #         # opaque
+    #         sd = SDct_01a * top + SDct_01b
+    #     else:
+    #         # windowing technique
+    #         sd = SDct_02a * top + SDct_02b
+    # else:
+    #     top = 0
+    #     sd = 0
+
+    # # LOG.debug('wsmax=%.3f, top=%.1f, fopaque=%.3f, q=%f, nfound=%d',
+    # #          wsmax, top, fopaque, q, nfound)
+    # return top, sd
 
 
 def derive_sobs(ctth_comp, npix, resultfile):
-    """Derive the super observations and print data to file"""
-
+    """Derive the super observations and print data to file."""
     tmpfname = tempfile.mktemp(suffix=('_' + os.path.basename(resultfile)),
                                dir=os.path.dirname(resultfile))
 
     # Get the lon,lat:
     lon, lat = ctth_comp.area_def.get_lonlats()
 
+    # isinstance(ctth_comp.height.data, numpy.ma.core.MaskedArray)
     try:
         ctth_height = ctth_comp.height.data.compute()
     except AttributeError:
@@ -217,8 +235,14 @@ def derive_sobs(ctth_comp, npix, resultfile):
     so_lon = lon[np.ix_(ly, lx)]
     so_lat = lat[np.ix_(ly, lx)]
 
+    npcount1 = 0
+    npcount2 = 0
+    npcount3 = 0
+
     so_tot = 0
     with open(tmpfname, 'w') as fpt:
+        # for iy in [111, ]:
+        #    for ix in [125, ]:
         for iy in range(len(ly)):
             for ix in range(len(lx)):
                 # print ix, iy
@@ -239,18 +263,23 @@ def derive_sobs(ctth_comp, npix, resultfile):
 
                 # any valid data?
                 if np.sum(ii) == 0:
+                    npcount1 += 1
                     continue
 
                 if so_cth[ii].compressed().shape[0] == 0:
+                    npcount1 += 2
                     continue
 
-                # calculate top and std
-                cth, sd = cloudtop(
-                    so_cth[ii], so_w[ii], so_flg[ii], np.prod(so_w.shape))
+                # # calculate top and std
+                # cth, sd = cloudtop(
+                #     so_cth[ii], so_w[ii], so_flg[ii], np.prod(so_w.shape))
 
-                # if not sd:
-                #     LOG.debug("iy, ix, so_y, so_x, so_lat, so_lon: %d %d %d %d %f %f",
-                #               iy, ix, y, x, so_lat[iy, ix], so_lon[iy, ix])
+                # calculate top and std
+                cth, sd = new_cloudtop(so_cth[ii], so_w[ii])
+
+                if not sd:
+                    LOG.debug("iy, ix, so_y, so_x, so_lat, so_lon: %d %d %d %d %f %f",
+                              iy, ix, y, x, so_lat[iy, ix], so_lon[iy, ix])
                 #     raise cthError(
                 #         'CTH is neither opaque nor use window tech!')
 
@@ -263,6 +292,11 @@ def derive_sobs(ctth_comp, npix, resultfile):
                               cth, sd)
                     fpt.write(result)
                     so_tot += 1
+                else:
+                    npcount3 += 2
+
+    LOG.info("Number of omitted observations: npcount1=%d npcount2=%d npcount3=%d",
+             npcount1, npcount2, npcount3)
 
     LOG.info('\tCreated %d superobservations', so_tot)
 
