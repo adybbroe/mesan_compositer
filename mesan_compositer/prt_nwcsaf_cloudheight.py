@@ -118,13 +118,15 @@ def new_cloudtop(so_CTH, so_w):
 
     The weigting is done independent of the flags.
     """
-    # Get rid of data points which are masked out:
-    so_w = np.repeat(so_w, so_CTH.mask is False)
-    so_CTH = so_CTH.compressed()
+    if so_CTH.max() == 0.0:
+        return None
 
+    # Get rid of data points which are masked out:
+    so_w = np.ma.masked_array(so_w, mask=so_CTH.mask).compressed()
+    so_CTH = so_CTH.compressed()
     top = np.sum(so_w*so_CTH)/np.sum(so_w)
 
-    return top, 999.9
+    return top
 
 
 def cloudtop(so_CTH, so_w, so_flg, num_of_datapoints):
@@ -136,9 +138,9 @@ def cloudtop(so_CTH, so_w, so_flg, num_of_datapoints):
     # SDct_02b = 1075   # 150 Windowing technique applied
 
     # Get rid of data points which are masked out:
-    so_flg = np.repeat(so_flg, so_CTH.mask is False)
+    so_flg = np.ma.masked_array(so_flg, mask=so_CTH.mask).compressed()
     # Corresponds to where the weight is 0:
-    so_w = np.repeat(so_w, so_CTH.mask is False)
+    so_w = np.ma.masked_array(so_w, mask=so_CTH.mask).compressed()
     so_CTH = so_CTH.compressed()
 
     # nfound = len(so_CTH)
@@ -237,18 +239,11 @@ def derive_sobs(ctth_comp, npix, resultfile):
 
     npcount1 = 0
     npcount2 = 0
-    npcount3 = 0
 
     so_tot = 0
     with open(tmpfname, 'w') as fpt:
-        # for iy in [111, ]:
-        #    for ix in [125, ]:
         for iy in range(len(ly)):
             for ix in range(len(lx)):
-                # print ix, iy
-                # if iy != 0 and ix != 58:
-                #    continue
-
                 # super ob domain is: ix-dlen:ix+dlen-1, iy-dlen:iy+dlen-1
                 x = lx[ix]
                 y = ly[iy]
@@ -274,29 +269,22 @@ def derive_sobs(ctth_comp, npix, resultfile):
                 # cth, sd = cloudtop(
                 #     so_cth[ii], so_w[ii], so_flg[ii], np.prod(so_w.shape))
 
-                # calculate top and std
-                cth, sd = new_cloudtop(so_cth[ii], so_w[ii])
+                # Calculate cloud top height for the super obs:
+                cth = new_cloudtop(so_cth[ii], so_w[ii])
+                sd = 999.9
 
-                if not sd:
+                if not cth:
                     LOG.debug("iy, ix, so_y, so_x, so_lat, so_lon: %d %d %d %d %f %f",
                               iy, ix, y, x, so_lat[iy, ix], so_lon[iy, ix])
-                #     raise cthError(
-                #         'CTH is neither opaque nor use window tech!')
-
-                # sd>0 means passed FPASS and QPASS
-                if sd > 0:
-                    # -999: no stn number, -60: satellite data */
-                    # cortype = 1, correct ?
+                else:
                     result = '%8d %7.2f %7.2f %5d %d %d %8.2f %8.2f\n' % \
                              (99999, so_lat[iy, ix], so_lon[iy, ix], -999, 1, -60,
                               cth, sd)
                     fpt.write(result)
                     so_tot += 1
-                else:
-                    npcount3 += 2
 
-    LOG.info("Number of omitted observations: npcount1=%d npcount2=%d npcount3=%d",
-             npcount1, npcount2, npcount3)
+    LOG.info("Number of omitted observations: npcount1=%d npcount2=%d",
+             npcount1, npcount2)
 
     LOG.info('\tCreated %d superobservations', so_tot)
 
