@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 - 2019 Adam.Dybbroe
+# Copyright (c) 2014 - 2019, 2021 Adam.Dybbroe
 
 # Author(s):
 
@@ -74,7 +74,8 @@ def get_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('--datetime', '-d', help='Date and time of observation - yyyymmddhh',
                         required=True)
-    parser.add_argument('--time_window', '-t', help='Number of minutes before and after time window',
+    parser.add_argument('--time_window', '-t',
+                        help='Number of minutes before and after observation time',
                         required=True)
     parser.add_argument('--area_id', '-a', help='Area id',
                         required=True)
