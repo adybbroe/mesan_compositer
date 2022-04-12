@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2015, 2016, 2019 Adam.Dybbroe
+# Copyright (c) 2014 - 2022 Adam.Dybbroe
 
 # Author(s):
 
@@ -232,7 +232,7 @@ def derive_sobs(ct_comp, ipar, npix, resultfile):
     # This happens:
     # 3. when only MSG data are present in the composite!
     # 2. when data are read from netCDF file
-    # 1. when both MSG and PPS data are persent in the composite and
+    # 1. when both MSG and PPS data are present in the composite and
     # when data are coming directly from the compositor
     #
     # FIXME!
