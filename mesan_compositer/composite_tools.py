@@ -173,7 +173,11 @@ def get_nwcsafproduct_list(parse_obj, filelist, timewindow, variant=None):
         sat = res['platform_name']
         product = res['product']
         geofilename = filename.replace(product, 'CMA')
-        orbit = '%05d' % res['orbit']
+        try:
+            orbit = '%05d' % res['orbit']
+        except KeyError:
+            orbit = '00000'
+
         platform_name = PPS_PLATFORM_NAME_TRANSLATION.get(sat, METEOSAT.get(sat))
         areaid = res.get('area_id', 'unknown')
         if not platform_name:

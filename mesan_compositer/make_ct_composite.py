@@ -253,7 +253,6 @@ class ctCompositer(object):
                          "pps_dr_dir = %s",
                          len(dr_list), min_num_of_pps_dr_files,
                          str(pps_dr_dir))
-
         ppsdr = self.get_pps_scenes(dr_list)
 
         ppsgds = []
@@ -360,7 +359,9 @@ class ctCompositer(object):
                 # x_flag = x_local['CT'].ct_quality.data
                 # Convert to old format:
                 x_CT = map_cloudtypes(x_local['ct'].data)
+                now = time.time()
                 x_flag = self._get_pps_flags(x_local)
+                print("Time used in _get_pps_flags: %s" % str(time.time() - now))
 
                 x_id = 0 * np.ones(x_CT.shape)
                 lat = 0 * np.ones(x_CT.shape)
