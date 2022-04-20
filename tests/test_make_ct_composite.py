@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019 Adam.Dybbroe
+# Copyright (c) 2019, 2022 Adam.Dybbroe
 
 # Author(s):
 
@@ -27,13 +27,9 @@ from datetime import datetime, timedelta
 import unittest
 
 from mesan_compositer.make_ct_composite import ctCompositer
-from mesan_compositer.composite_tools import PpsMetaData
-from mesan_compositer.composite_tools import MsgMetaData
+from mesan_compositer.composite_tools import NWCSAFMetaData
 
-if sys.version_info < (3,):
-    from mock import patch
-else:
-    from unittest.mock import patch
+from unittest.mock import patch
 
 _PATTERN = ('S_NWC_{product:s}_{platform_name:s}_{orbit:05d}_' +
             '{start_time:%Y%m%dT%H%M%S%f}Z_{end_time:%Y%m%dT%H%M%S%f}Z.nc')
@@ -42,11 +38,10 @@ CONFIG_OPTIONS = {'ct_composite_filename': 'mesan_composite_%(area)s_%Y%m%d_%H%M
                   'ctth_composite_filename': 'mesan_composite_%(area)s_%Y%m%d_%H%M_ctth',
                   'cloudamount_filename': 'mesan_composite_%(area)s_%Y%m%d_%H%M_clamount',
                   'cloudheight_filename': 'mesan_composite_%(area)s_%Y%m%d_%H%M_clheight',
-                  'pps_filename': _PATTERN,
+                  'pps_filename': 'S_NWC_{product:s}_{platform_name:s}_{orbit:05d}_{start_time:%Y%m%dT%H%M%S%f}Z_{end_time:%Y%m%dT%H%M%S%f}Z.nc',
                   'msg_satellites': 'Meteosat-11 Meteosat-10 Meteosat-9 Meteosat-8',
                   'msg_cty_filename': 'SAFNWC_%(satellite)s_CT___%Y%m%d%H%M_%(area)s.PLAX.CTTH.0.h5',
-                  'msg_cty_file_ext': 'PLAX.CTTH.0.h5',
-                  'msg_ctth_filename': 'SAFNWC_%(satellite)s_CTTH_%Y%m%d%H%M_%(area)s.PLAX.CTTH.0.h5',
+                  'msg_cty_file_ext': 'PLAX.CTTH.0.h5', 'msg_ctth_filename': 'SAFNWC_%(satellite)s_CTTH_%Y%m%d%H%M_%(area)s.PLAX.CTTH.0.h5',
                   'msg_ctth_file_ext': 'PLAX.CTTH.0.h5',
                   'cloud_amount_ipar': 71,
                   'number_of_pixels': 24,
@@ -55,10 +50,55 @@ CONFIG_OPTIONS = {'ct_composite_filename': 'mesan_composite_%(area)s_%Y%m%d_%H%M
                   'polar_satellites': 'NOAA-20 Metop-C Metop-B NOAA-19 Metop-A NOAA-18 NOAA-15 Suomi-NPP EOS-Aqua',
                   'min_num_of_pps_dr_files': 10,
                   'composite_output_dir': '/home/a000680/data/mesan/output',
-                  'pps_direct_readout_dir': '/home/a000680/data/mesan/satin/pps',
-                  'pps_metop_gds_dir': '/home/a000680/data/mesan/satin',
-                  'msg_dir': '/home/a000680/data/mesan/satin/msg',
-                  'msg_areaname': 'MSG-N'}
+                  'pps_direct_readout_dir': '/home/a000680/data/mesan/polar_in/v2018',
+                  'seviri': {'msg_dir': '/home/a000680/data/mesan/geo_in/ppsv2018',
+                             'nwcsaf-processor': 'pps',
+                             'reader': 'nwcsaf-pps_nc',
+                             'msg_cloudproducts_file_pattern': 'S_NWC_{product}_{platform_name}_{orbit:05d}_{start_time:%Y%m%dT%H%M%S%f}Z_{end_time:%Y%m%dT%H%M%S%f}Z.nc'}}
+
+CONFIG_OPTIONS_GEO = {'ct_composite_filename': 'mesan_composite_%(area)s_%Y%m%d_%H%M_ct',
+                      'ctth_composite_filename': 'mesan_composite_%(area)s_%Y%m%d_%H%M_ctth',
+                      'cloudamount_filename': 'mesan_composite_%(area)s_%Y%m%d_%H%M_clamount',
+                      'cloudheight_filename': 'mesan_composite_%(area)s_%Y%m%d_%H%M_clheight',
+                      'pps_filename': 'S_NWC_{product:s}_{platform_name:s}_{orbit:05d}_{start_time:%Y%m%dT%H%M%S%f}Z_{end_time:%Y%m%dT%H%M%S%f}Z.nc',
+                      'msg_satellites': 'Meteosat-11 Meteosat-10 Meteosat-9 Meteosat-8',
+                      'msg_cty_filename': 'SAFNWC_%(satellite)s_CT___%Y%m%d%H%M_%(area)s.PLAX.CTTH.0.h5',
+                      'msg_cty_file_ext': 'PLAX.CTTH.0.h5', 'msg_ctth_filename': 'SAFNWC_%(satellite)s_CTTH_%Y%m%d%H%M_%(area)s.PLAX.CTTH.0.h5',
+                      'msg_ctth_file_ext': 'PLAX.CTTH.0.h5',
+                      'cloud_amount_ipar': 71,
+                      'number_of_pixels': 24,
+                      'absolute_time_threshold_minutes': 35,
+                      'mesan_area_id': 'mesanEx',
+                      'polar_satellites': 'NOAA-20 Metop-C Metop-B NOAA-19 Metop-A NOAA-18 NOAA-15 Suomi-NPP EOS-Aqua',
+                      'min_num_of_pps_dr_files': 10,
+                      'composite_output_dir': '/home/a000680/data/mesan/output',
+                      'pps_direct_readout_dir': '/home/a000680/data/mesan/polar_in/v2018',
+                      'seviri': {'msg_dir': '/home/a000680/data/mesan/geo_in/geo',
+                                 'nwcsaf-processor': 'geo',
+                                 'reader': 'nwcsaf-msg2013-hdf5',
+                                 'msg_cloudproducts_file_pattern': 'S_NWC_{product}_{platform_name}_{area_id}-VISIR_{start_time:%Y%m%dT%H%M%S%f}Z.nc'}}
+
+# CONFIG_OPTIONS = {'ct_composite_filename': 'mesan_composite_%(area)s_%Y%m%d_%H%M_ct',
+#                   'ctth_composite_filename': 'mesan_composite_%(area)s_%Y%m%d_%H%M_ctth',
+#                   'cloudamount_filename': 'mesan_composite_%(area)s_%Y%m%d_%H%M_clamount',
+#                   'cloudheight_filename': 'mesan_composite_%(area)s_%Y%m%d_%H%M_clheight',
+#                   'pps_filename': _PATTERN,
+#                   'msg_satellites': 'Meteosat-11 Meteosat-10 Meteosat-9 Meteosat-8',
+#                   'msg_cty_filename': 'SAFNWC_%(satellite)s_CT___%Y%m%d%H%M_%(area)s.PLAX.CTTH.0.h5',
+#                   'msg_cty_file_ext': 'PLAX.CTTH.0.h5',
+#                   'msg_ctth_filename': 'SAFNWC_%(satellite)s_CTTH_%Y%m%d%H%M_%(area)s.PLAX.CTTH.0.h5',
+#                   'msg_ctth_file_ext': 'PLAX.CTTH.0.h5',
+#                   'cloud_amount_ipar': 71,
+#                   'number_of_pixels': 24,
+#                   'absolute_time_threshold_minutes': 35,
+#                   'mesan_area_id': 'mesanEx',
+#                   'polar_satellites': 'NOAA-20 Metop-C Metop-B NOAA-19 Metop-A NOAA-18 NOAA-15 Suomi-NPP EOS-Aqua',
+#                   'min_num_of_pps_dr_files': 10,
+#                   'composite_output_dir': '/home/a000680/data/mesan/output',
+#                   'pps_direct_readout_dir': '/home/a000680/data/mesan/satin/pps',
+#                   'pps_metop_gds_dir': '/home/a000680/data/mesan/satin',
+#                   'msg_dir': '/home/a000680/data/mesan/satin/msg',
+#                   'msg_areaname': 'MSG-N'}
 
 FAKE_PPS_FILES = ['/tmp/pps1.nc',
                   '/tmp/pps2.nc',
@@ -84,25 +124,37 @@ class TestctCompositor(unittest.TestCase):
         orbit = "37011"
         timeslot1 = datetime(2019, 11, 5, 19, 23, 32, 550000)
         variant = None
-        pps_metadata_obj = PpsMetaData(filename, geofilename, platform_name, orbit, timeslot1, variant)
+        pps_metadata_obj = NWCSAFMetaData(filename=filename,
+                                          geofilename=geofilename,
+                                          platform_name=platform_name,
+                                          orbit=orbit, timeslot=timeslot1,
+                                          variant=variant)
         self.ppsdr = [pps_metadata_obj]
 
         filename = '/tmp/my_msg_testfile.nc'
         platform_name = 'Meteosat-11'
         timeslot = datetime(2019, 11, 5, 19, 0)
         areaid = 'MSG-N'
-        msg_meta_obj1 = MsgMetaData(filename, platform_name, areaid, timeslot)
+        msg_meta_obj1 = NWCSAFMetaData(filename=filename,
+                                       platform_name=platform_name,
+                                       areaid=areaid,
+                                       timeslot=timeslot)
         filename = '/tmp/my_msg_testfile.nc'
         platform_name = 'Meteosat-11'
         timeslot = datetime(2019, 11, 5, 19, 15)
         areaid = 'MSG-N'
-        msg_meta_obj2 = MsgMetaData(filename, platform_name, areaid, timeslot)
+        msg_meta_obj2 = NWCSAFMetaData(filename=filename,
+                                       platform_name=platform_name,
+                                       areaid=areaid,
+                                       timeslot=timeslot)
         filename = '/tmp/my_msg_testfile.nc'
         platform_name = 'Meteosat-11'
         timeslot = datetime(2019, 11, 5, 19, 30)
         areaid = 'MSG-N'
-        msg_meta_obj3 = MsgMetaData(filename, platform_name, areaid, timeslot)
-
+        msg_meta_obj3 = NWCSAFMetaData(filename=filename,
+                                       platform_name=platform_name,
+                                       areaid=areaid,
+                                       timeslot=timeslot)
         self.msg_scenes = [msg_meta_obj1, msg_meta_obj2, msg_meta_obj3]
 
     @patch('mesan_compositer.make_ct_composite.ctCompositer._get_all_geo_files')
@@ -117,12 +169,14 @@ class TestctCompositor(unittest.TestCase):
         areaid = 'mesanEx'
 
         with patch.object(ctCompositer, 'get_pps_scenes') as get_pps_scenes:
-            ctcomp = ctCompositer(t_analysis, delta_t, areaid, CONFIG_OPTIONS)
-            ctcomp.get_catalogue()
-            get_pps_scenes.assert_called()
+            with patch.object(ctCompositer, 'get_geo_scenes') as get_geo_scenes:
+                ctcomp = ctCompositer(t_analysis, delta_t, areaid, CONFIG_OPTIONS)
+                ctcomp.get_catalogue()
+                get_pps_scenes.assert_called()
+                get_geo_scenes.assert_called()
 
-            ctcomp.pps_scenes = self.ppsdr
-            ctcomp.msg_scenes = self.msg_scenes
+                ctcomp.pps_scenes = self.ppsdr
+                ctcomp.msg_scenes = self.msg_scenes
 
             # TODO: Here we should try test the generation of the composite
 

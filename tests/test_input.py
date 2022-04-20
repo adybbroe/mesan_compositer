@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2015 Adam.Dybbroe
+# Copyright (c) 2014 - 2022 Adam.Dybbroe
 
 # Author(s):
 
-#   Adam.Dybbroe <a000680@c14526.ad.smhi.se>
+#   Adam Dybbroe
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,11 +23,11 @@
 """
 """
 
+from trollsift import Parser
 from datetime import datetime, timedelta
 import unittest
 
-from mesan_compositer.composite_tools import (get_ppslist,
-                                              get_msglist,
+from mesan_compositer.composite_tools import (get_nwcsafproduct_list,
                                               MSGSATS)
 
 # PPS_CTYPES = ['noaa16_20120625_1133_60621_satproj_00000_04059_cloudtype.h5',
@@ -44,6 +44,12 @@ MSG_CTYPES = ['SAFNWC_MSG2_CT___201206251130_EuropeCanary.PLAX.CTTH.0.h5',
               'SAFNWC_MSG2_CT___201206251230_EuropeCanary.PLAX.CTTH.0.h5',
               'SAFNWC_MSG2_CT___201206251145_EuropeCanary.PLAX.CTTH.0.h5'
               ]
+MSG_CTYPES = ['SAFNWC_MSG4_CT___202204191030_MSG-N_______.PLAX.CTTH.0.h5',
+              'SAFNWC_MSG4_CT___202204191045_MSG-N_______.PLAX.CTTH.0.h5',
+              'SAFNWC_MSG4_CT___202204191100_MSG-N_______.PLAX.CTTH.0.h5',
+              'SAFNWC_MSG4_CT___202204191115_MSG-N_______.PLAX.CTTH.0.h5',
+              'SAFNWC_MSG4_CT___202204191130_MSG-N_______.PLAX.CTTH.0.h5']
+
 
 PPS_BASEDIR = "/media/satdata/mesan/satin/pps/"
 PPS_CT_FILES = [PPS_BASEDIR + s for s in PPS_CTYPES]
@@ -52,7 +58,8 @@ MSG_BASEDIR = "/media/satdata/mesan/satin/msg/"
 MSG_CT_FILES = [MSG_BASEDIR + s for s in MSG_CTYPES]
 
 OBS_TIME1 = datetime(2015, 6, 23, 0, 0)
-OBS_TIME_MSG = datetime(2012, 6, 25, 12, 0)
+#OBS_TIME_MSG = datetime(2012, 6, 25, 12, 0)
+OBS_TIME_MSG = datetime(2022, 4, 19, 11, 0)
 
 
 class TestGetCloudtypes(unittest.TestCase):
@@ -66,24 +73,30 @@ class TestGetCloudtypes(unittest.TestCase):
     def test_pps_ctypes(self):
         """Test get the pps cloud type metadata from a list of files"""
 
+        PATTERN = "S_NWC_{product:s}_{platform_name:s}_{orbit:05d}_{start_time:%Y%m%dT%H%M%S%f}Z_{end_time:%Y%m%dT%H%M%S%f}Z.nc"
+        p__ = Parser(PATTERN)
+
         delta_t = timedelta(minutes=40)
         twindow = OBS_TIME1 - delta_t, OBS_TIME1 + delta_t
-        ppslist = get_ppslist(PPS_CT_FILES, twindow)
+        ppslist = get_nwcsafproduct_list(p__, PPS_CT_FILES, twindow)
         self.assertEqual(len(ppslist), 3)
 
         delta_t = timedelta(minutes=25)
         twindow = OBS_TIME1 - delta_t, OBS_TIME1 + delta_t
-        ppslist = get_ppslist(PPS_CT_FILES, twindow)
+        ppslist = get_nwcsafproduct_list(p__, PPS_CT_FILES, twindow)
         self.assertEqual(len(ppslist), 1)
 
     def test_msg_ctypes(self):
         """Test get the msg cloud type metadata from a list of files"""
 
-        delta_t = timedelta(minutes=40)
+        #PATTERN = 'S_NWC_{product}_{platform_name}_{area_id}-VISIR_{start_time:%Y%m%dT%H%M%S%f}Z.nc'
+        PATTERN = 'SAFNWC_{platform_name}_{product}_{start_time:%Y%m%d%H%M}_{area_id}.PLAX.CTTH.0.h5'
+        p__ = Parser(PATTERN)
+
+        delta_t = timedelta(minutes=35)
         twindow = OBS_TIME_MSG - delta_t, OBS_TIME_MSG + delta_t
-        msglist = get_msglist(MSG_CT_FILES, twindow, 'EuroCanary')
-        self.assertEqual(len(msglist), 0)
-        msglist = get_msglist(MSG_CT_FILES, twindow, 'EuropeCanary')
+
+        msglist = get_nwcsafproduct_list(p__, MSG_CT_FILES, twindow)
         self.assertEqual(len(msglist), 5)
         prenames = []
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 - 2019 Adam.Dybbroe
+# Copyright (c) 2014 - 2019, 2021, 2022 Adam.Dybbroe
 
 # Author(s):
 
@@ -22,16 +22,18 @@
 
 """Make a Cloud Type composite."""
 
+import time
 import argparse
 from datetime import datetime, timedelta
 from glob import glob
 import numpy as np
 import tempfile
 import shutil
+from trollsift import globify, Parser
+
 from mesan_compositer.pps_msg_conversions import ctype_procflags2pps
 from mesan_compositer import (ProjectException, LoadException)
-from mesan_compositer.composite_tools import (get_msglist,
-                                              get_ppslist,
+from mesan_compositer.composite_tools import (get_nwcsafproduct_list,
                                               get_weight_cloudtype)
 from mesan_compositer.netcdf_io import ncCloudTypeComposite
 from nwcsaf_formats.pps_conversions import (map_cloudtypes,
@@ -40,6 +42,10 @@ from mesan_compositer.ct_quicklooks import make_quicklooks
 
 from mesan_compositer.composite_tools import METOPS
 from mesan_compositer import get_config
+from mesan_compositer.composite_tools import (PLATFORM_NAME_TO_PPS_TRANSLATION,
+                                              PPS_PLATFORM_NAME_TRANSLATION,
+                                              MSGSATS)
+
 import sys
 import os
 import logging
@@ -47,8 +53,6 @@ from logging import handlers
 
 LOG = logging.getLogger(__name__)
 
-
-PLATFORM_NAMES_FROM_PPS = {}
 
 #: Default time format
 _DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
@@ -74,7 +78,8 @@ def get_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('--datetime', '-d', help='Date and time of observation - yyyymmddhh',
                         required=True)
-    parser.add_argument('--time_window', '-t', help='Number of minutes before and after time window',
+    parser.add_argument('--time_window', '-t',
+                        help='Number of minutes before and after observation time',
                         required=True)
     parser.add_argument('--area_id', '-a', help='Area id',
                         required=True)
@@ -118,12 +123,13 @@ def ctype_pps(pps, areaid):
     return retv
 
 
-def ctype_msg(msg, areaid):
+def ctype_msg(msg, areaid, reader_name):
     """Load MSG paralax corrected cloud type and reproject."""
     from satpy.scene import Scene
 
-    scene = Scene(filenames=[msg.uri, ], reader='nwcsaf-msg2013-hdf5')
-    scene.load(['cloudtype', 'ct', 'ct_quality'])
+    scene = Scene(filenames=[msg.uri, msg.geofilename], reader=reader_name)
+    scene.load(['cloudtype', 'ct', 'ct_quality', 'ct_status_flag', 'ct_conditions'])
+    #scene.load(['cloudtype', 'ct', 'ct_quality'])
     retv = scene.resample(areaid, radius_of_influence=20000)
 
     return retv
@@ -159,7 +165,7 @@ class ctCompositer(object):
         LOG.debug("Polar satellites supported: %s", str(self.polar_satellites))
 
         self.msg_satellites = config_options['msg_satellites'].split()
-        self.msg_areaname = config_options['msg_areaname']
+        self.msg_areaname = config_options.get('msg_areaname')
         self.areaid = areaid
         self.longitude = None
         self.latitude = None
@@ -168,38 +174,63 @@ class ctCompositer(object):
 
         self._options = config_options
 
+        if self._options['seviri'].get('nwcsaf-processor') and self._options['seviri'].get('nwcsaf-processor') in ['pps']:
+            self._pps_on_seviri = True
+        else:
+            self._pps_on_seviri = False
+
         self.pps_scenes = []
         self.msg_scenes = []
 
         self.composite = ncCloudTypeComposite()
 
     def _get_all_pps_files(self, pps_dir):
-        """Return list of pps files in directory."""
+        """Return list of NWCSAF/PPS files in directory."""
         if pps_dir is None:
             return []
 
-        LOG.debug('Get all PPS files in this directory = ' + str(pps_dir))
-        # Example: S_NWC_CT_metopb_14320_20150622T1642261Z_20150622T1654354Z.nc
-        return glob(os.path.join(pps_dir, 'S_NWC_CT_*nc'))
+        LOG.debug('Get all PPS files in this directory = %s', str(pps_dir))
+        filelist = []
+        for satname in self.polar_satellites:
+            glob_pattern = globify(self._options['pps_filename'],
+                                   {'platform_name': PLATFORM_NAME_TO_PPS_TRANSLATION.get(satname),
+                                    'product': 'CT'})
+            filelist = filelist + glob(os.path.join(pps_dir, glob_pattern))
+
+        return filelist
 
     def _get_all_geo_files(self, geo_dir):
         """Return list of NWCSAF/Geo files in directory."""
         if geo_dir is None:
             return []
 
-        LOG.debug('Get all NWCSAF/Geo files in this directory = ' + str(geo_dir))
-        return glob(os.path.join(geo_dir, '*_CT___*.PLAX.CTTH.0.h5'))
+        LOG.debug('Get all NWCSAF/Geo files in this directory = %s', str(geo_dir))
+        filelist = []
+        for satname in self.msg_satellites:
+            glob_pattern = globify(self._options['seviri']['msg_cloudproducts_file_pattern'],
+                                   {'platform_name': self._get_satellite_name(satname),
+                                    'area_id': self.msg_areaname,
+                                    'product': 'CT'})
+            filelist = filelist + glob(os.path.join(geo_dir, glob_pattern))
 
-    def get_pps_scenes(self, pps_file_list, satellites=None, variant=None):
+        return filelist
+
+    def _get_satellite_name(self, satname):
+        """From the satellite standard name get the name used in the NWCSAF file."""
+        if self._pps_on_seviri:
+            return PLATFORM_NAME_TO_PPS_TRANSLATION.get(satname)
+        else:
+            return MSGSATS.get(satname, 'MSGx')
+
+    def get_pps_scenes(self, pps_file_list, variant=None):
         """Get the list of valid pps scenes from file list."""
-        if satellites is None:
-            satellites = self.polar_satellites
-        return get_ppslist(pps_file_list, self.time_window,
-                           satellites=satellites, variant=variant)
+        p__ = Parser(self._options['pps_filename'])
+        return get_nwcsafproduct_list(p__, pps_file_list, self.time_window, variant=variant)
 
     def get_geo_scenes(self, geo_file_list):
-        """Get the list of valid NWCSAF/Geo scenes from file list."""
-        return get_msglist(geo_file_list, self.time_window, self.msg_areaname)  # satellites=self.msg_satellites)
+        """Get the list of valid (inside time-window) NWCSAF/Geo or NWCSAF/PPS scenes from file list."""
+        p__ = Parser(self._options['seviri']['msg_cloudproducts_file_pattern'])
+        return get_nwcsafproduct_list(p__, geo_file_list, self.time_window)
 
     def get_catalogue(self):
         """Get the catalougue of input data files.
@@ -222,7 +253,6 @@ class ctCompositer(object):
                          "pps_dr_dir = %s",
                          len(dr_list), min_num_of_pps_dr_files,
                          str(pps_dr_dir))
-
         ppsdr = self.get_pps_scenes(dr_list)
 
         ppsgds = []
@@ -242,18 +272,16 @@ class ctCompositer(object):
             LOG.debug("Polar scene:\n" + str(scene))
 
         # Get all geostationary satellite scenes:
-        msg_dir = self._options['msg_dir'] % {"number": "02"}
+        msg_dir = self._options['seviri']['msg_dir'] % {"number": "02"}
         # What about EuropeCanary and possible other areas!? FIXME!
         msg_list = self._get_all_geo_files(msg_dir)
-        LOG.debug(
-            "MSG files in directory " + str(msg_dir) + " : " + str(msg_list))
-        LOG.info("Get files inside time window: " +
-                 str(self.time_window[0]) + " - " +
-                 str(self.time_window[1]))
+
+        LOG.debug("MSG files in directory " + str(msg_dir) + " : " + str(msg_list))
+        LOG.info("Get files inside time window: %s - %s", str(self.time_window[0]), str(self.time_window[1]))
 
         self.msg_scenes = self.get_geo_scenes(msg_list)
         self.msg_scenes.sort()
-        LOG.info(str(len(self.msg_scenes)) + " MSG scenes located")
+        LOG.info("%d MSG scenes located", len(self.msg_scenes))
         for scene in self.msg_scenes:
             LOG.debug("Geo scene:\n" + str(scene))
 
@@ -261,7 +289,7 @@ class ctCompositer(object):
         """Make the Cloud Type composite."""
         # Reference time for time stamp in composite file
         # sec1970 = datetime(1970, 1, 1)
-        import time
+        satpy_reader_name = self._options['seviri']['reader']
 
         comp_CT = None
 
@@ -295,16 +323,28 @@ class ctCompositer(object):
 
         for scene in msgscenes + self.pps_scenes:
             x_CT = None
-            LOG.info("Scene:\n" + str(scene))
-            if (scene.platform_name.startswith("Meteosat") and
-                    not hasattr(scene, 'orbit')):
+            LOG.info("Scene:\n%s", str(scene))
+            if scene.platform_name.startswith("Meteosat"):
                 is_MSG = True
-                x_local = ctype_msg(scene, self.areaid)
-                dummy, lat = x_local['ct'].area.get_lonlats()
-                x_CT = x_local['ct'].data.compute()
+                x_local = ctype_msg(scene, self.areaid, satpy_reader_name)
+                _, lat = x_local['ct'].area.get_lonlats()
 
-                # convert msg flags to pps
-                x_flag = ctype_procflags2pps(x_local['ct_quality'].data.compute())
+                # Convert msg flags to pps
+                if self._pps_on_seviri:
+                    now = time.time()
+                    x_CT = map_cloudtypes(x_local['ct'].data)
+                    print("Time in map_cloudtypes: %s" % str(time.time() - now))
+                    now = time.time()
+                    x_flag = self._get_pps_flags(x_local)
+                    print("Time used in _get_pps_flags: %s" % str(time.time() - now))
+                else:
+                    now = time.time()
+                    x_CT = x_local['ct'].data.compute()
+                    print("Time used in compute ct: %s" % str(time.time() - now))
+                    now = time.time()
+                    x_flag = ctype_procflags2pps(x_local['ct_quality'].data.compute())
+                    print("Time used in ctype_procflags2pps: %s" % str(time.time() - now))
+
                 x_id = 1 * np.ones(x_CT.shape)
             else:
                 is_MSG = False
@@ -319,10 +359,10 @@ class ctCompositer(object):
                 # x_flag = x_local['CT'].ct_quality.data
                 # Convert to old format:
                 x_CT = map_cloudtypes(x_local['ct'].data)
-                sflags = x_local['ct_status_flag']
-                cflags = x_local['ct_conditions']
-                qflags = x_local['ct_quality']
-                x_flag = ctype_convert_flags(sflags, cflags, qflags)
+                now = time.time()
+                x_flag = self._get_pps_flags(x_local)
+                print("Time used in _get_pps_flags: %s" % str(time.time() - now))
+
                 x_id = 0 * np.ones(x_CT.shape)
                 lat = 0 * np.ones(x_CT.shape)
 
@@ -365,6 +405,14 @@ class ctCompositer(object):
         self.composite.store(composite, self.area)
 
         return True
+
+    @staticmethod
+    def _get_pps_flags(ctype):
+        """Get the three pps flags from the cloudtype object and map to one flag type."""
+        sflags = ctype['ct_status_flag']
+        cflags = ctype['ct_conditions']
+        qflags = ctype['ct_quality']
+        return ctype_convert_flags(sflags, cflags, qflags)
 
     def write(self):
         """Write the composite to a netcdf file."""

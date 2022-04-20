@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2019 Adam.Dybbroe
+# Copyright (c) 2014, 2019, 2022 Adam.Dybbroe
 
 # Author(s):
 
@@ -57,12 +57,14 @@ def get_config(configfile):
     with open(configfile, 'r') as fp_:
         config = yaml.load(fp_, Loader=UnsafeLoader)
 
-    options = {}
-    for item in config:
-        if not isinstance(config[item], dict):
-            options[item] = config[item]
+    return config
 
-    return options
+    # options = {}
+    # for item in config:
+    #     if not isinstance(config[item], dict):
+    #         options[item] = config[item]
+
+    # return options
 
 
 def nwcsaf_cloudtype():

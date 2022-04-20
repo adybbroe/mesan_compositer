@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 - 2019 Adam.Dybbroe
+# Copyright (c) 2014 - 2022 Adam.Dybbroe
 
 # Author(s):
 
@@ -26,8 +26,8 @@ import unittest
 import numpy as np
 from mesan_compositer.composite_tools import get_weight_cloudtype
 from mesan_compositer.composite_tools import get_analysis_time
-from mesan_compositer.composite_tools import PpsMetaData
-from mesan_compositer.composite_tools import MsgMetaData
+from mesan_compositer.composite_tools import NWCSAFMetaData
+
 
 from datetime import datetime, timedelta
 
@@ -154,20 +154,32 @@ class TestTimeTools(unittest.TestCase):
         orbit = "00102"
         timeslot1 = datetime(2019, 11, 5, 12, 0)
         variant = None
-        pm1 = PpsMetaData(filename, geofilename, platform_name, orbit, timeslot1, variant)
+        pm1 = NWCSAFMetaData(filename=filename,
+                             geofilename=geofilename,
+                             platform_name=platform_name,
+                             orbit=orbit, timeslot=timeslot1, variant=variant)
 
         timeslot2 = datetime(2019, 11, 5, 13, 30)
         orbit = "00103"
-        pm2 = PpsMetaData(filename, geofilename, platform_name, orbit, timeslot2, variant)
+        pm2 = NWCSAFMetaData(filename=filename,
+                             geofilename=geofilename,
+                             platform_name=platform_name,
+                             orbit=orbit, timeslot=timeslot2, variant=variant)
 
         timeslot3 = datetime(2019, 11, 5, 10, 30)
         orbit = "00101"
-        pm3 = PpsMetaData(filename, geofilename, platform_name, orbit, timeslot3, variant)
+        pm3 = NWCSAFMetaData(filename=filename,
+                             geofilename=geofilename,
+                             platform_name=platform_name,
+                             orbit=orbit, timeslot=timeslot3, variant=variant)
 
         timeslot4 = datetime(2019, 11, 5, 12, 0)
         orbit = "00999"
         platform_name = 'EOS-Aqua'
-        pm4 = PpsMetaData(filename, geofilename, platform_name, orbit, timeslot4, variant)
+        pm4 = NWCSAFMetaData(filename=filename,
+                             geofilename=geofilename,
+                             platform_name=platform_name,
+                             orbit=orbit, timeslot=timeslot4, variant=variant)
 
         pmlist = [pm1, pm2, pm3, pm4]
         pmlist.sort()
@@ -185,24 +197,37 @@ class TestTimeTools(unittest.TestCase):
         platform_name = 'Meteosat-11'
         timeslot1 = datetime(2019, 11, 5, 18, 0)
         areaid = 'area1'
-        mm1 = MsgMetaData(filename, platform_name, areaid, timeslot1)
+        mm1 = NWCSAFMetaData(filename=filename,
+                             platform_name=platform_name,
+                             areaid=areaid,
+                             timeslot=timeslot1)
 
         timeslot2 = datetime(2019, 11, 4, 18, 0)
         areaid = 'area2'
-        mm2 = MsgMetaData(filename, platform_name, areaid, timeslot2)
+        mm2 = NWCSAFMetaData(filename=filename,
+                             platform_name=platform_name,
+                             areaid=areaid,
+                             timeslot=timeslot2)
 
         timeslot3 = datetime(2019, 11, 5, 18, 15)
         areaid = 'area3'
-        mm3 = MsgMetaData(filename, platform_name, areaid, timeslot3)
+        mm3 = NWCSAFMetaData(filename=filename,
+                             platform_name=platform_name,
+                             areaid=areaid,
+                             timeslot=timeslot3)
 
         timeslot4 = datetime(2019, 11, 3, 12, 0)
         areaid = 'area4'
-        mm4 = MsgMetaData(filename, platform_name, areaid, timeslot4)
+        mm4 = NWCSAFMetaData(filename=filename,
+                             platform_name=platform_name,
+                             areaid=areaid,
+                             timeslot=timeslot4)
 
         timeslot5 = datetime(2019, 11, 5, 18, 15)
         areaid = 'area5'
         platform_name = 'Meteosat-9'
-        mm5 = MsgMetaData(filename, platform_name, areaid, timeslot5)
+        mm5 = NWCSAFMetaData(filename=filename, platform_name=platform_name,
+                             areaid=areaid, timeslot=timeslot5)
 
         mmlist = [mm1, mm2, mm3, mm4, mm5]
         mmlist.sort()
