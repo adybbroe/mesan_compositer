@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 - 2019 Adam.Dybbroe
+# Copyright (c) 2014 - 2022 Adam.Dybbroe
 
 # Author(s):
 
@@ -26,6 +26,7 @@ import os
 from datetime import datetime, timedelta
 from six.moves import configparser
 import six
+from trollsift import Parser
 from mesan_compositer.pps_msg_conversions import get_bit_from_flags
 import logging
 
@@ -44,26 +45,36 @@ METEOSAT = {'MSG1': 'Meteosat-8',
 TERRA_AQUA_NAMES = {'eos1': 'EOS-Terra',
                     'eos2': 'EOS-Aqua'}
 
-PLATFORM_NAME_INV = {'Suomi-NPP': 'npp',
-                     'NOAA-20': 'noaa20',
-                     'EOS-Terra': 'eos1',
-                     'EOS-Aqua': 'eos2',
-                     'Metop-A': 'metopa',
-                     'Metop-B': 'metopb',
-                     'Metop-C': 'metopc',
-                     'NOAA-18': 'noaa18',
-                     'NOAA-15': 'noaa15',
-                     'NOAA-19': 'noaa19'}
-PLATFORM_NAME = {'npp': 'Suomi-NPP',
-                 'noaa20': 'NOAA-20',
-                 'eos1': 'EOS-Terra',
-                 'eos2': 'EOS-Aqua',
-                 'metopa': 'Metop-A',
-                 'metopb': 'Metop-B',
-                 'metopc': 'Metop-C',
-                 'noaa18': 'NOAA-18',
-                 'noaa15': 'NOAA-15',
-                 'noaa19': 'NOAA-19'}
+PLATFORM_NAME_TO_PPS_TRANSLATION = {'Suomi-NPP': 'npp',
+                                    'NOAA-20': 'noaa20',
+                                    'EOS-Terra': 'eos1',
+                                    'EOS-Aqua': 'eos2',
+                                    'Metop-A': 'metopa',
+                                    'Metop-B': 'metopb',
+                                    'Metop-C': 'metopc',
+                                    'NOAA-18': 'noaa18',
+                                    'NOAA-15': 'noaa15',
+                                    'NOAA-19': 'noaa19',
+                                    'Meteosat-9': 'meteosat9',
+                                    'Meteosat-8': 'meteosat8',
+                                    'Meteosat-10': 'meteosat10',
+                                    'Meteosat-11': 'meteosat11'}
+
+PPS_PLATFORM_NAME_TRANSLATION = {'npp': 'Suomi-NPP',
+                                 'noaa20': 'NOAA-20',
+                                 'eos1': 'EOS-Terra',
+                                 'eos2': 'EOS-Aqua',
+                                 'metopa': 'Metop-A',
+                                 'metopb': 'Metop-B',
+                                 'metopc': 'Metop-C',
+                                 'noaa18': 'NOAA-18',
+                                 'noaa15': 'NOAA-15',
+                                 'noaa19': 'NOAA-19',
+                                 'meteosat8': 'Meteosat-8',
+                                 'meteosat9': 'Meteosat-9',
+                                 'meteosat10': 'Meteosat-10',
+                                 'meteosat11': 'Meteosat-11'
+                                 }
 
 METOPS = ['metop03', 'metop02', 'metop01']
 
@@ -83,16 +94,17 @@ SENSOR = {'NOAA-19': 'avhrr/3',
 PPS_FILENAME = "S_NWC_{product:s}_{platform_name:s}_{orbit:05d}_{start_time:%Y%m%dT%H%M%S%f}Z_{end_time:%Y%m%dT%H%M%S%f}Z.nc"
 
 
-class PpsMetaData(object):
+class NWCSAFMetaData(object):
 
-    """Container for the metadata defining the pps scenes"""
+    """Container for the metadata defining the NWCSAF (Geo/PPS) scenes"""
 
     def __init__(self, filename=None, geofilename=None,
                  platform_name=None,
-                 orbit="00000", timeslot=None,
+                 orbit="00000", areaid=None, timeslot=None,
                  variant=None):
         self.platform_name = platform_name
         self.orbit = orbit
+        self.areaid = areaid
         self.timeslot = timeslot
         self.variant = variant
         self.uri = filename
@@ -103,38 +115,9 @@ class PpsMetaData(object):
                           'geofilename=' + str(self.geofilename),
                           'platform_name=' + str(self.platform_name),
                           'orbit=' + self.orbit,
+                          'areaid=' + self.areaid,
                           'timeslot=' + str(self.timeslot),
                           'variant=' + str(self.variant)])
-
-    def __lt__(self, other):
-        return self.timeslot < other.timeslot
-
-    def __gt__(self, other):
-        return self.timeslot > other.timeslot
-
-    def __le__(self, other):
-        return self.timeslot <= other.timeslot
-
-    def __ge__(self, other):
-        return self.timeslot >= other.timeslot
-
-
-class MsgMetaData(object):
-
-    """Container for the metadata defining the msg scenes"""
-
-    def __init__(self, filename=None, platform_name=None,
-                 areaid=None, timeslot=None):
-        self.timeslot = timeslot
-        self.areaid = areaid
-        self.platform_name = platform_name
-        self.uri = filename
-
-    def __str__(self):
-        return "\n".join(['filename=' + str(self.uri),
-                          'platform_name=' + str(self.platform_name),
-                          'areaid=' + self.areaid,
-                          'timeslot=' + str(self.timeslot)])
 
     def __lt__(self, other):
         return self.timeslot < other.timeslot
@@ -166,14 +149,12 @@ def get_analysis_time(start_t, end_t):
         mean_time.year, mean_time.month, mean_time.day, mean_time.hour, 0, 0)
 
 
-def get_ppslist(filelist, timewindow, satellites=None, variant=None):
-    """Get the full list of metadata keys for all pps passes in the *filelist*,
-    but only for the satellites specified in the list *satellites* if given"""
+def get_nwcsafproduct_list(parse_obj, filelist, timewindow, variant=None):
+    """Get the full list of metadata keys for all NWCSAF Meteosat slots or Polar
+       scenes in the *filelist*, but only for those slots inside the time
+       window specified.
 
-    from trollsift import Parser
-    prod_p = Parser(PPS_FILENAME)
-
-    LOG.debug("List of satellites: %s", str(satellites))
+    """
     plist = []
     files_old = True
     latest_file = None
@@ -181,48 +162,40 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
     LOG.info("Going through file list with %d files", len(filelist))
     for filename in filelist:
         bname = os.path.basename(filename)
+        LOG.debug("Filename: %s", str(bname))
         try:
-            res = prod_p.parse(bname)
+            res = parse_obj.parse(bname)
         except ValueError:
             LOG.exception('Failed processing filename %s', filename)
             LOG.warning('Probably wrong date time string in PPS file, skip it...')
             continue
 
         sat = res['platform_name']
-
-        if satellites and PLATFORM_NAME.get(sat, sat) not in satellites:
-            LOG.debug("Satellite not in the list of platforms! platform=%s", PLATFORM_NAME.get(sat, sat))
-            continue
-
         product = res['product']
         geofilename = filename.replace(product, 'CMA')
         orbit = '%05d' % res['orbit']
+        platform_name = PPS_PLATFORM_NAME_TRANSLATION.get(sat, METEOSAT.get(sat))
+        areaid = res.get('area_id', 'unknown')
+        if not platform_name:
+            raise IOError("Error: satellite %s not supported!" % sat)
+
         if 'end_time' in res.keys():
-            if six.PY2:
-                # Requires Python 2.7:
-                delta_seconds = (res['end_time']-res['start_time']).total_seconds()
-                timeslot = res['start_time'] + timedelta(seconds=delta_seconds/2.)
-            else:
-                timeslot = res['start_time'] + (res['end_time']-res['start_time'])/2.
+            timeslot = res['start_time'] + (res['end_time']-res['start_time'])/2.
         else:
             timeslot = res['start_time']
 
         if timeslot > latest_file_time:
             latest_file_time = timeslot
             latest_file = filename
-        platform_name = PLATFORM_NAME.get(sat)
-        if not platform_name:
-            raise IOError("Error: satellite %s not supported!" % sat)
 
         # Now filter out all passes outside time window:
-        if (timeslot > timewindow[0] and
-                timeslot < timewindow[1]):
-
-            mda = PpsMetaData(filename=filename,
-                              geofilename=geofilename,
-                              orbit=orbit, timeslot=timeslot,
-                              platform_name=platform_name,
-                              variant=variant)
+        if timewindow[1] > timeslot > timewindow[0]:
+            mda = NWCSAFMetaData(filename=filename,
+                                 geofilename=geofilename,
+                                 platform_name=platform_name,
+                                 orbit=orbit,
+                                 areaid=areaid, timeslot=timeslot,
+                                 variant=variant)
             plist.append(mda)
             files_old = False
         elif (timewindow[0] - timeslot) < timedelta(seconds=3600 * 4):
@@ -238,57 +211,6 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
                   len(filelist), filelist[0], filelist[-1])
 
     return plist
-
-
-def get_msglist(filelist, timewindow, area_id, satellites=None):
-    """Get the full list of metadata keys for all Meteosat slots in the
-    *filelist*, but only for the satellites specified in the list *satellites*
-    if given"""
-
-    if not satellites:
-        satellites = ['Meteosat-8', 'Meteosat-9',
-                      'Meteosat-10', 'Meteosat-11']
-    metsats = [MSGSATS.get(s, 'MSGx') for s in satellites]
-
-    mlist = []
-    for filename in filelist:
-        bname = os.path.basename(filename)
-        LOG.debug("Filename: %s", str(bname))
-
-        bnsplit = bname.split('_')
-        sat = bnsplit[1]
-        if sat not in metsats:
-            LOG.warning('Satellite ' + str(sat) +
-                        ' not in list: ' + str(metsats))
-            continue
-
-        platform_name = METEOSAT[sat]
-        bnsplit = bname[17:].split('_')
-        areaid = bnsplit[1].split('.')[0]
-        if areaid != area_id:
-            LOG.debug("Area id " + str(areaid) +
-                      " not requested (" + str(area_id) + ")")
-            LOG.debug("bnsplit = %s", str(bnsplit))
-            continue
-
-        # Hardcoded the filenaming convention! FIXME!
-        try:
-            #timeslot = datetime.strptime(bname[17:17 + 12], '%Y%m%d%H%M')
-            timeslot = datetime.strptime(bnsplit[0], '%Y%m%d%H%M')
-        except ValueError:
-            LOG.error("Failure: Can't get the time of the msg scene! " +
-                      str(bname))
-            continue
-
-        # Now filter out all passes outside time window:
-        if (timeslot > timewindow[0] and
-                timeslot < timewindow[1]):
-            mda = MsgMetaData(filename=filename,
-                              areaid=areaid, timeslot=timeslot,
-                              platform_name=platform_name)
-            mlist.append(mda)
-
-    return mlist
 
 
 def get_nwcsaf_files(basedir, file_ext):
