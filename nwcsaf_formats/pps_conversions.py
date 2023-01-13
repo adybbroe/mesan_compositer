@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2015, 2019 Adam.Dybbroe
+# Copyright (c) 2014, 2015, 2019, 2023 Adam.Dybbroe
 
 # Author(s):
 
@@ -285,7 +285,7 @@ def old_processing_flag_palette(product):
                                   ' not supported!')
 
     # Outputvaluenamelist:
-    comp_type = np.dtype([('outval_name', np.str, 128), ])
+    comp_type = np.dtype([('outval_name', str, 128), ])
     vnamelist = []
     for i, item in enumerate(names):
         bitvalue = 2 ** i
@@ -298,7 +298,7 @@ def old_ctype_palette():
     """Make the old cloudtype output_value_namelist for hdf5 file"""
 
     # Outputvaluenamelist:
-    comp_type = np.dtype([('outval_name', np.str, 128), ])
+    comp_type = np.dtype([('outval_name', str, 128), ])
     vnamelist = []
     for i, item in enumerate(OLD_CTYPE_NAMES):
         vnamelist.append(str(i) + ": " + item)
