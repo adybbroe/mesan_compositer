@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 - 2019 Adam.Dybbroe
+# Copyright (c) 2014 - 2019, 2023 Adam.Dybbroe
 
 # Author(s):
 
@@ -23,11 +23,13 @@
 """Unit testing the composite generation."""
 
 import unittest
+import pytest
+import pathlib
 import numpy as np
 from mesan_compositer.composite_tools import get_weight_cloudtype
 from mesan_compositer.composite_tools import get_analysis_time
 from mesan_compositer.composite_tools import PpsMetaData
-from mesan_compositer.composite_tools import MsgMetaData
+from mesan_compositer.composite_tools import GeoMetaData
 
 from datetime import datetime, timedelta
 
@@ -116,6 +118,82 @@ WEIGHT_MSG2 = np.array([[0.65217391,  0.65217391,  0.65217391,  0.65217391,  0.6
                         [0.65217391,  0.65217391,  0.65217391,  0.65217391,  0.65217391,
                          0.65217391,  0.65217391,  0.65217391,  0.65217391,  0.65217391]], 'float')
 
+HRIT_TEST_FILE_NAMES = [
+    'H-000-MSG4__-MSG4________-HRV______-000007___-202301161115-__',
+    'H-000-MSG4__-MSG4________-IR_016___-000007___-202301161115-__',
+    'H-000-MSG4__-MSG4________-IR_039___-000007___-202301161115-__',
+    'H-000-MSG4__-MSG4________-IR_087___-000007___-202301161115-__',
+    'H-000-MSG4__-MSG4________-IR_097___-000007___-202301161115-__',
+    'H-000-MSG4__-MSG4________-IR_108___-000007___-202301161115-__',
+    'H-000-MSG4__-MSG4________-IR_120___-000007___-202301161115-__',
+    'H-000-MSG4__-MSG4________-IR_134___-000007___-202301161115-__',
+    'H-000-MSG4__-MSG4________-VIS006___-000007___-202301161115-__',
+    'H-000-MSG4__-MSG4________-VIS008___-000007___-202301161115-__',
+    'H-000-MSG4__-MSG4________-WV_062___-000007___-202301161115-__',
+    'H-000-MSG4__-MSG4________-WV_073___-000007___-202301161115-__',
+
+    'H-000-MSG4__-MSG4________-HRV______-000007___-202301161145-__',
+    'H-000-MSG4__-MSG4________-IR_016___-000007___-202301161145-__',
+    'H-000-MSG4__-MSG4________-IR_039___-000007___-202301161145-__',
+    'H-000-MSG4__-MSG4________-IR_087___-000007___-202301161145-__',
+    'H-000-MSG4__-MSG4________-IR_097___-000007___-202301161145-__',
+    'H-000-MSG4__-MSG4________-IR_108___-000007___-202301161145-__',
+    'H-000-MSG4__-MSG4________-IR_120___-000007___-202301161145-__',
+    'H-000-MSG4__-MSG4________-IR_134___-000007___-202301161145-__',
+    'H-000-MSG4__-MSG4________-VIS006___-000007___-202301161145-__',
+    'H-000-MSG4__-MSG4________-VIS008___-000007___-202301161145-__',
+    'H-000-MSG4__-MSG4________-WV_062___-000007___-202301161145-__',
+    'H-000-MSG4__-MSG4________-WV_073___-000007___-202301161145-__',
+
+    'H-000-MSG4__-MSG4________-HRV______-000006___-202301161115-__',
+    'H-000-MSG4__-MSG4________-IR_016___-000006___-202301161115-__',
+    'H-000-MSG4__-MSG4________-IR_039___-000006___-202301161115-__',
+    'H-000-MSG4__-MSG4________-IR_087___-000006___-202301161115-__',
+    'H-000-MSG4__-MSG4________-IR_097___-000006___-202301161115-__',
+    'H-000-MSG4__-MSG4________-IR_108___-000006___-202301161115-__',
+    'H-000-MSG4__-MSG4________-IR_120___-000006___-202301161115-__',
+    'H-000-MSG4__-MSG4________-IR_134___-000006___-202301161115-__',
+    'H-000-MSG4__-MSG4________-VIS006___-000006___-202301161115-__',
+    'H-000-MSG4__-MSG4________-VIS008___-000006___-202301161115-__',
+    'H-000-MSG4__-MSG4________-WV_062___-000006___-202301161115-__',
+    'H-000-MSG4__-MSG4________-WV_073___-000006___-202301161115-__']
+
+TEST_HRIT_SLOT = [
+    'H-000-MSG4__-MSG4________-HRV______-000007___-202301161115-__',
+    'H-000-MSG4__-MSG4________-IR_016___-000007___-202301161115-__',
+    'H-000-MSG4__-MSG4________-IR_039___-000007___-202301161115-__',
+    'H-000-MSG4__-MSG4________-IR_087___-000007___-202301161115-__',
+    'H-000-MSG4__-MSG4________-IR_097___-000007___-202301161115-__',
+    'H-000-MSG4__-MSG4________-IR_108___-000007___-202301161115-__',
+    'H-000-MSG4__-MSG4________-IR_120___-000007___-202301161115-__',
+    'H-000-MSG4__-MSG4________-IR_134___-000007___-202301161115-__',
+    'H-000-MSG4__-MSG4________-VIS006___-000007___-202301161115-__',
+    'H-000-MSG4__-MSG4________-VIS008___-000007___-202301161115-__',
+    'H-000-MSG4__-MSG4________-WV_062___-000007___-202301161115-__',
+    'H-000-MSG4__-MSG4________-WV_073___-000007___-202301161115-__',
+    'H-000-MSG4__-MSG4________-HRV______-000006___-202301161115-__',
+    'H-000-MSG4__-MSG4________-IR_016___-000006___-202301161115-__',
+    'H-000-MSG4__-MSG4________-IR_039___-000006___-202301161115-__',
+    'H-000-MSG4__-MSG4________-IR_087___-000006___-202301161115-__',
+    'H-000-MSG4__-MSG4________-IR_097___-000006___-202301161115-__',
+    'H-000-MSG4__-MSG4________-IR_108___-000006___-202301161115-__',
+    'H-000-MSG4__-MSG4________-IR_120___-000006___-202301161115-__',
+    'H-000-MSG4__-MSG4________-IR_134___-000006___-202301161115-__',
+    'H-000-MSG4__-MSG4________-VIS006___-000006___-202301161115-__',
+    'H-000-MSG4__-MSG4________-VIS008___-000006___-202301161115-__',
+    'H-000-MSG4__-MSG4________-WV_062___-000006___-202301161115-__',
+    'H-000-MSG4__-MSG4________-WV_073___-000006___-202301161115-__']
+
+
+@pytest.fixture
+def fake_hrit_files_directory(tmp_path):
+    """Fake a directory with HRIT files."""
+    for i in range(len(HRIT_TEST_FILE_NAMES)):
+        file_path = tmp_path / HRIT_TEST_FILE_NAMES[i]
+        file_path.touch()
+
+    return file_path.parent
+
 
 class TestCloudTypeWeights(unittest.TestCase):
     """Unit testing the functions to convert msg flags to pps (old) flags."""
@@ -139,12 +217,8 @@ class TestCloudTypeWeights(unittest.TestCase):
         return
 
 
-class TestTimeTools(unittest.TestCase):
+class TestTimeTools:
     """Test (time) arithmetics for observation time and listing/sorting of PPS/MSG scenes."""
-
-    def setUp(self):
-        """Set it up."""
-        return
 
     def test_pps_metadata(self):
         """Test operations on the PPS meta data class."""
@@ -174,46 +248,74 @@ class TestTimeTools(unittest.TestCase):
         tslots = [p.timeslot for p in pmlist]
         norbits = [int(p.orbit) for p in pmlist]
 
-        self.assertListEqual([101, 102, 999, 103], norbits)
-        self.assertTrue(tslots[0] <= tslots[1])
-        self.assertTrue(tslots[1] <= tslots[2])
-        self.assertTrue(tslots[2] <= tslots[3])
+        assert [101, 102, 999, 103] == norbits
+        assert tslots[0] <= tslots[1]
+        assert tslots[1] <= tslots[2]
+        assert tslots[2] <= tslots[3]
 
-    def test_msg_metadata(self):
-        """Test operations on the MSG meta data class."""
-        filename = '/tmp/my_msg_testfile.nc'
+    def test_geo_metadata_no_hrit(self, tmp_path):
+        """Test operations on the NWCSAF/Geo meta data class."""
+        filename = tmp_path / 'S_NWC_CTTH_MSG4_MSG-N-VISIR_20191105T180000Z_PLAX.nc'
+        timeslot1 = datetime(2019, 11, 5, 18, 0)
+
+        mda = GeoMetaData(filename, 'Meteosat-11', 'some_area', timeslot1)
+
+        assert isinstance(mda.uri, pathlib.PosixPath)
+        assert mda.uri.name == 'S_NWC_CTTH_MSG4_MSG-N-VISIR_20191105T180000Z_PLAX.nc'
+        assert mda.timeslot == datetime(2019, 11, 5, 18, 0)
+        assert mda.platform_name == 'Meteosat-11'
+        assert mda.areaid == 'some_area'
+
+    def test_geo_metadata_no_hrit_several_timeslots(self, tmp_path):
+        """Test operations on the NWCSAF/Geo meta data class - several timeslots."""
+        filename = tmp_path / 'S_NWC_CTTH_MSG4_MSG-N-VISIR_20191105T180000Z_PLAX.nc'
         platform_name = 'Meteosat-11'
         timeslot1 = datetime(2019, 11, 5, 18, 0)
         areaid = 'area1'
-        mm1 = MsgMetaData(filename, platform_name, areaid, timeslot1)
+        mm1 = GeoMetaData(filename, platform_name, areaid, timeslot1)
 
         timeslot2 = datetime(2019, 11, 4, 18, 0)
         areaid = 'area2'
-        mm2 = MsgMetaData(filename, platform_name, areaid, timeslot2)
+        mm2 = GeoMetaData(filename, platform_name, areaid, timeslot2)
 
         timeslot3 = datetime(2019, 11, 5, 18, 15)
         areaid = 'area3'
-        mm3 = MsgMetaData(filename, platform_name, areaid, timeslot3)
+        mm3 = GeoMetaData(filename, platform_name, areaid, timeslot3)
 
         timeslot4 = datetime(2019, 11, 3, 12, 0)
         areaid = 'area4'
-        mm4 = MsgMetaData(filename, platform_name, areaid, timeslot4)
+        mm4 = GeoMetaData(filename, platform_name, areaid, timeslot4)
 
         timeslot5 = datetime(2019, 11, 5, 18, 15)
         areaid = 'area5'
         platform_name = 'Meteosat-9'
-        mm5 = MsgMetaData(filename, platform_name, areaid, timeslot5)
+        mm5 = GeoMetaData(filename, platform_name, areaid, timeslot5)
 
         mmlist = [mm1, mm2, mm3, mm4, mm5]
         mmlist.sort()
         tslots = [m.timeslot for m in mmlist]
         areas = [m.areaid for m in mmlist]
 
-        self.assertListEqual(['area4', 'area2', 'area1', 'area3', 'area5'], areas)
-        self.assertTrue(tslots[0] <= tslots[1])
-        self.assertTrue(tslots[1] <= tslots[2])
-        self.assertTrue(tslots[2] <= tslots[3])
-        self.assertTrue(tslots[3] <= tslots[4])
+        assert ['area4', 'area2', 'area1', 'area3', 'area5'] == areas
+        assert tslots[0] <= tslots[1]
+        assert tslots[1] <= tslots[2]
+        assert tslots[2] <= tslots[3]
+        assert tslots[3] <= tslots[4]
+
+    def test_geo_metadata_set_hrit(self, fake_hrit_files_directory, tmp_path):
+        """Test adding hrit data files to the NWCSAF/Geo meta data class."""
+        filename = tmp_path / 'geo_products' / 'S_NWC_CTTH_MSG4_MSG-N-VISIR_20230116T111500Z_PLAX.nc'
+        timeslot1 = datetime(2023, 1, 16, 11, 15)
+
+        mda = GeoMetaData(filename, 'Meteosat-11', 'some_area', timeslot1)
+        mda.find_hrit_files(fake_hrit_files_directory)
+
+        expected = []
+        for fname in TEST_HRIT_SLOT:
+            expected.append(tmp_path / fname)
+        expected.sort()
+
+        assert mda.hrit_files == expected
 
     def test_get_analysis_time(self):
         """Test the determination of the analysis time from two times defining a time interval."""
@@ -222,33 +324,19 @@ class TestTimeTools(unittest.TestCase):
         t1_ = datetime(2015, 6, 23, 12, 22)
         t2_ = datetime(2015, 6, 23, 12, 35)
         res = get_analysis_time(t1_, t2_)
-        self.assertTrue(res - datetime(2015, 6, 23, 12, 0) < dtime_eps)
+        assert res - datetime(2015, 6, 23, 12, 0) < dtime_eps
 
         t1_ = datetime(2015, 6, 23, 12, 42)
         t2_ = datetime(2015, 6, 23, 12, 55)
         res = get_analysis_time(t1_, t2_)
-        self.assertTrue(res - datetime(2015, 6, 23, 13, 0) < dtime_eps)
+        assert res - datetime(2015, 6, 23, 13, 0) < dtime_eps
 
         t1_ = datetime(2015, 6, 23, 12, 48)
         t2_ = datetime(2015, 6, 23, 13, 1)
         res = get_analysis_time(t1_, t2_)
-        self.assertTrue(res - datetime(2015, 6, 23, 13, 0) < dtime_eps)
+        assert res - datetime(2015, 6, 23, 13, 0) < dtime_eps
 
         t1_ = datetime(2015, 6, 23, 13, 10)
         t2_ = datetime(2015, 6, 23, 13, 25)
         res = get_analysis_time(t1_, t2_)
-        self.assertTrue(res - datetime(2015, 6, 23, 13, 0) < dtime_eps)
-
-    def tearDown(self):
-        """Clean up."""
-        return
-
-
-def suite():
-    """Run all the tests for the compositer tools."""
-    loader = unittest.TestLoader()
-    mysuite = unittest.TestSuite()
-    mysuite.addTest(loader.loadTestsFromTestCase(TestCloudTypeWeights))
-    mysuite.addTest(loader.loadTestsFromTestCase(TestTimeTools))
-
-    return mysuite
+        assert res - datetime(2015, 6, 23, 13, 0) < dtime_eps

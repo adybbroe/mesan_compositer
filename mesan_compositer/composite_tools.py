@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 - 2019 Adam.Dybbroe
+# Copyright (c) 2014 - 2019, 2023 Adam.Dybbroe
 
 # Author(s):
 
@@ -23,6 +23,8 @@
 """Collection of minor helper tools for the generation of Mesan composites"""
 
 import os
+from glob import glob
+from trollsift import Parser, globify
 from datetime import datetime, timedelta
 from six.moves import configparser
 import six
@@ -119,9 +121,9 @@ class PpsMetaData(object):
         return self.timeslot >= other.timeslot
 
 
-class MsgMetaData(object):
+class GeoMetaData:
 
-    """Container for the metadata defining the msg scenes"""
+    """Container for the metadata defining the NWCSAF/Geo cloud scenes."""
 
     def __init__(self, filename=None, platform_name=None,
                  areaid=None, timeslot=None):
@@ -129,6 +131,24 @@ class MsgMetaData(object):
         self.areaid = areaid
         self.platform_name = platform_name
         self.uri = filename
+        self._hrit_pattern = '{rate:1s}-000-{hrit_format:_<6s}-{platform_shortname:4s}_{service:_<7s}-{channel:_<9s}-{segment:06d}___-{start_time:%Y%m%d%H%M}-__'
+        self._hrit_path = None
+        self.hrit_files = None
+
+    def find_hrit_files(self, hrit_path):
+        """Find the matching hrit files for the cloud scene."""
+        self._hrit_path = hrit_path
+        self.hrit_files = []
+
+        p__ = Parser(self._hrit_pattern)
+        hrit_files = self._hrit_path.glob(globify(self._hrit_pattern))
+
+        for hrit_fname in hrit_files:
+            res = p__.parse(hrit_fname.name)
+            if self.timeslot - timedelta(seconds=1) < res['start_time'] < self.timeslot + timedelta(seconds=1):
+                self.hrit_files.append(hrit_fname)
+
+        self.hrit_files.sort()
 
     def __str__(self):
         return "\n".join(['filename=' + str(self.uri),
@@ -283,7 +303,7 @@ def get_msglist(filelist, timewindow, area_id, satellites=None):
         # Now filter out all passes outside time window:
         if (timeslot > timewindow[0] and
                 timeslot < timewindow[1]):
-            mda = MsgMetaData(filename=filename,
+            mda = GeoMetaData(filename=filename,
                               areaid=areaid, timeslot=timeslot,
                               platform_name=platform_name)
             mlist.append(mda)

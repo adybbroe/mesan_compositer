@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 - 2019 Adam.Dybbroe
+# Copyright (c) 2014-2023 Adam.Dybbroe
 
 # Author(s):
 
@@ -93,7 +93,7 @@ def get_arguments():
                         action="store_true")
     parser.add_argument('--ctype_out', help='Mesan Cloudtype composite output',
                         required=False)
-    parser.add_argument('--bagground_ctth', help='CTTH background...',
+    parser.add_argument('--background_ctth', help='CTTH background...',
                         required=False)
 
     args = parser.parse_args()
@@ -257,6 +257,15 @@ class ctCompositer(object):
         for scene in self.msg_scenes:
             LOG.debug("Geo scene:\n" + str(scene))
 
+    def blend_ct_products(self):
+        """Blend the CT products together and create cloud analysis."""
+
+        breakpoint()
+
+        x = 1
+
+        return
+
     def make_composite(self):
         """Make the Cloud Type composite."""
         # Reference time for time stamp in composite file
@@ -328,7 +337,7 @@ class ctCompositer(object):
 
             # time identifier is seconds since 1970-01-01 00:00:00
             x_time = time.mktime(scene.timeslot.timetuple()) * np.ones(x_CT.shape)
-            idx_MSG = is_MSG * np.ones(x_CT.shape, dtype=np.bool)
+            idx_MSG = is_MSG * np.ones(x_CT.shape, dtype=bool)
             if comp_CT is None:
                 # initialize field with current CT
                 comp_lon, comp_lat = x_local['ct'].area.get_lonlats()
@@ -410,7 +419,9 @@ if __name__ == "__main__":
 
     ctcomp = ctCompositer(time_of_analysis, delta_time_window, area_id, OPTIONS)
     ctcomp.get_catalogue()
-    ctcomp.make_composite()
+    ctcomp.blend_ct_products()
+
+    # ctcomp.make_composite()
 
     # Just for testing purposes:
     # values = {"area": area_id, }
