@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 - 2019 Adam.Dybbroe
+# Copyright (c) 2014 - 2019, 2023 Adam.Dybbroe
 
 # Author(s):
 
@@ -26,6 +26,7 @@ import argparse
 from datetime import datetime
 import numpy as np
 import xarray as xr
+import dask.array as da
 from trollimage.xrimage import XRImage
 from mesan_compositer import get_config
 from satpy.composites import PaletteCompositor
@@ -106,7 +107,8 @@ def make_quicklooks(netcdf_filename, cloudtype, ids, weights):
 
     # xdata = xr.DataArray(cloudtype.data, dims=['y', 'x'], attrs=attrs)
     masked_data = np.ma.masked_outside(cloudtype.data, 0, 20)
-    xdata = xr.DataArray(masked_data, dims=['y', 'x'], attrs=attrs)
+    xdata = xr.DataArray(da.from_array(masked_data), dims=['y', 'x'], attrs=attrs)
+
     pcol = PaletteCompositor('mesan_cloudtype_composite')((xdata, pdata))
     ximg = XRImage(pcol)
     ximg.save(netcdf_filename.strip('.nc') + '_cloudtype.png')
@@ -114,7 +116,7 @@ def make_quicklooks(netcdf_filename, cloudtype, ids, weights):
     # Id field:
     pdata = xr.DataArray(palette, attrs=palette_attrs)
     data = (ids.data * 13).astype(np.dtype('uint8'))
-    xdata = xr.DataArray(data, dims=['y', 'x'], attrs=attrs)
+    xdata = xr.DataArray(da.from_array(data), dims=['y', 'x'], attrs=attrs)
     pcol = PaletteCompositor('mesan_cloudtype_composite')((xdata, pdata))
     ximg = XRImage(pcol)
     ximg.save(netcdf_filename.strip('.nc') + '_id.png')
@@ -122,7 +124,7 @@ def make_quicklooks(netcdf_filename, cloudtype, ids, weights):
     # Weight field:
     pdata = xr.DataArray(palette, attrs=palette_attrs)
     data = (weights.data * 20).astype(np.dtype('uint8'))
-    xdata = xr.DataArray(data, dims=['y', 'x'], attrs=attrs)
+    xdata = xr.DataArray(da.from_array(data), dims=['y', 'x'], attrs=attrs)
     pcol = PaletteCompositor('mesan_cloudtype_composite')((xdata, pdata))
     ximg = XRImage(pcol)
     ximg.save(netcdf_filename.strip('.nc') + '_weight.png')
