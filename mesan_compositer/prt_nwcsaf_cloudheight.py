@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2015 - 2019 Adam.Dybbroe
+# Copyright (c) 2015-2023 Adam.Dybbroe
 
 # Author(s):
 
@@ -37,7 +37,7 @@ import logging
 from logging import handlers
 from mesan_compositer.netcdf_io import ncCTTHComposite
 from mesan_compositer.pps_msg_conversions import get_bit_from_flags
-from mesan_compositer import get_config
+from mesan_compositer.config import get_config
 
 
 class cthError(Exception):

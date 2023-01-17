@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2015, 2019 Adam.Dybbroe
+# Copyright (c) 2014-2023 Adam.Dybbroe
 
 # Author(s):
 
@@ -20,8 +20,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Make quick look images of the ctth composite
-"""
+"""Make quick look images of the ctth composite."""
 
 import argparse
 from datetime import datetime
@@ -30,7 +29,7 @@ import xarray as xr
 from trollimage.xrimage import XRImage
 from mesan_compositer import ctth_height
 from mesan_compositer.netcdf_io import ncCTTHComposite
-from mesan_compositer import get_config
+from mesan_compositer.config import get_config
 from satpy.composites import ColormapCompositor
 import sys
 import os
@@ -47,8 +46,7 @@ _DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
 
 
 def get_arguments():
-    """
-    Get command line arguments
+    """Get command line arguments.
 
     args.logging_conf_file, args.config_file, obs_time, area_id, wsize
 
@@ -59,7 +57,6 @@ def get_arguments():
       Area id
       Window size
     """
-
     parser = argparse.ArgumentParser()
     parser.add_argument('--datetime', '-d', help='Date and time of observation - yyyymmddhh',
                         required=True)

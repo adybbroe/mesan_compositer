@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2019 Adam.Dybbroe
+# Copyright (c) 2014, 2019, 2023 Adam.Dybbroe
 
 # Author(s):
 
@@ -23,11 +23,6 @@
 """Package file for the mesan_compositer."""
 
 import logging
-import yaml
-try:
-    from yaml import UnsafeLoader
-except ImportError:
-    from yaml import Loader as UnsafeLoader
 
 from pkg_resources import get_distribution, DistributionNotFound
 try:
@@ -50,19 +45,6 @@ class LoadException(Exception):
     """Exception class for loading data."""
 
     pass
-
-
-def get_config(configfile):
-    """Get the configuration from file."""
-    with open(configfile, 'r') as fp_:
-        config = yaml.load(fp_, Loader=UnsafeLoader)
-
-    options = {}
-    for item in config:
-        if not isinstance(config[item], dict):
-            options[item] = config[item]
-
-    return options
 
 
 def nwcsaf_cloudtype():

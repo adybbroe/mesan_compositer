@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 - 2019 Adam.Dybbroe
+# Copyright (c) 2014-2023 Adam.Dybbroe
 
 # Author(s):
 
@@ -36,7 +36,7 @@ from mesan_compositer.pps_msg_conversions import ctth_procflags2pps
 from nwcsaf_formats.pps_conversions import ctth_convert_flags
 from mesan_compositer.composite_tools import METOPS
 from mesan_compositer.netcdf_io import ncCTTHComposite
-from mesan_compositer import get_config
+from mesan_compositer.config import get_config
 from mesan_compositer.composite_tools import (get_msglist,
                                               get_ppslist,
                                               get_weight_ctth)

@@ -39,7 +39,7 @@ from nwcsaf_formats.pps_conversions import (map_cloudtypes,
 from mesan_compositer.ct_quicklooks import make_quicklooks
 
 from mesan_compositer.composite_tools import METOPS
-from mesan_compositer import get_config
+from mesan_compositer.config import get_config
 import sys
 import os
 import logging
@@ -259,11 +259,6 @@ class ctCompositer(object):
 
     def blend_ct_products(self):
         """Blend the CT products together and create cloud analysis."""
-
-        breakpoint()
-
-        x = 1
-
         return
 
     def make_composite(self):

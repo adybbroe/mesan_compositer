@@ -28,7 +28,7 @@ import numpy as np
 import xarray as xr
 import dask.array as da
 from trollimage.xrimage import XRImage
-from mesan_compositer import get_config
+from mesan_compositer.config import get_config
 from satpy.composites import PaletteCompositor
 from mesan_compositer import nwcsaf_cloudtype
 from mesan_compositer.netcdf_io import ncCloudTypeComposite

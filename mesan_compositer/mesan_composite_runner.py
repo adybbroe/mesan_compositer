@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2015 - 2019 Adam.Dybbroe
+# Copyright (c) 2015-2023 Adam.Dybbroe
 
 # Author(s):
 
@@ -20,9 +20,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Posttroll-runner for the mesan composite generator. Listens to incoming
-satellite data products (lvl2 cloud products) and generates a mesan composite
-valid for the closest (whole) hour.
+"""Posttroll-runner for the mesan composite generator.
+
+Listens to incoming satellite data products (lvl2 cloud products) and generates
+a mesan composite valid for the closest (whole) hour.
 
 """
 
@@ -54,7 +55,7 @@ from mesan_compositer import make_ct_composite as mcc
 from mesan_compositer import make_ctth_composite
 from mesan_compositer.prt_nwcsaf_cloudamount import derive_sobs as derive_sobs_clamount
 from mesan_compositer.prt_nwcsaf_cloudheight import derive_sobs as derive_sobs_clheight
-from mesan_compositer import get_config
+from mesan_compositer.config import get_config
 
 LOG = logging.getLogger(__name__)
 
@@ -88,16 +89,15 @@ PRODUCT_NAMES = ['CMA', 'CT', 'CTTH', 'PC', 'CPP']
 
 
 def get_arguments():
-    """
-    Get command line arguments
+    """Get command line arguments.
 
     args.logging_conf_file, args.config_file, obs_time, area_id, wsize
 
     Return
       File path of the logging.ini file
       File path of the application configuration file
-    """
 
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config_file',
                         type=str,
@@ -118,12 +118,8 @@ def get_arguments():
     return args.logging_conf_file, args.config_file
 
 
-class MesanCompRunError(Exception):
-    pass
-
-
 def reset_job_registry(objdict, key):
-    """Remove job key from registry"""
+    """Remove job key from registry."""
     LOG.debug("Release/reset job-key " + str(key) + " from job registry")
     if key in objdict:
         objdict.pop(key)
@@ -135,56 +131,57 @@ def reset_job_registry(objdict, key):
 
 
 class FilePublisher(threading.Thread):
+    """A publisher for the cloud composite result files.
 
-    """A publisher for the MESAN composite result files. Picks up the return value
-    from the ctype_composite_worker when ready, and publishes the files via posttroll
+    Picks up the return value from the ctype_composite_worker when ready, and
+    publishes the files via posttroll.
 
     """
 
     def __init__(self, queue):
+        """Initialize the file publisher object."""
         threading.Thread.__init__(self)
         self.loop = True
         self.queue = queue
         self.jobs = {}
 
     def stop(self):
-        """Stops the file publisher"""
+        """Stop the file publisher."""
         self.loop = False
         self.queue.put(None)
 
     def run(self):
-
+        """Start the publisher thread and publish as adequate until interrupted/stopped."""
         with Publish('mesan_composite_runner', 0, ['netCDF/3', ]) as publisher:
-
             while self.loop:
                 retv = self.queue.get()
-
-                if retv != None:
+                if retv is not None:
                     LOG.info("Publish the files...")
                     publisher.send(retv)
 
 
 class FileListener(threading.Thread):
+    """A file listener class, to listen for incoming messages.
 
-    """A file listener class, to listen for incoming messages with a 
-    relevant file for further processing"""
+    The messages requires a relevant file and will trigger for further processing on it.
+    """
 
     def __init__(self, queue):
+        """Initialize the file listener object."""
         threading.Thread.__init__(self)
         self.loop = True
         self.queue = queue
 
     def stop(self):
-        """Stops the file listener"""
+        """Stop the file listener."""
         self.loop = False
         self.queue.put(None)
 
     def run(self):
-
+        """Start the runner and run indefinately until interrupted."""
         with posttroll.subscriber.Subscribe('', ['CF/2',
                                                  '2/nwcsaf-msg/0deg/ctth-plax-corrected',
                                                  '2/nwcsaf-msg/0deg/ct-plax-corrected'], True) as subscr:
-
             for msg in subscr.recv(timeout=90):
                 if not self.loop:
                     break
@@ -192,11 +189,10 @@ class FileListener(threading.Thread):
                 # Check if it is a relevant message:
                 if self.check_message(msg):
                     LOG.debug("Put the message on the queue...")
-                    #LOG.debug("Message = %s", str(msg))
                     self.queue.put(msg)
 
     def check_message(self, msg):
-
+        """Check that the incoming message is okay."""
         if not msg:
             return False
 
@@ -227,8 +223,7 @@ class FileListener(threading.Thread):
 
 
 def create_message(resultfile, scene):
-    """Create the posttroll message"""
-
+    """Create the posttroll message."""
     to_send = {}
     to_send['uri'] = ('ssh://%s/%s' % (SERVERNAME, resultfile))
     to_send['uid'] = resultfile
@@ -251,8 +246,7 @@ def create_message(resultfile, scene):
 
 
 def ready2run(msg, files4comp, job_register, sceneid, product='CT'):
-    """Check whether we can start a composite generation on scene"""
-
+    """Check whether we can start a composite generation on scene."""
     LOG.debug("Ready to run?")
     LOG.info("Got message: " + str(msg))
 
@@ -338,8 +332,7 @@ def ready2run(msg, files4comp, job_register, sceneid, product='CT'):
 
 
 def ctype_composite_worker(scene, job_id, publish_q, config_options):
-    """Spawn/Start a Mesan composite generation on a new thread if available"""
-
+    """Spawn/Start a Mesan composite generation on a new thread if available."""
     try:
         LOG.debug("Ctype: Start compositer...")
         # Get the time of analysis from start and end times:
@@ -395,15 +388,13 @@ def ctype_composite_worker(scene, job_id, publish_q, config_options):
                 LOG.warning(
                     "Job entry is not a datetime instance: " + str(job_id))
 
-    except:
+    except Exception:
         LOG.exception('Failed in ctype_composite_worker...')
         raise
 
 
 def ctth_composite_worker(scene, job_id, publish_q, config_options):
-    """Spawn/Start a Mesan cloud height composite generation on a new thread if
-    available"""
-
+    """Spawn/Start a cloud height composite generation on a new thread if available."""
     try:
         LOG.debug("CTTH compositer: Start...")
         # Get the time of analysis from start and end times:
@@ -456,14 +447,21 @@ def ctth_composite_worker(scene, job_id, publish_q, config_options):
                 LOG.warning(
                     "Job entry is not a datetime instance: " + str(job_id))
 
-    except:
+    except Exception:
         LOG.exception('Failed in ctth_composite_worker...')
         raise
 
 
 def mesan_live_runner(config_options):
-    """Listens and triggers processing"""
+    """Start and run the Mesan cloud composite processing in real-time.
 
+    Processing is triggered on incoming Meteosat NWCSAF/Geo cloud scene by
+    listening to incoming messages. Processing is being triggered and possible
+    NWCSAF/PPS scenes are taken into account. When successfully finished on a
+    time slot, the composite is written to disk and a Posttroll message is
+    being sent.
+
+    """
     LOG.info("*** Start the runner for the Mesan composite generator:")
     LOG.debug("os.environ = " + str(os.environ))
     npix = int(config_options.get('number_of_pixels', DEFAULT_SUPEROBS_WINDOW_SIZE_NPIX))
@@ -482,7 +480,6 @@ def mesan_live_runner(config_options):
     composite_files = {}
     jobs_dict = {}
     while True:
-
         try:
             msg = listener_q.get()
         except Empty:

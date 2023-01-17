@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2015, 2016, 2019 Adam.Dybbroe
+# Copyright (c) 2014-2023 Adam.Dybbroe
 
 # Author(s):
 
@@ -28,7 +28,7 @@ amount/cover and print to stdout.
 
 import numpy as np
 from mesan_compositer.netcdf_io import ncCloudTypeComposite
-from mesan_compositer import get_config
+from mesan_compositer.config import get_config
 
 import argparse
 from datetime import datetime

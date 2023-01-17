@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 - 2019, 2023 Adam.Dybbroe
+# Copyright (c) 2014-2023 Adam.Dybbroe
 
 # Author(s):
 
@@ -20,13 +20,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Collection of minor helper tools for the generation of Mesan composites"""
+"""Collection of minor helper tools for the generation of Mesan composites."""
 
 import os
-from glob import glob
+
 from trollsift import Parser, globify
 from datetime import datetime, timedelta
-from six.moves import configparser
+
 import six
 from mesan_compositer.pps_msg_conversions import get_bit_from_flags
 import logging
@@ -82,17 +82,18 @@ SENSOR = {'NOAA-19': 'avhrr/3',
           'NOAA-20': 'viirs'}
 
 
-PPS_FILENAME = "S_NWC_{product:s}_{platform_name:s}_{orbit:05d}_{start_time:%Y%m%dT%H%M%S%f}Z_{end_time:%Y%m%dT%H%M%S%f}Z.nc"
+PPS_FILENAME = "S_NWC_{product:s}_{platform_name:s}_{orbit:05d}_{start_time:%Y%m%dT%H%M%S%f}Z_{end_time:%Y%m%dT%H%M%S%f}Z.nc"  # noqa
+# FIXME!
 
 
 class PpsMetaData(object):
-
-    """Container for the metadata defining the pps scenes"""
+    """Container for the metadata defining the NWCSAF/PPS cloud scenes."""
 
     def __init__(self, filename=None, geofilename=None,
                  platform_name=None,
                  orbit="00000", timeslot=None,
                  variant=None):
+        """Initialize the metadata object for the NWCSAF/PPS cloud product scene."""
         self.platform_name = platform_name
         self.orbit = orbit
         self.timeslot = timeslot
@@ -101,6 +102,7 @@ class PpsMetaData(object):
         self.geofilename = geofilename
 
     def __str__(self):
+        """Print the metadata content in human readable form."""
         return "\n".join(['filename=' + str(self.uri),
                           'geofilename=' + str(self.geofilename),
                           'platform_name=' + str(self.platform_name),
@@ -109,29 +111,33 @@ class PpsMetaData(object):
                           'variant=' + str(self.variant)])
 
     def __lt__(self, other):
+        """Less than."""
         return self.timeslot < other.timeslot
 
     def __gt__(self, other):
+        """Greater than."""
         return self.timeslot > other.timeslot
 
     def __le__(self, other):
+        """Less than equal."""
         return self.timeslot <= other.timeslot
 
     def __ge__(self, other):
+        """Greater than equal."""
         return self.timeslot >= other.timeslot
 
 
 class GeoMetaData:
-
     """Container for the metadata defining the NWCSAF/Geo cloud scenes."""
 
     def __init__(self, filename=None, platform_name=None,
                  areaid=None, timeslot=None):
+        """Initialize the metadata class for the NWCSAF/Geo cloud scene."""
         self.timeslot = timeslot
         self.areaid = areaid
         self.platform_name = platform_name
         self.uri = filename
-        self._hrit_pattern = '{rate:1s}-000-{hrit_format:_<6s}-{platform_shortname:4s}_{service:_<7s}-{channel:_<9s}-{segment:06d}___-{start_time:%Y%m%d%H%M}-__'
+        self._hrit_pattern = '{rate:1s}-000-{hrit_format:_<6s}-{platform_shortname:4s}_{service:_<7s}-{channel:_<9s}-{segment:06d}___-{start_time:%Y%m%d%H%M}-__'  # noqa
         self._hrit_path = None
         self.hrit_files = None
 
@@ -151,28 +157,36 @@ class GeoMetaData:
         self.hrit_files.sort()
 
     def __str__(self):
+        """Print out the metadata content in human reeadable form."""
         return "\n".join(['filename=' + str(self.uri),
                           'platform_name=' + str(self.platform_name),
                           'areaid=' + self.areaid,
                           'timeslot=' + str(self.timeslot)])
 
     def __lt__(self, other):
+        """Less than."""
         return self.timeslot < other.timeslot
 
     def __gt__(self, other):
+        """Greater than."""
         return self.timeslot > other.timeslot
 
     def __le__(self, other):
+        """Less than equal."""
         return self.timeslot <= other.timeslot
 
     def __ge__(self, other):
+        """Greater than equal."""
         return self.timeslot >= other.timeslot
 
 
 def get_analysis_time(start_t, end_t):
-    """From two times defining an interval, determine the closest hour (zero
-    minutes past) and return as a datetime object"""
+    """Get the analysis time within a time interval specified.
 
+    From two times defining an interval, determine the closest hour (zero
+    minutes past) and return as a datetime object.
+
+    """
     if end_t and start_t > end_t:
         raise IOError("Start time greater than end time!")
     elif not end_t:
@@ -187,9 +201,10 @@ def get_analysis_time(start_t, end_t):
 
 
 def get_ppslist(filelist, timewindow, satellites=None, variant=None):
-    """Get the full list of metadata keys for all pps passes in the *filelist*,
-    but only for the satellites specified in the list *satellites* if given"""
+    """Get the full list of metadata keys for all pps passes in the *filelist*.
 
+    Only consider the satellites specified in the list *satellites* if provided.
+    """
     from trollsift import Parser
     prod_p = Parser(PPS_FILENAME)
 
@@ -261,10 +276,12 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
 
 
 def get_msglist(filelist, timewindow, area_id, satellites=None):
-    """Get the full list of metadata keys for all Meteosat slots in the
-    *filelist*, but only for the satellites specified in the list *satellites*
-    if given"""
+    """Get the full list of metadata keys for all Meteosat SEVIRI slots provided in the list of files.
 
+    Only consider the Meteosat slots defined by the *filelist*, and only for the satellites specified
+    in the list *satellites* if provided.
+
+    """
     if not satellites:
         satellites = ['Meteosat-8', 'Meteosat-9',
                       'Meteosat-10', 'Meteosat-11']
@@ -293,7 +310,6 @@ def get_msglist(filelist, timewindow, area_id, satellites=None):
 
         # Hardcoded the filenaming convention! FIXME!
         try:
-            #timeslot = datetime.strptime(bname[17:17 + 12], '%Y%m%d%H%M')
             timeslot = datetime.strptime(bnsplit[0], '%Y%m%d%H%M')
         except ValueError:
             LOG.error("Failure: Can't get the time of the msg scene! " +
@@ -312,15 +328,13 @@ def get_msglist(filelist, timewindow, area_id, satellites=None):
 
 
 def get_nwcsaf_files(basedir, file_ext):
-    """Get list of file names of msg or pps products"""
+    """Get list of file names of msg or pps products."""
     from glob import glob
     return glob(os.path.join(basedir, '*' + file_ext))
 
 
 def get_weight_ctth(ctth_flag, lat, tdiff, is_msg):
-    """Weights for given CTTH flag, time diff and latitude (only MSG).
-    """
-    #
+    """Weights for given CTTH flag, time diff and latitude (only MSG)."""
     import numpy as np
     #
     #  limits; linear lat dependence for MSG
@@ -369,7 +383,7 @@ def get_weight_ctth(ctth_flag, lat, tdiff, is_msg):
         weight[np.nonzero(b)] *= wCTTHflg[bit, 1 * is_msg[np.nonzero(b)]]
     # linear lat dependence for MSG btw LATMIN_MSG and latmax_msg
     # weight is 1.0 for lat < LATMIN and 0.0 for lat > LATMAX
-    if not np.all(is_msg == False):
+    if not np.all(is_msg is False):
         ii = (lat >= latmin_msg) * (lat <= latmax_msg) * is_msg
         weight[ii] *= (latmax_msg - lat[ii]) / (latmax_msg - latmin_msg)
         ii = (lat > latmax_msg) * is_msg
@@ -379,9 +393,7 @@ def get_weight_ctth(ctth_flag, lat, tdiff, is_msg):
 
 
 def get_weight_cloudtype(ctype, ctype_flag, lat, tdiff, is_msg, fill_value=20):
-    """Weights for given ctype, ctype flag, time diff and latitude (only MSG).
-    """
-    #
+    """Weights for given ctype, ctype flag, time diff and latitude (only MSG)."""
     import numpy as np
 
     #  limits; linear lat dependence for MSG
@@ -459,7 +471,7 @@ def get_weight_cloudtype(ctype, ctype_flag, lat, tdiff, is_msg, fill_value=20):
 
     # linear lat dependence for MSG btw latmin_msg and latmax_msg
     # weight is 1.0 for lat < LATMIN and 0.0 for lat > LATMAX
-    if not np.all(is_msg == False):
+    if not np.all(is_msg is False):
         ii = (lat >= latmin_msg) * (lat <= latmax_msg) * is_msg
         weight[ii] *= (latmax_msg - lat[ii]) / (latmax_msg - latmin_msg)
         ii = (lat > latmax_msg) * is_msg

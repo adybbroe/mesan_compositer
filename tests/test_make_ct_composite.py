@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019 Adam.Dybbroe
+# Copyright (c) 2019, 2023 Adam.Dybbroe
 
 # Author(s):
 
@@ -24,11 +24,10 @@
 
 import sys
 from datetime import datetime, timedelta
-import unittest
 
 from mesan_compositer.make_ct_composite import ctCompositer
 from mesan_compositer.composite_tools import PpsMetaData
-from mesan_compositer.composite_tools import MsgMetaData
+from mesan_compositer.composite_tools import GeoMetaData
 
 if sys.version_info < (3,):
     from mock import patch
@@ -73,10 +72,10 @@ FAKE_PPS_FILES = ['/tmp/pps1.nc',
                   '/tmp/pps11.nc']
 
 
-class TestctCompositor(unittest.TestCase):
+class TestctCompositor:
     """Test the ctCompositor class."""
 
-    def setUp(self):
+    def setup_method(self):
         """Set up the tests."""
         filename = '/tmp/my_pps_testfile.nc'
         geofilename = '/tmp/my_pps_geo_testfile.nc'
@@ -91,17 +90,17 @@ class TestctCompositor(unittest.TestCase):
         platform_name = 'Meteosat-11'
         timeslot = datetime(2019, 11, 5, 19, 0)
         areaid = 'MSG-N'
-        msg_meta_obj1 = MsgMetaData(filename, platform_name, areaid, timeslot)
+        msg_meta_obj1 = GeoMetaData(filename, platform_name, areaid, timeslot)
         filename = '/tmp/my_msg_testfile.nc'
         platform_name = 'Meteosat-11'
         timeslot = datetime(2019, 11, 5, 19, 15)
         areaid = 'MSG-N'
-        msg_meta_obj2 = MsgMetaData(filename, platform_name, areaid, timeslot)
+        msg_meta_obj2 = GeoMetaData(filename, platform_name, areaid, timeslot)
         filename = '/tmp/my_msg_testfile.nc'
         platform_name = 'Meteosat-11'
         timeslot = datetime(2019, 11, 5, 19, 30)
         areaid = 'MSG-N'
-        msg_meta_obj3 = MsgMetaData(filename, platform_name, areaid, timeslot)
+        msg_meta_obj3 = GeoMetaData(filename, platform_name, areaid, timeslot)
 
         self.msg_scenes = [msg_meta_obj1, msg_meta_obj2, msg_meta_obj3]
 
@@ -125,16 +124,3 @@ class TestctCompositor(unittest.TestCase):
             ctcomp.msg_scenes = self.msg_scenes
 
             # TODO: Here we should try test the generation of the composite
-
-    def tearDown(self):
-        """Clean up."""
-        pass
-
-
-def suite():
-    """Perform the unit testing for the cloudtype composite generation."""
-    loader = unittest.TestLoader()
-    mysuite = unittest.TestSuite()
-    mysuite.addTest(loader.loadTestsFromTestCase(TestctCompositor))
-
-    return mysuite
