@@ -23,7 +23,6 @@
 """Unit testing the composite generation."""
 
 import unittest
-import pytest
 import pathlib
 import numpy as np
 from mesan_compositer.composite_tools import get_weight_cloudtype
@@ -118,82 +117,6 @@ WEIGHT_MSG2 = np.array([[0.65217391,  0.65217391,  0.65217391,  0.65217391,  0.6
                         [0.65217391,  0.65217391,  0.65217391,  0.65217391,  0.65217391,
                          0.65217391,  0.65217391,  0.65217391,  0.65217391,  0.65217391]], 'float')
 
-HRIT_TEST_FILE_NAMES = [
-    'H-000-MSG4__-MSG4________-HRV______-000007___-202301161115-__',
-    'H-000-MSG4__-MSG4________-IR_016___-000007___-202301161115-__',
-    'H-000-MSG4__-MSG4________-IR_039___-000007___-202301161115-__',
-    'H-000-MSG4__-MSG4________-IR_087___-000007___-202301161115-__',
-    'H-000-MSG4__-MSG4________-IR_097___-000007___-202301161115-__',
-    'H-000-MSG4__-MSG4________-IR_108___-000007___-202301161115-__',
-    'H-000-MSG4__-MSG4________-IR_120___-000007___-202301161115-__',
-    'H-000-MSG4__-MSG4________-IR_134___-000007___-202301161115-__',
-    'H-000-MSG4__-MSG4________-VIS006___-000007___-202301161115-__',
-    'H-000-MSG4__-MSG4________-VIS008___-000007___-202301161115-__',
-    'H-000-MSG4__-MSG4________-WV_062___-000007___-202301161115-__',
-    'H-000-MSG4__-MSG4________-WV_073___-000007___-202301161115-__',
-
-    'H-000-MSG4__-MSG4________-HRV______-000007___-202301161145-__',
-    'H-000-MSG4__-MSG4________-IR_016___-000007___-202301161145-__',
-    'H-000-MSG4__-MSG4________-IR_039___-000007___-202301161145-__',
-    'H-000-MSG4__-MSG4________-IR_087___-000007___-202301161145-__',
-    'H-000-MSG4__-MSG4________-IR_097___-000007___-202301161145-__',
-    'H-000-MSG4__-MSG4________-IR_108___-000007___-202301161145-__',
-    'H-000-MSG4__-MSG4________-IR_120___-000007___-202301161145-__',
-    'H-000-MSG4__-MSG4________-IR_134___-000007___-202301161145-__',
-    'H-000-MSG4__-MSG4________-VIS006___-000007___-202301161145-__',
-    'H-000-MSG4__-MSG4________-VIS008___-000007___-202301161145-__',
-    'H-000-MSG4__-MSG4________-WV_062___-000007___-202301161145-__',
-    'H-000-MSG4__-MSG4________-WV_073___-000007___-202301161145-__',
-
-    'H-000-MSG4__-MSG4________-HRV______-000006___-202301161115-__',
-    'H-000-MSG4__-MSG4________-IR_016___-000006___-202301161115-__',
-    'H-000-MSG4__-MSG4________-IR_039___-000006___-202301161115-__',
-    'H-000-MSG4__-MSG4________-IR_087___-000006___-202301161115-__',
-    'H-000-MSG4__-MSG4________-IR_097___-000006___-202301161115-__',
-    'H-000-MSG4__-MSG4________-IR_108___-000006___-202301161115-__',
-    'H-000-MSG4__-MSG4________-IR_120___-000006___-202301161115-__',
-    'H-000-MSG4__-MSG4________-IR_134___-000006___-202301161115-__',
-    'H-000-MSG4__-MSG4________-VIS006___-000006___-202301161115-__',
-    'H-000-MSG4__-MSG4________-VIS008___-000006___-202301161115-__',
-    'H-000-MSG4__-MSG4________-WV_062___-000006___-202301161115-__',
-    'H-000-MSG4__-MSG4________-WV_073___-000006___-202301161115-__']
-
-TEST_HRIT_SLOT = [
-    'H-000-MSG4__-MSG4________-HRV______-000007___-202301161115-__',
-    'H-000-MSG4__-MSG4________-IR_016___-000007___-202301161115-__',
-    'H-000-MSG4__-MSG4________-IR_039___-000007___-202301161115-__',
-    'H-000-MSG4__-MSG4________-IR_087___-000007___-202301161115-__',
-    'H-000-MSG4__-MSG4________-IR_097___-000007___-202301161115-__',
-    'H-000-MSG4__-MSG4________-IR_108___-000007___-202301161115-__',
-    'H-000-MSG4__-MSG4________-IR_120___-000007___-202301161115-__',
-    'H-000-MSG4__-MSG4________-IR_134___-000007___-202301161115-__',
-    'H-000-MSG4__-MSG4________-VIS006___-000007___-202301161115-__',
-    'H-000-MSG4__-MSG4________-VIS008___-000007___-202301161115-__',
-    'H-000-MSG4__-MSG4________-WV_062___-000007___-202301161115-__',
-    'H-000-MSG4__-MSG4________-WV_073___-000007___-202301161115-__',
-    'H-000-MSG4__-MSG4________-HRV______-000006___-202301161115-__',
-    'H-000-MSG4__-MSG4________-IR_016___-000006___-202301161115-__',
-    'H-000-MSG4__-MSG4________-IR_039___-000006___-202301161115-__',
-    'H-000-MSG4__-MSG4________-IR_087___-000006___-202301161115-__',
-    'H-000-MSG4__-MSG4________-IR_097___-000006___-202301161115-__',
-    'H-000-MSG4__-MSG4________-IR_108___-000006___-202301161115-__',
-    'H-000-MSG4__-MSG4________-IR_120___-000006___-202301161115-__',
-    'H-000-MSG4__-MSG4________-IR_134___-000006___-202301161115-__',
-    'H-000-MSG4__-MSG4________-VIS006___-000006___-202301161115-__',
-    'H-000-MSG4__-MSG4________-VIS008___-000006___-202301161115-__',
-    'H-000-MSG4__-MSG4________-WV_062___-000006___-202301161115-__',
-    'H-000-MSG4__-MSG4________-WV_073___-000006___-202301161115-__']
-
-
-@pytest.fixture
-def fake_hrit_files_directory(tmp_path):
-    """Fake a directory with HRIT files."""
-    for i in range(len(HRIT_TEST_FILE_NAMES)):
-        file_path = tmp_path / HRIT_TEST_FILE_NAMES[i]
-        file_path.touch()
-
-    return file_path.parent
-
 
 class TestCloudTypeWeights(unittest.TestCase):
     """Unit testing the functions to convert msg flags to pps (old) flags."""
@@ -253,7 +176,7 @@ class TestTimeTools:
         assert tslots[1] <= tslots[2]
         assert tslots[2] <= tslots[3]
 
-    def test_geo_metadata_no_hrit(self, tmp_path):
+    def test_geo_metadata(self, tmp_path):
         """Test operations on the NWCSAF/Geo meta data class."""
         filename = tmp_path / 'S_NWC_CTTH_MSG4_MSG-N-VISIR_20191105T180000Z_PLAX.nc'
         timeslot1 = datetime(2019, 11, 5, 18, 0)
@@ -266,7 +189,7 @@ class TestTimeTools:
         assert mda.platform_name == 'Meteosat-11'
         assert mda.areaid == 'some_area'
 
-    def test_geo_metadata_no_hrit_several_timeslots(self, tmp_path):
+    def test_geo_metadata_several_timeslots(self, tmp_path):
         """Test operations on the NWCSAF/Geo meta data class - several timeslots."""
         filename = tmp_path / 'S_NWC_CTTH_MSG4_MSG-N-VISIR_20191105T180000Z_PLAX.nc'
         platform_name = 'Meteosat-11'
@@ -301,21 +224,6 @@ class TestTimeTools:
         assert tslots[1] <= tslots[2]
         assert tslots[2] <= tslots[3]
         assert tslots[3] <= tslots[4]
-
-    def test_geo_metadata_set_hrit(self, fake_hrit_files_directory, tmp_path):
-        """Test adding hrit data files to the NWCSAF/Geo meta data class."""
-        filename = tmp_path / 'geo_products' / 'S_NWC_CTTH_MSG4_MSG-N-VISIR_20230116T111500Z_PLAX.nc'
-        timeslot1 = datetime(2023, 1, 16, 11, 15)
-
-        mda = GeoMetaData(filename, 'Meteosat-11', 'some_area', timeslot1)
-        mda.find_hrit_files(fake_hrit_files_directory)
-
-        expected = []
-        for fname in TEST_HRIT_SLOT:
-            expected.append(tmp_path / fname)
-        expected.sort()
-
-        assert mda.hrit_files == expected
 
     def test_get_analysis_time(self):
         """Test the determination of the analysis time from two times defining a time interval."""

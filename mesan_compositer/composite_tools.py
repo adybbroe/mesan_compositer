@@ -23,8 +23,7 @@
 """Collection of minor helper tools for the generation of Mesan composites."""
 
 import os
-
-from trollsift import Parser, globify
+from trollsift import Parser
 from datetime import datetime, timedelta
 
 import six
@@ -137,27 +136,27 @@ class GeoMetaData:
         self.areaid = areaid
         self.platform_name = platform_name
         self.uri = filename
-        self._hrit_pattern = '{rate:1s}-000-{hrit_format:_<6s}-{platform_shortname:4s}_{service:_<7s}-{channel:_<9s}-{segment:06d}___-{start_time:%Y%m%d%H%M}-__'  # noqa
-        self._hrit_path = None
-        self.hrit_files = None
+        # self._hrit_pattern = '{rate:1s}-000-{hrit_format:_<6s}-{platform_shortname:4s}_{service:_<7s}-{channel:_<9s}-{segment:06d}___-{start_time:%Y%m%d%H%M}-__'  # noqa
+        # self._hrit_path = None
+        # self.hrit_files = None
 
-    def find_hrit_files(self, hrit_path):
-        """Find the matching hrit files for the cloud scene."""
-        self._hrit_path = hrit_path
-        self.hrit_files = []
+    # def find_hrit_files(self, hrit_path):
+    #     """Find the matching hrit files for the cloud scene."""
+    #     self._hrit_path = hrit_path
+    #     self.hrit_files = []
 
-        p__ = Parser(self._hrit_pattern)
-        hrit_files = self._hrit_path.glob(globify(self._hrit_pattern))
+    #     p__ = Parser(self._hrit_pattern)
+    #     hrit_files = self._hrit_path.glob(globify(self._hrit_pattern))
 
-        for hrit_fname in hrit_files:
-            res = p__.parse(hrit_fname.name)
-            if self.timeslot - timedelta(seconds=1) < res['start_time'] < self.timeslot + timedelta(seconds=1):
-                self.hrit_files.append(hrit_fname)
+    #     for hrit_fname in hrit_files:
+    #         res = p__.parse(hrit_fname.name)
+    #         if self.timeslot - timedelta(seconds=1) < res['start_time'] < self.timeslot + timedelta(seconds=1):
+    #             self.hrit_files.append(hrit_fname)
 
-        self.hrit_files.sort()
+    #     self.hrit_files.sort()
 
     def __str__(self):
-        """Print out the metadata content in human reeadable form."""
+        """Print out the metadata content in human readable form."""
         return "\n".join(['filename=' + str(self.uri),
                           'platform_name=' + str(self.platform_name),
                           'areaid=' + self.areaid,
@@ -205,7 +204,6 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
 
     Only consider the satellites specified in the list *satellites* if provided.
     """
-    from trollsift import Parser
     prod_p = Parser(PPS_FILENAME)
 
     LOG.debug("List of satellites: %s", str(satellites))
@@ -275,56 +273,56 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
     return plist
 
 
-def get_msglist(filelist, timewindow, area_id, satellites=None):
-    """Get the full list of metadata keys for all Meteosat SEVIRI slots provided in the list of files.
+# def get_msglist(filelist, timewindow, area_id, satellites=None):
+#     """Get the full list of metadata keys for all Meteosat SEVIRI slots provided in the list of files.
 
-    Only consider the Meteosat slots defined by the *filelist*, and only for the satellites specified
-    in the list *satellites* if provided.
+#     Only consider the Meteosat slots defined by the *filelist*, and only for the satellites specified
+#     in the list *satellites* if provided.
 
-    """
-    if not satellites:
-        satellites = ['Meteosat-8', 'Meteosat-9',
-                      'Meteosat-10', 'Meteosat-11']
-    metsats = [MSGSATS.get(s, 'MSGx') for s in satellites]
+#     """
+#     if not satellites:
+#         satellites = ['Meteosat-8', 'Meteosat-9',
+#                       'Meteosat-10', 'Meteosat-11']
+#     metsats = [MSGSATS.get(s, 'MSGx') for s in satellites]
 
-    mlist = []
-    for filename in filelist:
-        bname = os.path.basename(filename)
-        LOG.debug("Filename: %s", str(bname))
+#     mlist = []
+#     for filename in filelist:
+#         bname = os.path.basename(filename)
+#         LOG.debug("Filename: %s", str(bname))
 
-        bnsplit = bname.split('_')
-        sat = bnsplit[1]
-        if sat not in metsats:
-            LOG.warning('Satellite ' + str(sat) +
-                        ' not in list: ' + str(metsats))
-            continue
+#         bnsplit = bname.split('_')
+#         sat = bnsplit[1]
+#         if sat not in metsats:
+#             LOG.warning('Satellite ' + str(sat) +
+#                         ' not in list: ' + str(metsats))
+#             continue
 
-        platform_name = METEOSAT[sat]
-        bnsplit = bname[17:].split('_')
-        areaid = bnsplit[1].split('.')[0]
-        if areaid != area_id:
-            LOG.debug("Area id " + str(areaid) +
-                      " not requested (" + str(area_id) + ")")
-            LOG.debug("bnsplit = %s", str(bnsplit))
-            continue
+#         platform_name = METEOSAT[sat]
+#         bnsplit = bname[17:].split('_')
+#         areaid = bnsplit[1].split('.')[0]
+#         if areaid != area_id:
+#             LOG.debug("Area id " + str(areaid) +
+#                       " not requested (" + str(area_id) + ")")
+#             LOG.debug("bnsplit = %s", str(bnsplit))
+#             continue
 
-        # Hardcoded the filenaming convention! FIXME!
-        try:
-            timeslot = datetime.strptime(bnsplit[0], '%Y%m%d%H%M')
-        except ValueError:
-            LOG.error("Failure: Can't get the time of the msg scene! " +
-                      str(bname))
-            continue
+#         # Hardcoded the filenaming convention! FIXME!
+#         try:
+#             timeslot = datetime.strptime(bnsplit[0], '%Y%m%d%H%M')
+#         except ValueError:
+#             LOG.error("Failure: Can't get the time of the msg scene! " +
+#                       str(bname))
+#             continue
 
-        # Now filter out all passes outside time window:
-        if (timeslot > timewindow[0] and
-                timeslot < timewindow[1]):
-            mda = GeoMetaData(filename=filename,
-                              areaid=areaid, timeslot=timeslot,
-                              platform_name=platform_name)
-            mlist.append(mda)
+#         # Now filter out all passes outside time window:
+#         if (timeslot > timewindow[0] and
+#                 timeslot < timewindow[1]):
+#             mda = GeoMetaData(filename=filename,
+#                               areaid=areaid, timeslot=timeslot,
+#                               platform_name=platform_name)
+#             mlist.append(mda)
 
-    return mlist
+#     return mlist
 
 
 def get_nwcsaf_files(basedir, file_ext):

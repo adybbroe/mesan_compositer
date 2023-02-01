@@ -47,6 +47,32 @@ class LoadException(Exception):
     pass
 
 
+def nwcsaf_cloudtype_2021():
+    """Palette for NWCSAF cloud type product - v2021."""
+    legend = []
+    legend.append((0, 0, 0))  # Unprocessed: Grey
+    legend.append((0, 120,   0))
+    legend.append((0,   0,   0))  # Sea: Black
+    legend.append((250, 190, 250))  # Snow
+    legend.append((220, 160, 220))  # Sea-ice
+
+    legend.append((255, 100,   0))
+    legend.append((255, 180,   0))
+    legend.append((240, 240,   0))
+
+    legend.append((215, 215, 150))
+    legend.append((230, 230, 230))
+
+    legend.append((200,  0, 200))
+    legend.append((0, 80, 215))
+    legend.append((0, 180, 230))
+    legend.append((0, 240, 240))
+    legend.append((90, 200, 160))
+    legend.append((200, 175, 250))
+
+    return convert_palette(legend)
+
+
 def nwcsaf_cloudtype():
     """Palette for regular cloud classification."""
     legend = []

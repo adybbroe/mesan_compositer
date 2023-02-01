@@ -41,7 +41,5 @@ def test_get_yaml_configuration(fake_yamlconfig_file):
     assert config['min_num_of_pps_dr_files'] == 10
 
     assert config['msg_dir'] == '/path/to/nwcsaf/geo/cloud/products'
-    assert config['hrit_path'] == '/path/to/seviri/hrit/files'
-
     assert config['composite_output_dir'] == '/path/to/cloud/composites/output'
     assert config['pps_direct_readout_dir'] == '/path/to/nwcsaf/pps/cloud/products'
