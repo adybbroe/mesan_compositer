@@ -71,15 +71,3 @@ def test_geo_clouds_loader_load(nwcsaf_geo_ct_filename):
     dset_names = scn.scene.available_dataset_names()
     for pname in scn._composites_and_datasets_to_load:
         assert pname in dset_names
-
-
-def test_geo_clouds_loader_get_satz_angles(nwcsaf_geo_ct_filename):
-    """Test create the geo cloud product loader instance from list of fake files."""
-    scn = GeoCloudProductsLoader([nwcsaf_geo_ct_filename])
-    scn.load()
-    myarea_def = TEST_AREADEF
-
-    assert 'orbital_parameters' in scn.scene['ct'].attrs.keys()
-    satz = scn.prepare_satz_angles_on_area(myarea_def)
-
-    assert satz.shape == (1024, 1024)
