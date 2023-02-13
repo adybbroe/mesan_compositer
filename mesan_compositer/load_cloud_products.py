@@ -5,7 +5,7 @@
 
 # Author(s):
 
-#   Adam.Dybbroe <a000680@c21856.ad.smhi.se>
+#   Adam.Dybbroe <Firstname.Lastname @ smhi.se>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,23 +26,19 @@ import os
 from glob import glob
 import xarray as xr
 import numpy as np
+
+# from trollimage.xrimage import XRImage
 from pyorbital.orbital import Orbital
 from satpy import Scene
 from satpy.utils import debug_on
 from satpy import MultiScene, DataQuery
 from satpy.multiscene import stack
 from satpy.modifiers.angles import get_satellite_zenith_angle
+import logging
 
 debug_on()
 
-
-def get_remapped_angles(scn, area_def):
-    """From a polar/geo Scene object get the remapped angles."""
-    from pyresample.bilinear import XArrayBilinearResampler
-    resampler = XArrayBilinearResampler(scn['ct'].area, area_def, 30e3)
-
-    satz = scn['satz']
-    return resampler.resample(satz)
+LOG = logging.getLogger(__name__)
 
 
 class GeoCloudProductsLoader:
@@ -60,15 +56,6 @@ class GeoCloudProductsLoader:
         self.scene = Scene({self._reader: self._cloud_files})
         self.scene.load(self._composites_and_datasets_to_load)
 
-    def prepare_satz_angles_on_area(self, area_def):
-        """Derive the satellite zenith angles and attach data to Satpy scene object."""
-        composite_name = 'ct'
-
-        self.scene['satz'] = get_satellite_zenith_angle(self.scene[composite_name])
-        self.scene['satz'].attrs['area'] = self.scene[composite_name].attrs['area']
-
-        return get_remapped_angles(self.scene, area_def)
-
 
 class PPSCloudProductsLoader:
     """Class to load and prepare a NWCSAF/PPS Cloud product on area."""
@@ -84,12 +71,10 @@ class PPSCloudProductsLoader:
         self.scene = Scene(filenames=self._cloud_files, reader='nwcsaf-pps_nc')
         self.scene.load(self._composites_and_datasets_to_load)
 
-    def prepare_satz_angles_on_area(self, area_def):
+    def prepare_satz_angles_on(self):
         """Derive the satellite zenith angles and attach data to Satpy scene object."""
         self.scene['satz'] = self._get_satz_angles()
         self.scene['satz'].attrs['area'] = self.scene['cma'].attrs['area']
-
-        return get_remapped_angles(self.scene, area_def)
 
     def _get_satz_angles(self):
         """Calculate the satellite zenith angles using Pyorbital."""
@@ -105,9 +90,11 @@ class PPSCloudProductsLoader:
         obs_time = np.dstack([obs_time]*self._shape[1])[0]
 
         lon, lat = self.scene['cma'].attrs['area'].get_lonlats()
+        LOG.debug('Get satellite elevation via Pyorbital')
         _, elevation = orb.get_observer_look(obs_time, lon, lat, 0.)
         del _
         sat_zen = 90. - elevation
+        LOG.debug('Satellite zenith angles derived on data')
 
         satz = xr.DataArray(data=sat_zen, dims=["y", "x"],
                             coords=dict(
@@ -126,38 +113,51 @@ if __name__ == "__main__":
     from pyresample import load_area
 
     GEO_DIR = "/home/a000680/data/mesan/geo_in/v2021"
-    GEO_FILES = glob(os.path.join(GEO_DIR, 'S_NWC_*MSG4_MSG-N-VISIR_20230116T1100*PLAX.nc'))
+    # GEO_FILES = glob(os.path.join(GEO_DIR, 'S_NWC_*MSG4_MSG-N-VISIR_20230116T1100*PLAX.nc'))
+    GEO_FILES = glob(os.path.join(GEO_DIR, 'S_NWC_*MSG4_MSG-N-VISIR_20230201T1700*_PLAX.nc'))
 
     geo = GeoCloudProductsLoader(GEO_FILES)
     geo.load()
 
-    # areaid = "mesanEx"
-    areaid = 'euro4'
+    areaid = "mesanEx"
     area_def = load_area('/home/a000680/usr/src/pytroll-config/etc/areas.yaml', areaid)
 
-    # geo_satz = geo.prepare_satz_angles_on_area(area_def)
-
     POLAR_DIR = "/home/a000680/data/mesan/polar_in/v2021"
-    N18_FILES = glob(os.path.join(POLAR_DIR, 'S_NWC_*noaa18_91014*nc'))
-    N20_FILES = glob(os.path.join(POLAR_DIR, 'S_NWC_*noaa20_00000_20230116T10*nc'))
+    # N18_FILES = glob(os.path.join(POLAR_DIR, 'S_NWC_*noaa18_91014*nc'))
+    POES_FILES = glob(os.path.join(POLAR_DIR, 'S_NWC_*noaa19_72055_20230201T1651106Z*nc'))
+    # N20_FILES = glob(os.path.join(POLAR_DIR, 'S_NWC_*noaa20_00000_20230116T10*nc'))
+    METOP_FILES = glob(os.path.join(POLAR_DIR, 'S_NWC_*metopc_21988_20230201T1657001Z*nc'))
 
-    n18 = PPSCloudProductsLoader(N18_FILES)
-    n18.load()
+    poes = PPSCloudProductsLoader(POES_FILES)
+    poes.load()
+    poes.prepare_satz_angles_on()
+    metop = PPSCloudProductsLoader(METOP_FILES)
+    metop.load()
+    metop.prepare_satz_angles_on()
 
-    n18_satz = n18.prepare_satz_angles_on_area(area_def)
-
-    mscn = MultiScene([geo.scene, n18.scene])
+    mscn = MultiScene([geo.scene, poes.scene, metop.scene])
     groups = {DataQuery(name='CTY_group'): ['ct']}
     mscn.group(groups)
 
     resampled = mscn.resample(areaid, reduce_data=False)
 
     local_scn = resampled.scenes[0]['ct']
-    geo_satz = get_satellite_zenith_angle(local_scn)
 
-    weights = [1./geo_satz, 1./n18_satz]
+    # that = XRImage(local_scn)
+    # that.save('./geo_ct_scene_{area}.png'.format(area=areaid))
+
+    geo_satz = get_satellite_zenith_angle(local_scn)
+    poes_satz = resampled.scenes[1]['satz']
+    metop_satz = resampled.scenes[2]['satz']
+
+    weights = [1./geo_satz, 1./poes_satz, 1./metop_satz]
 
     from functools import partial
     stack_with_weights = partial(stack, weights=weights)
     blended = resampled.blend(blend_function=stack_with_weights)
-    blended.save_dataset('CTY_group', filename='./blended_stack_weighted_geo_n18_{area}.nc'.format(area=areaid))
+
+    polar_sats = (poes.scene['ct'].attrs['platform_name'].lower() +
+                  "_" + metop.scene['ct'].attrs['platform_name'].lower())
+    blended.save_dataset('CTY_group',
+                         filename='./blended_stack_weighted_geo_{polar}_{area}.nc'.format(polar=polar_sats,
+                                                                                          area=areaid))
