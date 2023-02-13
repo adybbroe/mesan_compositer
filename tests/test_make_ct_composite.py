@@ -58,11 +58,11 @@ dimensions = {"nx": 1530,
 START_TIME_PPS = "20230118T103917000Z"
 END_TIME_PPS = "20230118T104222000Z"
 
-global_attrs = {"source": "NWC/PPS version v2021",
-                "platform": "Suomi-NPP",
-                "orbit_number": 0,
-                "time_coverage_start": START_TIME_PPS,
-                "time_coverage_end": END_TIME_PPS}
+GLOBAL_ATTRIBUTES = {"source": "NWC/PPS version v2021",
+                     "platform": "Suomi-NPP",
+                     "orbit_number": 0,
+                     "time_coverage_start": START_TIME_PPS,
+                     "time_coverage_end": END_TIME_PPS}
 
 CT_PALETTE_MEANINGS = ("1 2 3 4 5 6 7 8 9 10 11 12 13 14 15")
 
@@ -73,7 +73,7 @@ PAL_ARRAY = np.random.randint(0, 255, size=(250, 3), dtype=np.uint8)
 @pytest.fixture
 def nwcsaf_pps_ct_filename(tmp_path_factory):
     """Create a NWCSAF/PPS Cloud Type file."""
-    attrs = global_attrs.copy()
+    attrs = GLOBAL_ATTRIBUTES.copy()
     attrs.update(PROJ_KM)
     attrs["time_coverage_start"] = START_TIME_PPS
     attrs["time_coverage_end"] = END_TIME_PPS
@@ -81,7 +81,7 @@ def nwcsaf_pps_ct_filename(tmp_path_factory):
     return filename
 
 
-def create_ct_file(path, filetype, attrs=global_attrs):
+def create_ct_file(path, filetype, attrs=GLOBAL_ATTRIBUTES):
     """Create a NWCSAF/PPS ct file."""
     filename = path / f"S_NWC_{filetype.upper()}_npp_00000_20230118T1039170Z_20230118T1042220Z.nc"
     with h5netcdf.File(filename, mode="w") as nc_file:
