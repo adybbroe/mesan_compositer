@@ -113,28 +113,6 @@ def get_arguments():
     return args.logging_conf_file, args.config_file, tanalysis, args.area_id, delta_t
 
 
-# def ctype_pps(pps, areaid):
-#     """Load PPS Cloudtype and reproject."""
-#     from satpy.scene import Scene
-
-#     scene = Scene(filenames=[pps.uri, pps.geofilename], reader='nwcsaf-pps_nc')
-#     scene.load(['cloudtype', 'ct', 'ct_quality', 'ct_status_flag', 'ct_conditions'])
-#     retv = scene.resample(areaid, radius_of_influence=8000)
-
-#     return retv
-
-
-# def ctype_msg(msg, areaid):
-#     """Load MSG paralax corrected cloud type and reproject."""
-#     from satpy.scene import Scene
-
-#     scene = Scene(filenames=[msg.uri, ], reader='nwcsaf-msg2013-hdf5')
-#     scene.load(['cloudtype', 'ct', 'ct_quality'])
-#     retv = scene.resample(areaid, radius_of_influence=20000)
-
-#     return retv
-
-
 class ctCompositer:
     """The Cloud Type Composite generator class."""
 
@@ -307,147 +285,10 @@ class ctCompositer:
 
     def blend_ct_products(self):
         """Blend the CT products together and create a cloud analysis."""
-        area_def = load_area('/home/a000680/usr/src/pytroll-config/etc/areas.yaml', self.areaid)
-
-        geo_scenes = []
-
-        for geo_file in [f.uri for f in self.msg_scenes]:
-            geo = GeoCloudProductsLoader([geo_file])
-            geo.load()
-            geo_satz = geo.prepare_satz_angles_on_area(area_def)
-            geo_scenes.append((geo, geo_satz))
-
-        polar_scenes = []
-        for pps_file in [f.uri for f in self.pps_scenes]:
-            polar = PPSCloudProductsLoader([pps_file])
-            polar.load()
-            polar_satz = polar.prepare_satz_angles_on_area(area_def)
-            polar_scenes.append((polar, polar_satz))
-
-        weights = []
-        cloud_scenes = []
-        for scn, satz in geo_scenes + polar_scenes:
-            cloud_scenes.append(scn.scene)
-            weights.append(1./satz)
-
-        mscn = MultiScene(cloud_scenes)
-        groups = {DataQuery(name='CTY_group'): ['ct']}
-        mscn.group(groups)
-
-        resampled = mscn.resample(self.areaid, reduce_data=False)
-
-        stack_with_weights = partial(stack, weights=weights)
-
-        return resampled.blend(blend_function=stack_with_weights)
-
-    # def make_composite(self):
-    #     """Make the Cloud Type composite."""
-    #     # Reference time for time stamp in composite file
-    #     # sec1970 = datetime(1970, 1, 1)
-    #     import time
-
-    #     comp_CT = None
-
-    #     if len(self.msg_scenes + self.pps_scenes) == 0:
-    #         LOG.error(
-    #             "Cannot make ct composite when no Scenes have been found!")
-    #         return False
-
-    #     # Loop over all polar and geostationary satellite scenes:
-    #     is_MSG = False
-    #     LOG.info("Loop over all polar and geostationary scenes:")
-    #     # msgscenes = [self.msg_scenes[0], self.msg_scenes[2], self.msg_scenes[1]]
-    #     # msgscenes = [self.msg_scenes[2], self.msg_scenes[1], self.msg_scenes[0]]
-    #     # msgscenes = [self.msg_scenes[1], self.msg_scenes[0], self.msg_scenes[2]]
-    #     # msgscenes = [self.msg_scenes[1], self.msg_scenes[2], self.msg_scenes[0]]
-    #     # for scene in msgscenes + self.pps_scenes:
-
-    #     # Go through the list of msg-scenes and find the one closest to the
-    #     # obs-time, and put in front. Also revert the list. All this is to make
-    #     # the code work as it did when the system tests were generated:
-    #     tdelta = timedelta(seconds=9999)
-    #     myindex = 0
-    #     for idx, scene in enumerate(self.msg_scenes):
-    #         if abs(scene.timeslot - self.obstime) < tdelta:
-    #             tdelta = abs(scene.timeslot - self.obstime)
-    #             myindex = idx
-    #     msgscenes = self.msg_scenes[::-1]
-    #     scene = self.msg_scenes[myindex]
-    #     msgscenes.remove(scene)
-    #     msgscenes.insert(0, scene)
-
-    #     for scene in msgscenes + self.pps_scenes:
-    #         x_CT = None
-    #         LOG.info("Scene:\n" + str(scene))
-    #         if (scene.platform_name.startswith("Meteosat") and
-    #                 not hasattr(scene, 'orbit')):
-    #             is_MSG = True
-    #             x_local = ctype_msg(scene, self.areaid)
-    #             dummy, lat = x_local['ct'].area.get_lonlats()
-    #             x_CT = x_local['ct'].data.compute()
-
-    #             # convert msg flags to pps
-    #             x_flag = ctype_procflags2pps(x_local['ct_quality'].data.compute())
-    #             x_id = 1 * np.ones(x_CT.shape)
-    #         else:
-    #             is_MSG = False
-    #             try:
-    #                 x_local = ctype_pps(scene, self.areaid)
-    #             except (ProjectException, LoadException) as err:
-    #                 LOG.warning("Couldn't load pps scene:\n" + str(scene))
-    #                 LOG.warning("Exception was: " + str(err))
-    #                 continue
-
-    #             # x_CT = x_local['CT'].ct.data
-    #             # x_flag = x_local['CT'].ct_quality.data
-    #             # Convert to old format:
-    #             x_CT = map_cloudtypes(x_local['ct'].data)
-    #             sflags = x_local['ct_status_flag']
-    #             cflags = x_local['ct_conditions']
-    #             qflags = x_local['ct_quality']
-    #             x_flag = ctype_convert_flags(sflags, cflags, qflags)
-    #             x_id = 0 * np.ones(x_CT.shape)
-    #             lat = 0 * np.ones(x_CT.shape)
-
-    #         # time identifier is seconds since 1970-01-01 00:00:00
-    #         x_time = time.mktime(scene.timeslot.timetuple()) * np.ones(x_CT.shape)
-    #         idx_MSG = is_MSG * np.ones(x_CT.shape, dtype=bool)
-    #         if comp_CT is None:
-    #             # initialize field with current CT
-    #             comp_lon, comp_lat = x_local['ct'].area.get_lonlats()
-    #             comp_CT = x_CT
-    #             comp_flag = x_flag
-    #             comp_time = x_time
-    #             comp_id = x_id
-    #             comp_w = get_weight_cloudtype(
-    #                 x_CT, x_flag, lat, abs(self.obstime - scene.timeslot), idx_MSG, fill_value=255)
-    #         else:
-    #             # compare with quality of current CT
-    #             x_w = get_weight_cloudtype(
-    #                 x_CT, x_flag, lat, abs(self.obstime - scene.timeslot), idx_MSG, fill_value=255)
-
-    #             # replace info where current CT data is best
-    #             ii = x_w > comp_w
-
-    #             comp_CT = np.where(ii, x_CT, comp_CT)
-    #             comp_flag = np.where(ii, x_flag, comp_flag)
-    #             comp_w = np.where(ii, x_w, comp_w)
-    #             comp_time = np.where(ii, x_time, comp_time)
-    #             comp_id = np.where(ii, x_id, comp_id)
-
-        # self.longitude = comp_lon
-        # self.latitude = comp_lat
-
-        # self.area = x_local['ct'].area
-
-        # composite = {"cloudtype": comp_CT,
-        #              "flag": comp_flag,
-        #              "weight": comp_w,
-        #              "time": comp_time,
-        #              "id": comp_id.astype(np.uint8)}
-        # self.composite.store(composite, self.area)
-
-        # return True
+        areaid = self.areaid
+        msg_files = (f.uri for f in self.msg_scenes)
+        pps_files = (f.uri for f in self.pps_scenes)
+        return blend_ct_products(areaid, msg_files, pps_files)
 
     def write(self):
         """Write the composite to a netcdf file."""
@@ -466,6 +307,42 @@ class ctCompositer:
         """Make quicklook images."""
         make_quicklooks(self.filename, self.composite.cloudtype,
                         self.composite.id, self.composite.weight)
+
+
+def blend_ct_products(areaid, msg_files, pps_files):
+    """Blend CT products."""
+    area_def = load_area('/home/a000680/usr/src/pytroll-config/etc/areas.yaml', areaid)
+
+    geo_scenes = []
+
+    for geo_file in msg_files:
+        geo = GeoCloudProductsLoader([geo_file])
+        geo.load()
+        geo_satz = geo.prepare_satz_angles_on_area(area_def)
+        geo_scenes.append((geo, geo_satz))
+
+    polar_scenes = []
+    for pps_file in pps_files:
+        polar = PPSCloudProductsLoader([pps_file])
+        polar.load()
+        polar_satz = polar.prepare_satz_angles_on_area(area_def)
+        polar_scenes.append((polar, polar_satz))
+
+    weights = []
+    cloud_scenes = []
+    for scn, satz in geo_scenes + polar_scenes:
+        cloud_scenes.append(scn.scene)
+        weights.append(1./satz)
+
+    mscn = MultiScene(cloud_scenes)
+    groups = {DataQuery(name='CTY_group'): ['ct']}
+    mscn.group(groups)
+
+    resampled = mscn.resample(areaid, reduce_data=False)
+
+    stack_with_weights = partial(stack, weights=weights)
+
+    return resampled.blend(blend_function=stack_with_weights)
 
 
 if __name__ == "__main__":
@@ -493,6 +370,7 @@ if __name__ == "__main__":
 
     ctcomp = ctCompositer(time_of_analysis, delta_time_window, area_id, OPTIONS)
     ctcomp.get_catalogue()
+
     blended = ctcomp.blend_ct_products()
 
     blended.save_dataset('CTY_group', filename='./blended_stack_weighted_geo_n18_{area}.nc'.format(area=ctcomp.areaid))

@@ -37,7 +37,10 @@ CHUNK_SIZE = 4096
 if __name__ == "__main__":
 
     areaid = 'euro4'
-    FILEPATH = "./blended_stack_weighted_geo_n18_{area}.nc".format(area=areaid)
+    # areaid = 'mesanEx'
+    # FILEPATH = "./blended_stack_weighted_geo_noaa-19_metop-c_{area}.nc".format(area=areaid)
+    FILEPATH = "./blended_stack_weighted_geo_noaa-19_{area}.nc".format(area=areaid)
+    # FILEPATH = "./blended_stack_weighted_geo_n18_{area}.nc".format(area=areaid)
     netcdf_filename = FILEPATH
 
     nc_ = xr.open_dataset(netcdf_filename, decode_cf=True,

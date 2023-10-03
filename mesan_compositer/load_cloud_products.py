@@ -71,7 +71,7 @@ class PPSCloudProductsLoader:
         self.scene = Scene(filenames=self._cloud_files, reader='nwcsaf-pps_nc')
         self.scene.load(self._composites_and_datasets_to_load)
 
-    def prepare_satz_angles_on(self):
+    def prepare_satz_angles_on_area(self):
         """Derive the satellite zenith angles and attach data to Satpy scene object."""
         self.scene['satz'] = self._get_satz_angles()
         self.scene['satz'].attrs['area'] = self.scene['cma'].attrs['area']
@@ -108,56 +108,56 @@ class PPSCloudProductsLoader:
         return satz
 
 
-if __name__ == "__main__":
+def blend_ct_products(areaid, geo_files, list_of_polar_scenes: list[list[str]]):
+    """Blend Geo and PPS cloud product scenes."""
+    # area_def = load_area('/home/a000680/usr/src/pytroll-config/etc/areas.yaml', areaid)
 
-    from pyresample import load_area
-
-    GEO_DIR = "/home/a000680/data/mesan/geo_in/v2021"
-    # GEO_FILES = glob(os.path.join(GEO_DIR, 'S_NWC_*MSG4_MSG-N-VISIR_20230116T1100*PLAX.nc'))
-    GEO_FILES = glob(os.path.join(GEO_DIR, 'S_NWC_*MSG4_MSG-N-VISIR_20230201T1700*_PLAX.nc'))
-
-    geo = GeoCloudProductsLoader(GEO_FILES)
+    geo = GeoCloudProductsLoader(geo_files)
     geo.load()
 
-    areaid = "mesanEx"
-    area_def = load_area('/home/a000680/usr/src/pytroll-config/etc/areas.yaml', areaid)
+    polar_scenes = []
+    for pps_files in list_of_polar_scenes:
+        polar = PPSCloudProductsLoader(pps_files)
+        polar.load()
+        polar.prepare_satz_angles_on_area()
+        polar_scenes.append(polar)
 
-    POLAR_DIR = "/home/a000680/data/mesan/polar_in/v2021"
-    # N18_FILES = glob(os.path.join(POLAR_DIR, 'S_NWC_*noaa18_91014*nc'))
-    POES_FILES = glob(os.path.join(POLAR_DIR, 'S_NWC_*noaa19_72055_20230201T1651106Z*nc'))
-    # N20_FILES = glob(os.path.join(POLAR_DIR, 'S_NWC_*noaa20_00000_20230116T10*nc'))
-    METOP_FILES = glob(os.path.join(POLAR_DIR, 'S_NWC_*metopc_21988_20230201T1657001Z*nc'))
-
-    poes = PPSCloudProductsLoader(POES_FILES)
-    poes.load()
-    poes.prepare_satz_angles_on()
-    metop = PPSCloudProductsLoader(METOP_FILES)
-    metop.load()
-    metop.prepare_satz_angles_on()
-
-    mscn = MultiScene([geo.scene, poes.scene, metop.scene])
+    mscn = MultiScene([geo.scene] + [polar.scene for polar in polar_scenes])
     groups = {DataQuery(name='CTY_group'): ['ct']}
     mscn.group(groups)
 
     resampled = mscn.resample(areaid, reduce_data=False)
-
     local_scn = resampled.scenes[0]['ct']
 
-    # that = XRImage(local_scn)
-    # that.save('./geo_ct_scene_{area}.png'.format(area=areaid))
-
     geo_satz = get_satellite_zenith_angle(local_scn)
-    poes_satz = resampled.scenes[1]['satz']
-    metop_satz = resampled.scenes[2]['satz']
 
-    weights = [1./geo_satz, 1./poes_satz, 1./metop_satz]
+    polar_satz = resampled.scenes[1]['satz']
+
+    weights = [1./geo_satz, 1./polar_satz]
 
     from functools import partial
     stack_with_weights = partial(stack, weights=weights)
     blended = resampled.blend(blend_function=stack_with_weights)
 
-    polar_sats = (poes.scene['ct'].attrs['platform_name'].lower() +
-                  "_" + metop.scene['ct'].attrs['platform_name'].lower())
+    polar_sats = (polar.scene['ct'].attrs['platform_name'].lower())
     blended.save_dataset('CTY_group',
                          filename='./blended_stack_weighted_geo_{polar}_{area}.nc'.format(polar=polar_sats,
                                                                                           area=areaid))
+
+
+if __name__ == "__main__":
+
+    GEO_DIR = "/home/a000680/data/mesan/geo_in/v2021"
+    # GEO_FILES = glob(os.path.join(GEO_DIR, 'S_NWC_*MSG4_MSG-N-VISIR_20230116T1100*PLAX.nc'))
+    GEO_FILES = glob(os.path.join(GEO_DIR, 'S_NWC_*MSG4_MSG-N-VISIR_20230201T1700*_PLAX.nc'))
+
+    # areaid = "mesanEx"
+    areaid = "euro4"
+
+    POLAR_DIR = "/home/a000680/data/mesan/polar_in/v2021"
+    # N18_FILES = glob(os.path.join(POLAR_DIR, 'S_NWC_*noaa18_91014*nc'))
+    POES_FILES = glob(os.path.join(POLAR_DIR, 'S_NWC_*noaa19_72055_20230201T1651106Z*nc'))
+    NPP_FILES = glob(os.path.join(POLAR_DIR, 'S_NWC_*npp_00000_20230116T11*nc'))
+    METOP_FILES = glob(os.path.join(POLAR_DIR, 'S_NWC_*metopc_21988_20230201T1657001Z*nc'))
+
+    blend_ct_products(areaid, GEO_FILES, [POES_FILES, NPP_FILES])
