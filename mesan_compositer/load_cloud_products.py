@@ -64,7 +64,6 @@ class GeoCloudProductsLoader:
     def _get_satz_angles(self):
         """Calculate the satellite zenith angles using Pyorbital."""
         data_array = self.scene['ct']
-        self._shape = data_array.shape
 
         return get_satellite_zenith_angle(data_array)
 
@@ -91,10 +90,10 @@ class PPSCloudProductsLoader:
     def _get_satz_angles(self):
         """Calculate the satellite zenith angles using Pyorbital."""
         cma = self.scene['cma']
-        shape = cma.shape
-        self._shape = cma.shape
-
-        return compute_satz_with_pyorbital(cma, shape)
+        try:
+            return get_satellite_zenith_angle(cma)
+        except KeyError:
+            return compute_satz_with_pyorbital(cma, cma.shape)
 
 
 def compute_satz_with_pyorbital(data_array, shape):
