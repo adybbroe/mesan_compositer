@@ -56,6 +56,18 @@ class GeoCloudProductsLoader:
         self.scene = Scene({self._reader: self._cloud_files})
         self.scene.load(self._composites_and_datasets_to_load)
 
+    def prepare_satz_angles_on_area(self):
+        """Derive the satellite zenith angles and attach data to Satpy scene object."""
+        self.scene['satz'] = self._get_satz_angles()
+        self.scene['satz'].attrs['area'] = self.scene['ct'].attrs['area']
+
+    def _get_satz_angles(self):
+        """Calculate the satellite zenith angles using Pyorbital."""
+        data_array = self.scene['ct']
+        self._shape = data_array.shape
+
+        return get_satellite_zenith_angle(data_array)
+
 
 class PPSCloudProductsLoader:
     """Class to load and prepare a NWCSAF/PPS Cloud product on area."""
@@ -78,34 +90,40 @@ class PPSCloudProductsLoader:
 
     def _get_satz_angles(self):
         """Calculate the satellite zenith angles using Pyorbital."""
-        self._shape = self.scene['cma'].shape
+        cma = self.scene['cma']
+        shape = cma.shape
+        self._shape = cma.shape
 
-        satname = self.scene['cma'].attrs['platform_name']
-        orb = Orbital(satname)
+        return compute_satz_with_pyorbital(cma, shape)
 
-        time_step = (self.scene['cma'].attrs['end_time'] -
-                     self.scene['cma'].attrs['start_time'])/self._shape[0]
-        starttime = self.scene['cma'].attrs['start_time']
-        obs_time = starttime + time_step * np.arange(self._shape[0])
-        obs_time = np.dstack([obs_time]*self._shape[1])[0]
 
-        lon, lat = self.scene['cma'].attrs['area'].get_lonlats()
-        LOG.debug('Get satellite elevation via Pyorbital')
-        _, elevation = orb.get_observer_look(obs_time, lon, lat, 0.)
-        del _
-        sat_zen = 90. - elevation
-        LOG.debug('Satellite zenith angles derived on data')
+def compute_satz_with_pyorbital(data_array, shape):
+    """Compute the sat zenith angles with pyorbital."""
+    satname = data_array.attrs['platform_name']
+    orb = Orbital(satname)
 
-        satz = xr.DataArray(data=sat_zen, dims=["y", "x"],
-                            coords=dict(
-                                lon=(["y", "x"], lon),
-                                lat=(["y", "x"], lat)),
-                            attrs=dict(
-                                description="Satellite zenith angle.",
-                                units="deg",
-        ),)
+    time_step = (data_array.attrs['end_time'] - data_array.attrs['start_time']) / shape[0]
+    starttime = data_array.attrs['start_time']
+    obs_time = starttime + time_step * np.arange(shape[0])
+    obs_time = np.dstack([obs_time]*shape[1])[0]
 
-        return satz
+    lon, lat = data_array.attrs['area'].get_lonlats()
+    LOG.debug('Get satellite elevation via Pyorbital')
+    _, elevation = orb.get_observer_look(obs_time, lon, lat, 0.)
+    del _
+    sat_zen = 90. - elevation
+    LOG.debug('Satellite zenith angles derived on data')
+
+    satz = xr.DataArray(data=sat_zen, dims=["y", "x"],
+                        coords=dict(
+                            lon=(["y", "x"], lon),
+                            lat=(["y", "x"], lat)),
+                        attrs=dict(
+                            description="Satellite zenith angle.",
+                            units="deg",
+    ),)
+
+    return satz
 
 
 def blend_ct_products(areaid, geo_files, list_of_polar_scenes: list[list[str]]):
@@ -114,6 +132,7 @@ def blend_ct_products(areaid, geo_files, list_of_polar_scenes: list[list[str]]):
 
     geo = GeoCloudProductsLoader(geo_files)
     geo.load()
+    geo.prepare_satz_angles_on_area()
 
     polar_scenes = []
     for pps_files in list_of_polar_scenes:
@@ -127,10 +146,7 @@ def blend_ct_products(areaid, geo_files, list_of_polar_scenes: list[list[str]]):
     mscn.group(groups)
 
     resampled = mscn.resample(areaid, reduce_data=False)
-    local_scn = resampled.scenes[0]['ct']
-
-    geo_satz = get_satellite_zenith_angle(local_scn)
-
+    geo_satz = resampled.scenes[0]["satz"]
     polar_satz = resampled.scenes[1]['satz']
 
     weights = [1./geo_satz, 1./polar_satz]
@@ -146,15 +162,16 @@ def blend_ct_products(areaid, geo_files, list_of_polar_scenes: list[list[str]]):
 
 
 if __name__ == "__main__":
+    base_dir = "/data/lang/satellit/mesan/"
 
-    GEO_DIR = "/home/a000680/data/mesan/geo_in/v2021"
+    GEO_DIR = os.path.join(base_dir, "geo_in/v2021")
     # GEO_FILES = glob(os.path.join(GEO_DIR, 'S_NWC_*MSG4_MSG-N-VISIR_20230116T1100*PLAX.nc'))
     GEO_FILES = glob(os.path.join(GEO_DIR, 'S_NWC_*MSG4_MSG-N-VISIR_20230201T1700*_PLAX.nc'))
 
     # areaid = "mesanEx"
     areaid = "euro4"
 
-    POLAR_DIR = "/home/a000680/data/mesan/polar_in/v2021"
+    POLAR_DIR = os.path.join(base_dir, "polar_in/v2021")
     # N18_FILES = glob(os.path.join(POLAR_DIR, 'S_NWC_*noaa18_91014*nc'))
     POES_FILES = glob(os.path.join(POLAR_DIR, 'S_NWC_*noaa19_72055_20230201T1651106Z*nc'))
     NPP_FILES = glob(os.path.join(POLAR_DIR, 'S_NWC_*npp_00000_20230116T11*nc'))
