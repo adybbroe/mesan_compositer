@@ -115,7 +115,7 @@ def blend_ct_products(product, areaid, *scenes, cache_dir=None):
     """Blend NWCSAF Geo and PPS cloud product scenes."""
     loaded_scenes = []
     for files in scenes:
-        print(files)
+        LOG.debug("Files: %s", str(files))
         loader = CloudProductsLoader(files)
         loader.load([product])
         loader.prepare_satz_angles_on_area(product)
@@ -126,14 +126,18 @@ def blend_ct_products(product, areaid, *scenes, cache_dir=None):
     groups = {DataQuery(name=group_name): [product]}
     mscn.group(groups)
 
+    LOG.debug("Before call to reaample on Multiscene...")
     resampled = mscn.resample(areaid, reduce_data=False, cache_dir=cache_dir, mask_area=False)
 
+    LOG.debug("Getting the weights...")
     weights = [1. / scene["satz"] for scene in resampled.scenes]
 
     from functools import partial
     stack_with_weights = partial(stack, weights=weights)
+    LOG.debug("Before resampling...")
     blended = resampled.blend(blend_function=stack_with_weights)
 
+    LOG.debug("Before returning the blended scene")
     return blended, group_name
 
 
