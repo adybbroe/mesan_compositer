@@ -25,11 +25,10 @@
 import logging
 import os
 from glob import glob
+from tempfile import gettempdir
 
 import numpy as np
 import xarray as xr
-
-# from trollimage.xrimage import XRImage
 from pyorbital.orbital import Orbital
 from satpy import DataQuery, MultiScene, Scene
 from satpy.modifiers.angles import get_satellite_zenith_angle
@@ -58,14 +57,14 @@ class CloudProductsLoader:
         self.scene = Scene({self._reader: self._cloud_files})
         self.scene.load(to_load)
 
-    def prepare_satz_angles_on_area(self):
+    def prepare_satz_angles_on_area(self, product):
         """Derive the satellite zenith angles and attach data to Satpy scene object."""
-        self.scene["satz"] = self._get_satz_angles()
-        self.scene["satz"].attrs["area"] = self.scene["ct"].attrs["area"]
+        self.scene["satz"] = self._get_satz_angles(product)
+        self.scene["satz"].attrs["area"] = self.scene[product].attrs["area"]
 
-    def _get_satz_angles(self):
+    def _get_satz_angles(self, product):
         """Calculate the satellite zenith angles using Pyorbital."""
-        data_array = self.scene["ct"]
+        data_array = self.scene[product]
         try:
             return get_satellite_zenith_angle(data_array)
         except KeyError:
@@ -103,20 +102,17 @@ def generate_observation_time_array(data_array):
     time_step = (data_array.attrs["end_time"] - data_array.attrs["start_time"]) / shape[0]
     starttime = data_array.attrs["start_time"]
     obs_time = starttime + time_step * np.arange(shape[0])
-    obs_time = np.dstack([obs_time]*shape[1])[0]
-    return obs_time
+    return obs_time[:, np.newaxis]
 
 
-def blend_ct_products(areaid, *scenes):
+def blend_ct_products(product, areaid, *scenes, cache_dir=None):
     """Blend Geo and PPS cloud product scenes."""
-    product = "ct"
-
     loaded_scenes = []
 
     for files in scenes:
         loader = CloudProductsLoader(files)
         loader.load([product])
-        loader.prepare_satz_angles_on_area()
+        loader.prepare_satz_angles_on_area(product)
         loaded_scenes.append(loader.scene)
 
     mscn = MultiScene(loaded_scenes)
@@ -124,7 +120,7 @@ def blend_ct_products(areaid, *scenes):
     groups = {DataQuery(name=group_name): [product]}
     mscn.group(groups)
 
-    resampled = mscn.resample(areaid, reduce_data=False)
+    resampled = mscn.resample(areaid, reduce_data=False, cache_dir=cache_dir, mask_area=False)
 
     weights = [1. / scene["satz"] for scene in resampled.scenes]
 
@@ -132,7 +128,6 @@ def blend_ct_products(areaid, *scenes):
     stack_with_weights = partial(stack, weights=weights)
     blended = resampled.blend(blend_function=stack_with_weights)
 
-    # polar_sats = (polar.scene['ct'].attrs['platform_name'].lower())
     blended.save_dataset(group_name,
                          filename="./blended_stack_weighted_geo_polar_{area}.nc".format(area=areaid))
 
@@ -153,4 +148,4 @@ if __name__ == "__main__":
     NPP_FILES = glob(os.path.join(POLAR_DIR, "S_NWC_*npp_00000_20230116T11*nc"))
     METOP_FILES = glob(os.path.join(POLAR_DIR, "S_NWC_*metopc_21988_20230201T1657001Z*nc"))
 
-    blend_ct_products(areaid, GEO_FILES, POES_FILES, NPP_FILES)
+    blend_ct_products("ct", areaid, GEO_FILES, POES_FILES, NPP_FILES, cache_dir=gettempdir())
