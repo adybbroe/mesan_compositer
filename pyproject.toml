@@ -1,0 +1,25 @@
+[project]
+name = "mesan_compositer"
+dynamic = ["version"]
+dependencies = ["satpy"]
+
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2", 'setuptools_scm_git_archive']
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+# write_to = "mesan_compositer/version.py"
+
+[project.scripts]
+pytroll-runner = "mesan_compositer.load_cloud_products:main"
+
+[tool.ruff]
+select = ["E", "W", "F", "I", "D", "S", "B", "A", "PT", "Q", "TID"]
+ignore = ["B905"]  # only available from python 3.10
+line-length = 120
+
+[tool.ruff.per-file-ignores]
+"mesan_compositer/tests/*" = ["S101"]  # assert allowed in tests
+
+[tool.ruff.pydocstyle]
+convention = "google"

@@ -22,142 +22,130 @@
 
 """Utilities to load and prepare cloud products on area."""
 
+import logging
 import os
 from glob import glob
-import xarray as xr
-import numpy as np
+from tempfile import gettempdir
 
-# from trollimage.xrimage import XRImage
+import numpy as np
+import xarray as xr
 from pyorbital.orbital import Orbital
-from satpy import Scene
-from satpy.utils import debug_on
-from satpy import MultiScene, DataQuery
-from satpy.multiscene import stack
+from satpy import DataQuery, MultiScene, Scene
 from satpy.modifiers.angles import get_satellite_zenith_angle
-import logging
+from satpy.multiscene import stack
+from satpy.utils import debug_on
 
 debug_on()
 
 LOG = logging.getLogger(__name__)
 
 
-class GeoCloudProductsLoader:
-    """Class to load and prepare a Geo Cloud product on area."""
-
-    def __init__(self, cloud_files, reader='nwcsaf-geo'):
-        """Initialize the class."""
-        self._cloud_files = cloud_files
-        self.scene = None
-        self._composites_and_datasets_to_load = ['ct']
-        self._reader = reader
-
-    def load(self):
-        """Load the cloud products."""
-        self.scene = Scene({self._reader: self._cloud_files})
-        self.scene.load(self._composites_and_datasets_to_load)
-
-
-class PPSCloudProductsLoader:
-    """Class to load and prepare a NWCSAF/PPS Cloud product on area."""
+class CloudProductsLoader:
+    """Class to load and prepare cloud products on area."""
 
     def __init__(self, cloud_files):
-        """Initialize the class."""
+        """Set up the instance."""
         self._cloud_files = cloud_files
         self.scene = None
-        self._composites_and_datasets_to_load = ['cma', 'ct']
+        if "MSG" in cloud_files[0]:
+            self._reader = "nwcsaf-geo"
+        else:
+            self._reader = "nwcsaf-pps_nc"
 
-    def load(self):
+    def load(self, to_load):
         """Load the cloud products."""
-        self.scene = Scene(filenames=self._cloud_files, reader='nwcsaf-pps_nc')
-        self.scene.load(self._composites_and_datasets_to_load)
+        self.scene = Scene({self._reader: self._cloud_files})
+        self.scene.load(to_load)
 
-    def prepare_satz_angles_on_area(self):
+    def prepare_satz_angles_on_area(self, product):
         """Derive the satellite zenith angles and attach data to Satpy scene object."""
-        self.scene['satz'] = self._get_satz_angles()
-        self.scene['satz'].attrs['area'] = self.scene['cma'].attrs['area']
+        self.scene["satz"] = self._get_satz_angles(product)
+        self.scene["satz"].attrs["area"] = self.scene[product].attrs["area"]
 
-    def _get_satz_angles(self):
+    def _get_satz_angles(self, product):
         """Calculate the satellite zenith angles using Pyorbital."""
-        self._shape = self.scene['cma'].shape
-
-        satname = self.scene['cma'].attrs['platform_name']
-        orb = Orbital(satname)
-
-        time_step = (self.scene['cma'].attrs['end_time'] -
-                     self.scene['cma'].attrs['start_time'])/self._shape[0]
-        starttime = self.scene['cma'].attrs['start_time']
-        obs_time = starttime + time_step * np.arange(self._shape[0])
-        obs_time = np.dstack([obs_time]*self._shape[1])[0]
-
-        lon, lat = self.scene['cma'].attrs['area'].get_lonlats()
-        LOG.debug('Get satellite elevation via Pyorbital')
-        _, elevation = orb.get_observer_look(obs_time, lon, lat, 0.)
-        del _
-        sat_zen = 90. - elevation
-        LOG.debug('Satellite zenith angles derived on data')
-
-        satz = xr.DataArray(data=sat_zen, dims=["y", "x"],
-                            coords=dict(
-                                lon=(["y", "x"], lon),
-                                lat=(["y", "x"], lat)),
-                            attrs=dict(
-                                description="Satellite zenith angle.",
-                                units="deg",
-        ),)
-
-        return satz
+        data_array = self.scene[product]
+        try:
+            return get_satellite_zenith_angle(data_array)
+        except KeyError:
+            return compute_satz_with_pyorbital(data_array)
 
 
-def blend_ct_products(areaid, geo_files, list_of_polar_scenes: list[list[str]]):
+def compute_satz_with_pyorbital(data_array):
+    """Compute the sat zenith angles with pyorbital."""
+    satname = data_array.attrs["platform_name"]
+
+    obs_time = generate_observation_time_array(data_array)
+
+    lon, lat = data_array.attrs["area"].get_lonlats()
+    LOG.debug("Get satellite elevation via Pyorbital")
+
+    orb = Orbital(satname)
+    azimuth, elevation = orb.get_observer_look(obs_time, lon, lat, 0.)
+    del azimuth
+    sat_zen = 90. - elevation
+    LOG.debug("Satellite zenith angles derived on data")
+
+    satz = xr.DataArray(data=sat_zen, dims=["y", "x"],
+                        coords=dict(
+                            lon=(["y", "x"], lon),
+                            lat=(["y", "x"], lat)),
+                        attrs=dict(
+                            description="Satellite zenith angle.",
+                            units="deg"))
+
+    return satz
+
+def generate_observation_time_array(data_array):
+    """Generate the observation time array."""
+    shape = data_array.shape
+    time_step = (data_array.attrs["end_time"] - data_array.attrs["start_time"]) / shape[0]
+    starttime = data_array.attrs["start_time"]
+    obs_time = starttime + time_step * np.arange(shape[0])
+    return obs_time[:, np.newaxis]
+
+
+def blend_ct_products(product, areaid, *scenes, cache_dir=None):
     """Blend Geo and PPS cloud product scenes."""
-    # area_def = load_area('/home/a000680/usr/src/pytroll-config/etc/areas.yaml', areaid)
+    loaded_scenes = []
 
-    geo = GeoCloudProductsLoader(geo_files)
-    geo.load()
+    for files in scenes:
+        loader = CloudProductsLoader(files)
+        loader.load([product])
+        loader.prepare_satz_angles_on_area(product)
+        loaded_scenes.append(loader.scene)
 
-    polar_scenes = []
-    for pps_files in list_of_polar_scenes:
-        polar = PPSCloudProductsLoader(pps_files)
-        polar.load()
-        polar.prepare_satz_angles_on_area()
-        polar_scenes.append(polar)
-
-    mscn = MultiScene([geo.scene] + [polar.scene for polar in polar_scenes])
-    groups = {DataQuery(name='CTY_group'): ['ct']}
+    mscn = MultiScene(loaded_scenes)
+    group_name = product.upper() + "_group"
+    groups = {DataQuery(name=group_name): [product]}
     mscn.group(groups)
 
-    resampled = mscn.resample(areaid, reduce_data=False)
-    local_scn = resampled.scenes[0]['ct']
+    resampled = mscn.resample(areaid, reduce_data=False, cache_dir=cache_dir, mask_area=False)
 
-    geo_satz = get_satellite_zenith_angle(local_scn)
-
-    polar_satz = resampled.scenes[1]['satz']
-
-    weights = [1./geo_satz, 1./polar_satz]
+    weights = [1. / scene["satz"] for scene in resampled.scenes]
 
     from functools import partial
     stack_with_weights = partial(stack, weights=weights)
     blended = resampled.blend(blend_function=stack_with_weights)
 
-    polar_sats = (polar.scene['ct'].attrs['platform_name'].lower())
-    blended.save_dataset('CTY_group',
-                         filename='./blended_stack_weighted_geo_{polar}_{area}.nc'.format(polar=polar_sats,
-                                                                                          area=areaid))
+    blended.save_dataset(group_name,
+                         filename="./blended_stack_weighted_geo_polar_{area}.nc".format(area=areaid))
 
 
 if __name__ == "__main__":
+    base_dir = "/data/lang/satellit/mesan/"
 
-    GEO_DIR = "/home/a000680/data/mesan/geo_in/v2021"
+    GEO_DIR = os.path.join(base_dir, "geo_in/v2021")
     # GEO_FILES = glob(os.path.join(GEO_DIR, 'S_NWC_*MSG4_MSG-N-VISIR_20230116T1100*PLAX.nc'))
-    GEO_FILES = glob(os.path.join(GEO_DIR, 'S_NWC_*MSG4_MSG-N-VISIR_20230201T1700*_PLAX.nc'))
+    GEO_FILES = glob(os.path.join(GEO_DIR, "S_NWC_*MSG4_MSG-N-VISIR_20230201T1700*_PLAX.nc"))
 
     # areaid = "mesanEx"
     areaid = "euro4"
 
-    POLAR_DIR = "/home/a000680/data/mesan/polar_in/v2021"
+    POLAR_DIR = os.path.join(base_dir, "polar_in/v2021")
     # N18_FILES = glob(os.path.join(POLAR_DIR, 'S_NWC_*noaa18_91014*nc'))
-    POES_FILES = glob(os.path.join(POLAR_DIR, 'S_NWC_*noaa19_72055_20230201T1651106Z*nc'))
-    NPP_FILES = glob(os.path.join(POLAR_DIR, 'S_NWC_*npp_00000_20230116T11*nc'))
-    METOP_FILES = glob(os.path.join(POLAR_DIR, 'S_NWC_*metopc_21988_20230201T1657001Z*nc'))
+    POES_FILES = glob(os.path.join(POLAR_DIR, "S_NWC_*noaa19_72055_20230201T1651106Z*nc"))
+    NPP_FILES = glob(os.path.join(POLAR_DIR, "S_NWC_*npp_00000_20230116T11*nc"))
+    METOP_FILES = glob(os.path.join(POLAR_DIR, "S_NWC_*metopc_21988_20230201T1657001Z*nc"))
 
-    blend_ct_products(areaid, GEO_FILES, [POES_FILES, NPP_FILES])
+    blend_ct_products("ct", areaid, GEO_FILES, POES_FILES, NPP_FILES, cache_dir=gettempdir())
