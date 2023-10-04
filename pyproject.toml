@@ -1,5 +1,5 @@
 [project]
-name = "pytroll-runner"
+name = "mesan_compositer"
 dynamic = ["version"]
 dependencies = ["satpy"]
 
