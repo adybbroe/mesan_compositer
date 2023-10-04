@@ -23,8 +23,7 @@
 """Utilities to load and prepare cloud products on area."""
 
 import logging
-import os
-from glob import glob
+import pathlib
 from tempfile import gettempdir
 
 import numpy as np
@@ -47,7 +46,7 @@ class CloudProductsLoader:
         """Set up the instance."""
         self._cloud_files = cloud_files
         self.scene = None
-        if "MSG" in cloud_files[0]:
+        if "MSG" in str(self._cloud_files[0].name):
             self._reader = "nwcsaf-geo"
         else:
             self._reader = "nwcsaf-pps_nc"
@@ -73,7 +72,13 @@ class CloudProductsLoader:
 
 def compute_satz_with_pyorbital(data_array):
     """Compute the sat zenith angles with pyorbital."""
-    satname = data_array.attrs["platform_name"]
+    try:
+        satname = data_array.attrs["platform_name"]
+    except KeyError:
+        print("Failed determining platform name!")
+        raise
+
+    print("Platform name = {platform}".format(platform=satname))
 
     obs_time = generate_observation_time_array(data_array)
 
@@ -96,6 +101,7 @@ def compute_satz_with_pyorbital(data_array):
 
     return satz
 
+
 def generate_observation_time_array(data_array):
     """Generate the observation time array."""
     shape = data_array.shape
@@ -106,10 +112,10 @@ def generate_observation_time_array(data_array):
 
 
 def blend_ct_products(product, areaid, *scenes, cache_dir=None):
-    """Blend Geo and PPS cloud product scenes."""
+    """Blend NWCSAF Geo and PPS cloud product scenes."""
     loaded_scenes = []
-
     for files in scenes:
+        print(files)
         loader = CloudProductsLoader(files)
         loader.load([product])
         loader.prepare_satz_angles_on_area(product)
@@ -128,24 +134,28 @@ def blend_ct_products(product, areaid, *scenes, cache_dir=None):
     stack_with_weights = partial(stack, weights=weights)
     blended = resampled.blend(blend_function=stack_with_weights)
 
-    blended.save_dataset(group_name,
-                         filename="./blended_stack_weighted_geo_polar_{area}.nc".format(area=areaid))
+    return blended, group_name
 
 
 if __name__ == "__main__":
-    base_dir = "/data/lang/satellit/mesan/"
+    # base_dir = pathlib.Path("/data/lang/satellit/mesan/")
+    base_dir = pathlib.Path("/home/a000680/data/mesan")
 
-    GEO_DIR = os.path.join(base_dir, "geo_in/v2021")
-    # GEO_FILES = glob(os.path.join(GEO_DIR, 'S_NWC_*MSG4_MSG-N-VISIR_20230116T1100*PLAX.nc'))
-    GEO_FILES = glob(os.path.join(GEO_DIR, "S_NWC_*MSG4_MSG-N-VISIR_20230201T1700*_PLAX.nc"))
+    GEO_DIR = base_dir / "geo_in/v2021"
+
+    GEO_FILES = [*GEO_DIR.glob("S_NWC_*MSG4_MSG-N-VISIR_20230201T1700*_PLAX.nc")]
+    # glob(os.path.join(GEO_DIR, "S_NWC_*MSG4_MSG-N-VISIR_20230201T1700*_PLAX.nc"))
 
     # areaid = "mesanEx"
     areaid = "euro4"
 
-    POLAR_DIR = os.path.join(base_dir, "polar_in/v2021")
-    # N18_FILES = glob(os.path.join(POLAR_DIR, 'S_NWC_*noaa18_91014*nc'))
-    POES_FILES = glob(os.path.join(POLAR_DIR, "S_NWC_*noaa19_72055_20230201T1651106Z*nc"))
-    NPP_FILES = glob(os.path.join(POLAR_DIR, "S_NWC_*npp_00000_20230116T11*nc"))
-    METOP_FILES = glob(os.path.join(POLAR_DIR, "S_NWC_*metopc_21988_20230201T1657001Z*nc"))
+    POLAR_DIR = base_dir / "polar_in/v2021"
+    # POES_FILES = glob(os.path.join(POLAR_DIR, "S_NWC_*noaa19_72055_20230201T1651106Z*nc"))
+    POES_FILES = [*POLAR_DIR.glob("S_NWC_*noaa19_72055_20230201T1651106Z*nc")]
+    NPP_FILES = [*POLAR_DIR.glob("S_NWC_*npp_00000_20230116T11*nc")]
+    METOP_FILES = [*POLAR_DIR.glob("S_NWC_*metopc_21988_20230201T1657001Z*nc")]
 
-    blend_ct_products("ct", areaid, GEO_FILES, POES_FILES, NPP_FILES, cache_dir=gettempdir())
+    blended, group_name = blend_ct_products("ct", areaid, GEO_FILES, POES_FILES, NPP_FILES,
+                                            cache_dir=gettempdir())
+    blended.save_dataset(group_name,
+                         filename="./blended_stack_weighted_geo_polar_{area}.nc".format(area=areaid))

@@ -1,0 +1,7 @@
+[bandit]
+skips: B506
+exclude: satpy/tests
+
+[flake8]
+per-file-ignores =
+    tests: S101

@@ -22,11 +22,12 @@
 
 """Test loading the NWCSAF scenes."""
 
-from satpy.tests.reader_tests.test_nwcsaf_nc import create_nwcsaf_geo_ct_file
 import pytest
-
-from mesan_compositer.load_cloud_products import GeoCloudProductsLoader
 from pyresample import parse_area_file
+from satpy.tests.reader_tests.test_nwcsaf_nc import create_nwcsaf_geo_ct_file
+
+from mesan_compositer.load_cloud_products import CloudProductsLoader
+
 # from satpy.readers.nwcsaf_nc import NcNWCSAF, read_nwcsaf_time
 
 
@@ -47,7 +48,7 @@ AREA_YAML_DEF = """euro4:
     units: m
 """
 
-TEST_AREADEF = parse_area_file(AREA_YAML_DEF, 'euro4')[0]
+TEST_AREADEF = parse_area_file(AREA_YAML_DEF, "euro4")[0]
 
 
 @pytest.fixture(scope="session")
@@ -58,7 +59,7 @@ def nwcsaf_geo_ct_filename(tmp_path_factory):
 
 def test_geo_clouds_loader_init(nwcsaf_geo_ct_filename):
     """Test create the geo cloud product loader instance from list of fake files."""
-    scn = GeoCloudProductsLoader([nwcsaf_geo_ct_filename])
+    scn = CloudProductsLoader([nwcsaf_geo_ct_filename])
     assert scn.scene is None
     assert len(scn._cloud_files) == 1
     assert scn._cloud_files[0].name == nwcsaf_geo_ct_filename.name
@@ -66,8 +67,7 @@ def test_geo_clouds_loader_init(nwcsaf_geo_ct_filename):
 
 def test_geo_clouds_loader_load(nwcsaf_geo_ct_filename):
     """Test create the geo cloud product loader instance from list of fake files."""
-    scn = GeoCloudProductsLoader([nwcsaf_geo_ct_filename])
-    scn.load()
+    scn = CloudProductsLoader([nwcsaf_geo_ct_filename])
+    scn.load(["ct"])
     dset_names = scn.scene.available_dataset_names()
-    for pname in scn._composites_and_datasets_to_load:
-        assert pname in dset_names
+    assert "ct" in dset_names

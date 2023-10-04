@@ -23,12 +23,13 @@
 """Make cloud composite quicklooks."""
 
 import os
+
+import dask.array as da
 import numpy as np
 import xarray as xr
-import dask.array as da
+from satpy.composites import PaletteCompositor
 from trollimage.xrimage import XRImage
 
-from satpy.composites import PaletteCompositor
 from mesan_compositer import nwcsaf_cloudtype_2021
 
 CHUNK_SIZE = 4096
@@ -36,32 +37,34 @@ CHUNK_SIZE = 4096
 
 if __name__ == "__main__":
 
-    areaid = 'euro4'
+    areaid = "euro4"
     # areaid = 'mesanEx'
     # FILEPATH = "./blended_stack_weighted_geo_noaa-19_metop-c_{area}.nc".format(area=areaid)
-    FILEPATH = "./blended_stack_weighted_geo_noaa-19_{area}.nc".format(area=areaid)
+    # FILEPATH = "./blended_stack_weighted_geo_noaa-19_{area}.nc".format(area=areaid)
+    FILEPATH = "./blended_stack_weighted_geo_polar_euro4.nc"
     # FILEPATH = "./blended_stack_weighted_geo_n18_{area}.nc".format(area=areaid)
     netcdf_filename = FILEPATH
 
     nc_ = xr.open_dataset(netcdf_filename, decode_cf=True,
                           mask_and_scale=True,
-                          chunks={'columns': CHUNK_SIZE,
-                                  'rows': CHUNK_SIZE})
+                          chunks={"columns": CHUNK_SIZE,
+                                  "rows": CHUNK_SIZE})
 
-    cloudtype = nc_['CTY_group'][:]
+    # cloudtype = nc_['CTY_group'][:]
+    cloudtype = nc_["CT_group"][:]
 
     palette = nwcsaf_cloudtype_2021()
 
     # Cloud type field:
-    attrs = {'_FillValue': np.nan, 'valid_range': (0, 15)}
-    palette_attrs = {'palette_meanings': list(range(16))}
+    attrs = {"_FillValue": np.nan, "valid_range": (0, 15)}
+    palette_attrs = {"palette_meanings": list(range(16))}
 
     pdata = xr.DataArray(palette, attrs=palette_attrs)
 
     masked_data = np.ma.masked_outside(cloudtype.data, 0, 15)
-    xdata = xr.DataArray(da.from_array(masked_data), dims=['y', 'x'], attrs=attrs)
+    xdata = xr.DataArray(da.from_array(masked_data), dims=["y", "x"], attrs=attrs)
 
-    pcol = PaletteCompositor('mesan_cloudtype_composite')((xdata, pdata))
+    pcol = PaletteCompositor("mesan_cloudtype_composite")((xdata, pdata))
     ximg = XRImage(pcol)
-    outfile = os.path.join('./', os.path.basename(netcdf_filename).strip('.nc') + '_cloudtype.png')
+    outfile = os.path.join("./", os.path.basename(netcdf_filename).strip(".nc") + "_cloudtype.png")
     ximg.save(outfile)
