@@ -26,23 +26,25 @@ From the cloud type composite retrieve super observations of cloud
 amount/cover and print to stdout.
 """
 
-import numpy as np
-from mesan_compositer.netcdf_io import ncCloudTypeComposite
-from mesan_compositer.config import get_config
-
 import argparse
-from datetime import datetime
+import logging
 import os
 import sys
+from datetime import datetime
 from logging import handlers
-import logging
+
+import numpy as np
+
+from mesan_compositer.config import get_config
+from mesan_compositer.netcdf_io import ncCloudTypeComposite
+
 LOG = logging.getLogger(__name__)
 
 #: Default time format
-_DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
+_DEFAULT_TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 #: Default log format
-_DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
+_DEFAULT_LOG_FORMAT = "[%(levelname)s: %(asctime)s : %(name)s] %(message)s"
 
 # min 8 x 8 pixels in super obs
 DLENMIN = 4
@@ -59,6 +61,11 @@ LONMAX = 180.0
 # cloud cover observation error [%]
 SDcc = 0.15   # All cloud types
 
+# NWCSAF/Geo:
+# ct:comment = "1:  Cloud-free land; 2:  Cloud-free sea; 3:  Snow over land;  4:  Sea ice; 5:  Very low clouds; 6:  Low clouds; 7:  Mid-level clouds;  8:  High opaque clouds; 9:  Very high opaque clouds;  10:  Fractional clouds; 11:  High semitransparent thin clouds;  12:  High semitransparent moderately thick clouds;  13:  High semitransparent thick clouds;  14:  High semitransparent above low or medium clouds;  15:  High semitransparent above snow/ice" ; # noqa
+
+# NWCSAF/PPS:
+# ct:flag_meanings = "Cloud-free_land Cloud-free_sea Snow_over_land Sea_ice Very_low_clouds Low_clouds Mid-level_clouds High_opaque_clouds Very_high_opaque_clouds Fractional_clouds High_semitransparent_very_thin_clouds High_semitransparent_thin_clouds High_semitransparent_thick_clouds High_semitransparent_above_low_or_medium_clouds High_semitransparent_above_snow_or_ice" ; # noqa
 
 # ipar= 71; total cloud cover: cloud amount per type
 ntctypecl = np.array([
@@ -67,22 +74,17 @@ ntctypecl = np.array([
     0.0,  # 02 Cloud free sea
     0.0,  # 03 Snow/ice contaminated land
     0.0,  # 04 Snow/ice contaminated sea
-    1.0,  # 05 Very low cumiliform cloud
-    1.0,  # 06 Very low stratiform cloud
-    1.0,  # 07 Low cumiliform cloud
-    1.0,  # 08 Low stratiform cloud
-    1.0,  # 09 Medium level cumiliform cloud
-    1.0,  # 10 Medium level stratiform cloud
-    1.0,  # 11 High and opaque cumiliform cloud
-    1.0,  # 12 High and opaque stratiform cloud
-    1.0,  # 13 Very high and opaque cumiliform cloud
-    1.0,  # 14 Very high and opaque stratiform cloud
-    1.0,  # 15 Very thin cirrus cloud
-    1.0,  # 16 Thin cirrus cloud
-    1.0,  # 17 Thick cirrus cloud
-    1.0,  # 18 Cirrus above low or medium level cloud
-    1.0,  # 19 Fractional or sub-pixel cloud
-    0.0  # 20 Undefined
+    1.0,  # 05 Very low clouds
+    1.0,  # 06 Low clouds
+    1.0,  # 07 Medium level clouds
+    1.0,  # 08 High and opaque clouds
+    1.0,  # 09 Very high and opaque clouds
+    1.0,  # 10 Fractional clouds
+    1.0,  # 11 High semitransparent thin clouds;
+    1.0,  # 12 High semitransparent moderately thick clouds
+    1.0,  # 13 High semitransparent thick clouds
+    1.0,  # 14 High semitransparent above low or medium clouds
+    1.0   # 15 High semitransparent above snow/ice
 ])
 
 # ipar= 73; low level cloud cover: cloud amount per type
@@ -92,22 +94,17 @@ nlctypecl = np.array([
     0.0,  # 02 Cloud free sea
     0.0,  # 03 Snow/ice contaminated land
     0.0,  # 04 Snow/ice contaminated sea
-    1.0,  # 05 Very low cumiliform cloud
-    1.0,  # 06 Very low stratiform cloud
-    1.0,  # 07 Low cumiliform cloud
-    1.0,  # 08 Low stratiform cloud
-    0.5,  # 09 Medium level cumiliform cloud
-    0.5,  # 10 Medium level stratiform cloud
-    0.5,  # 11 High and opaque cumiliform cloud
-    0.5,  # 12 High and opaque stratiform cloud
-    0.5,  # 13 Very high and opaque cumiliform cloud
-    0.5,  # 14 Very high and opaque stratiform cloud
-    0.0,  # 15 Very thin cirrus cloud
-    0.0,  # 16 Thin cirrus cloud
-    0.0,  # 17 Thick cirrus cloud
-    0.5,  # 18 Cirrus above low or medium level cloud
-    .75,  # 19 Fractional or sub-pixel cloud
-    0.0  # 20 Undefined
+    1.0,  # 05 Very low clouds
+    1.0,  # 06 Low clouds
+    0.5,  # 07 Medium level clouds
+    0.5,  # 08 High and opaque clouds
+    0.5,  # 09 Very high and opaque clouds
+    .75,  # 10 Fractional clouds
+    0.0,  # 11 High semitransparent thin clouds;
+    0.0,  # 12 High semitransparent moderately thick clouds
+    0.0,  # 13 High semitransparent thick clouds
+    0.0,  # 14 High semitransparent above low or medium clouds
+    0.5   # 15 High semitransparent above snow/ice
 ])
 
 # ipar= 74; medium level cloud cover: cloud amount per type
@@ -117,22 +114,17 @@ nmctypecl = np.array([
     0.0,  # 02 Cloud free sea
     0.0,  # 03 Snow/ice contaminated land
     0.0,  # 04 Snow/ice contaminated sea
-    0.0,  # 05 Very low cumiliform cloud
-    0.0,  # 06 Very low stratiform cloud
-    0.0,  # 07 Low cumiliform cloud
-    0.0,  # 08 Low stratiform cloud
-    1.0,  # 09 Medium level cumiliform cloud
-    1.0,  # 10 Medium level stratiform cloud
-    .75,  # 11 High and opaque cumiliform cloud
-    .75,  # 12 High and opaque stratiform cloud
-    .75,  # 13 Very high and opaque cumiliform cloud
-    .75,  # 14 Very high and opaque stratiform cloud
-    0.0,  # 15 Very thin cirrus cloud
-    0.0,  # 16 Thin cirrus cloud
-    .25,  # 17 Thick cirrus cloud
-    0.5,  # 18 Cirrus above low or medium level cloud
-    .25,  # 19 Fractional or sub-pixel cloud
-    0.0  # 20 Undefined
+    0.0,  # 05 Very low clouds
+    0.0,  # 06 Low clouds
+    1.0,  # 07 Medium level clouds
+    .75,  # 08 High and opaque clouds
+    .75,  # 09 Very high and opaque clouds
+    .25,  # 10 Fractional clouds
+    0.0,  # 11 High semitransparent thin clouds;
+    0.0,  # 12 High semitransparent moderately thick clouds
+    .25,  # 13 High semitransparent thick clouds
+    0.5,  # 14 High semitransparent above low or medium clouds
+    0.5   # 15 High semitransparent above snow/ice
 ])
 
 # ipar= 75; high level cloud cover: cloud amount per type
@@ -142,34 +134,28 @@ nhctypecl = np.array([
     0.0,  # 02 Cloud free sea
     0.0,  # 03 Snow/ice contaminated land
     0.0,  # 04 Snow/ice contaminated sea
-    0.0,  # 05 Very low cumiliform cloud
-    0.0,  # 06 Very low stratiform cloud
-    0.0,  # 07 Low cumiliform cloud
-    0.0,  # 08 Low stratiform cloud
-    0.0,  # 09 Medium level cumiliform cloud
-    0.0,  # 10 Medium level stratiform cloud
-    1.0,  # 11 High and opaque cumiliform cloud
-    1.0,  # 12 High and opaque stratiform cloud
-    1.0,  # 13 Very high and opaque cumiliform cloud
-    1.0,  # 14 Very high and opaque stratiform cloud
-    1.0,  # 15 Very thin cirrus cloud
-    1.0,  # 16 Thin cirrus cloud
-    1.0,  # 17 Thick cirrus cloud
-    1.0,  # 18 Cirrus above low or medium level cloud
-    .25,  # 19 Fractional or sub-pixel cloud
-    0.0  # 20 Undefined
+    0.0,  # 05 Very low clouds
+    0.0,  # 06 Low clouds
+    0.0,  # 07 Medium level clouds
+    1.0,  # 08 High and opaque clouds
+    1.0,  # 09 Very high and opaque clouds
+    .25,  # 10 Fractional clouds
+    1.0,  # 11 High semitransparent thin clouds;
+    1.0,  # 12 High semitransparent moderately thick clouds
+    1.0,  # 13 High semitransparent thick clouds
+    1.0,  # 14 High semitransparent above low or medium clouds
+    1.0   # 15 High semitransparent above snow/ice
 ])
 
-nctypecl = {'71': ntctypecl, '73': nlctypecl, '74': nmctypecl, '75': nhctypecl}
+nctypecl = {"71": ntctypecl, "73": nlctypecl, "74": nmctypecl, "75": nhctypecl}
 
 
 def get_arguments():
-    """
-    Get command line arguments.
+    """Get command line arguments.
 
     args.logging_conf_file, args.config_file, obs_time, area_id, wsize
 
-    Return
+    Return:
       File path of the logging.ini file
       File path of the application configuration file
       Observation/Analysis time
@@ -178,17 +164,17 @@ def get_arguments():
 
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument('--datetime', '-d', help='Date and time of observation - yyyymmddhh',
+    parser.add_argument("--datetime", "-d", help="Date and time of observation - yyyymmddhh",
                         required=True)
-    parser.add_argument('--area_id', '-a', help='Area id',
+    parser.add_argument("--area_id", "-a", help="Area id",
                         required=True)
-    parser.add_argument('--ipar', '-i', help='Parameter id',
+    parser.add_argument("--ipar", "-i", help="Parameter id",
                         required=True)
-    parser.add_argument('--size', '-s', help='Size of integration area in pixels',
+    parser.add_argument("--size", "-s", help="Size of integration area in pixels",
                         required=True)
-    parser.add_argument('-c', '--config_file',
+    parser.add_argument("-c", "--config_file",
                         type=str,
-                        dest='config_file',
+                        dest="config_file",
                         required=True,
                         help="The file containing configuration parameters e.g. mesan_sat_config.yaml")
     parser.add_argument("-l", "--logging",
@@ -205,8 +191,8 @@ def get_arguments():
     wsize = args.size
     area_id = args.area_id
     ipar = args.ipar
-    obs_time = datetime.strptime(args.datetime, '%Y%m%d%H')
-    if 'template' in args.config_file:
+    obs_time = datetime.strptime(args.datetime, "%Y%m%d%H")
+    if "template" in args.config_file:
         print("Template file given as master config, aborting!")
         sys.exit()
 
@@ -215,10 +201,10 @@ def get_arguments():
 
 def derive_sobs(ct_comp, ipar, npix, resultfile):
     """Derive the super observations and print data to file."""
-    import tempfile
     import shutil
+    import tempfile
 
-    tmpfname = tempfile.mktemp(suffix=('_' + os.path.basename(resultfile)),
+    tmpfname = tempfile.mktemp(suffix=("_" + os.path.basename(resultfile)),
                                dir=os.path.dirname(resultfile))
 
     # Get the lon,lat:
@@ -237,11 +223,11 @@ def derive_sobs(ct_comp, ipar, npix, resultfile):
     #
     # FIXME!
     try:
-        ctype = ct_comp.cloudtype.data.compute().astype('int')
+        ctype = ct_comp.cloudtype.data.compute().astype("int")
         # Put the nodata (255) to zero (non-processed):
         ctype = np.where(np.equal(ctype, 255), 0, ctype)
     except AttributeError:
-        ctype = ct_comp.cloudtype.data.astype('int')
+        ctype = ct_comp.cloudtype.data.astype("int")
         # Put the nodata (255) to zero (non-processed):
         try:
             ctype = ctype.filled(0)
@@ -258,8 +244,8 @@ def derive_sobs(ct_comp, ipar, npix, resultfile):
     dlen = int(np.ceil(float(npix) / 2.0))
     dx = int(max(2 * DLENMIN, 2 * dlen))
     dy = dx
-    fpt = open(tmpfname, 'w')
-    LOG.info('\tUsing %d x %d pixels in a superobservation', dx, dy)
+    fpt = open(tmpfname, "w")
+    LOG.info("\tUsing %d x %d pixels in a superobservation", dx, dy)
 
     # initialize superobs data */
     ny, nx = ctype.shape
@@ -303,7 +289,7 @@ def derive_sobs(ct_comp, ipar, npix, resultfile):
                 so_cloud = np.sum(so_nc * so_w / so_wtot)
                 #
                 # print data
-                if ipar == '71' and so_q >= 0.95:
+                if ipar == "71" and so_q >= 0.95:
                     # 10 => checked uncorrelated observations
                     # 11 => checked correlated observations
                     # use 10 to override data from automatic stations
@@ -312,7 +298,7 @@ def derive_sobs(ct_comp, ipar, npix, resultfile):
                     cortyp = 1  # is this correct ???
                 #
                 # -999: no stn number, -60: satellite data */
-                result = '%8d %7.2f %7.2f %5d %2.2d %2.2d %8.2f %8.2f\n' % \
+                result = "%8d %7.2f %7.2f %5d %2.2d %2.2d %8.2f %8.2f\n" % \
                     (99999, so_lat[iy, ix], so_lon[iy, ix], -999, cortyp, -60,
                      so_cloud, SDcc)
                 fpt.write(result)
@@ -320,12 +306,12 @@ def derive_sobs(ct_comp, ipar, npix, resultfile):
             else:
                 so_rejected = so_rejected + 1
 
-    LOG.info('\tCreated %d superobservations', so_tot)
-    LOG.debug('\t%d superobservations rejected', so_rejected)
+    LOG.info("\tCreated %d superobservations", so_tot)
+    LOG.debug("\t%d superobservations rejected", so_rejected)
     fpt.close()
 
     now = datetime.utcnow()
-    fname_with_timestamp = str(resultfile) + now.strftime('_%Y%m%d%H%M%S')
+    fname_with_timestamp = str(resultfile) + now.strftime("_%Y%m%d%H%M%S")
     shutil.copy(tmpfname, fname_with_timestamp)
     os.rename(tmpfname, resultfile)
 
@@ -347,12 +333,12 @@ if __name__ == "__main__":
                                       datefmt=_DEFAULT_TIME_FORMAT)
         handler.setFormatter(formatter)
 
-    logging.getLogger('').addHandler(handler)
-    logging.getLogger('').setLevel(logging.DEBUG)
+    logging.getLogger("").addHandler(handler)
+    logging.getLogger("").setLevel(logging.DEBUG)
 
-    LOG = logging.getLogger('prt_nwcsaf_cloudamount')
+    LOG = logging.getLogger("prt_nwcsaf_cloudamount")
 
-    log_handlers = logging.getLogger('').handlers
+    log_handlers = logging.getLogger("").handlers
     for log_handle in log_handlers:
         if type(log_handle) is handlers.SMTPHandler:
             LOG.debug("Mail notifications to: %s", str(log_handle.toaddrs))
@@ -360,9 +346,9 @@ if __name__ == "__main__":
     OPTIONS = get_config(config_filename)
 
     values = {"area": areaid, }
-    bname = obstime.strftime(OPTIONS['ct_composite_filename']) % values
-    path = OPTIONS['composite_output_dir']
-    filename = os.path.join(path, bname) + '.nc'
+    bname = obstime.strftime(OPTIONS["ct_composite_filename"]) % values
+    path = OPTIONS["composite_output_dir"]
+    filename = os.path.join(path, bname) + ".nc"
     if not os.path.exists(filename):
         LOG.error("File " + str(filename) + " does not exist!")
         sys.exit(-1)
@@ -374,7 +360,7 @@ if __name__ == "__main__":
     IPAR = str(iparam)
     NPIX = int(window_size)
 
-    bname = obstime.strftime(OPTIONS['cloudamount_filename']) % values
-    path = OPTIONS['composite_output_dir']
-    filename = os.path.join(path, bname + '.dat')
+    bname = obstime.strftime(OPTIONS["cloudamount_filename"]) % values
+    path = OPTIONS["composite_output_dir"]
+    filename = os.path.join(path, bname + ".dat")
     derive_sobs(comp, IPAR, NPIX, filename)

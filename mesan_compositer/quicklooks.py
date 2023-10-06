@@ -22,7 +22,7 @@
 
 """Make cloud composite quicklooks."""
 
-import os
+import argparse
 
 import dask.array as da
 import numpy as np
@@ -35,23 +35,16 @@ from mesan_compositer import nwcsaf_cloudtype_2021
 CHUNK_SIZE = 4096
 
 
-if __name__ == "__main__":
-
-    areaid = "euro4"
-    # areaid = 'mesanEx'
-    # FILEPATH = "./blended_stack_weighted_geo_noaa-19_metop-c_{area}.nc".format(area=areaid)
-    # FILEPATH = "./blended_stack_weighted_geo_noaa-19_{area}.nc".format(area=areaid)
-    FILEPATH = "./blended_stack_weighted_geo_polar_euro4.nc"
-    # FILEPATH = "./blended_stack_weighted_geo_n18_{area}.nc".format(area=areaid)
-    netcdf_filename = FILEPATH
-
+def ctype_quicklook_from_netcdf(group_name, netcdf_filename):
+    """Make a CLoud Type quicklook image from the netCDF file."""
     nc_ = xr.open_dataset(netcdf_filename, decode_cf=True,
                           mask_and_scale=True,
                           chunks={"columns": CHUNK_SIZE,
                                   "rows": CHUNK_SIZE})
 
+    breakpoint()
     # cloudtype = nc_['CTY_group'][:]
-    cloudtype = nc_["CT_group"][:]
+    cloudtype = nc_[group_name][:]
 
     palette = nwcsaf_cloudtype_2021()
 
@@ -66,5 +59,35 @@ if __name__ == "__main__":
 
     pcol = PaletteCompositor("mesan_cloudtype_composite")((xdata, pdata))
     ximg = XRImage(pcol)
-    outfile = os.path.join("./", os.path.basename(netcdf_filename).strip(".nc") + "_cloudtype.png")
+    outfile = netcdf_filename.strip(".nc") + "_cloudtype.png"
     ximg.save(outfile)
+
+    return outfile
+
+
+def get_arguments():
+    """Get command line arguments."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-f", "--netcdf_filepath",
+                        type=str,
+                        dest="netcdf_filepath",
+                        required=True,
+                        help="The netcdf file path of the cloud type composite.")
+
+    args = parser.parse_args()
+
+    return args.netcdf_filepath
+
+
+if __name__ == "__main__":
+
+    areaid = "euro4"
+    # areaid = 'mesanEx'
+    # FILEPATH = "./blended_stack_weighted_geo_noaa-19_metop-c_{area}.nc".format(area=areaid)
+    # FILEPATH = "./blended_stack_weighted_geo_noaa-19_{area}.nc".format(area=areaid)
+    FILEPATH = "./blended_stack_weighted_geo_polar_euro4.nc"
+    # FILEPATH = "/home/a000680/data/mesan/output/mesan_composite_euro4_20230201_1700_ct_20231005181316.nc"
+    # FILEPATH = "./blended_stack_weighted_geo_n18_{area}.nc".format(area=areaid)
+
+    netcdfpath = get_arguments()
+    ctype_quicklook_from_netcdf("CT_group", netcdfpath)

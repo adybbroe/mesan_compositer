@@ -23,7 +23,9 @@
 """Utilities to load and prepare cloud products on area."""
 
 import logging
+import os
 import pathlib
+from datetime import timedelta
 from tempfile import gettempdir
 
 import numpy as np
@@ -33,6 +35,7 @@ from satpy import DataQuery, MultiScene, Scene
 from satpy.modifiers.angles import get_satellite_zenith_angle
 from satpy.multiscene import stack
 from satpy.utils import debug_on
+from trollsift import Parser, globify
 
 debug_on()
 
@@ -70,6 +73,31 @@ class CloudProductsLoader:
             return compute_satz_with_pyorbital(data_array)
 
 
+def get_tle_file(start_time, end_time):
+    """Get the TLE file with TLEs that are closest in time to the actual observation time."""
+    tles_env = os.getenv("TLES")
+    if tles_env is None:
+        LOG.warning("No valid environment set for offline TLEs!")
+        return None
+    tles_path = pathlib.Path(tles_env)
+
+    dtobj = start_time + (end_time - start_time)/2
+    TLE_FILE_PATTERN = "tle-{datetime:%Y%m%d%H%M}.txt"
+
+    tle_filepaths = tles_path.glob(globify(TLE_FILE_PATTERN))
+    p__ = Parser(TLE_FILE_PATTERN)
+    tdelta = timedelta(days=30)
+    found_tlefile = None
+    for tle_path in tle_filepaths:
+        res = p__.parse(tle_path.name)
+
+        if abs(res["datetime"] - dtobj) < tdelta:
+            tdelta = abs(res["datetime"] - dtobj)
+            found_tlefile = tle_path
+
+    return found_tlefile
+
+
 def compute_satz_with_pyorbital(data_array):
     """Compute the sat zenith angles with pyorbital."""
     try:
@@ -83,9 +111,14 @@ def compute_satz_with_pyorbital(data_array):
     obs_time = generate_observation_time_array(data_array)
 
     lon, lat = data_array.attrs["area"].get_lonlats()
-    LOG.debug("Get satellite elevation via Pyorbital")
 
-    orb = Orbital(satname)
+    LOG.debug("Get satellite elevation via Pyorbital")
+    tlefilepath = get_tle_file(data_array.attrs["start_time"], data_array.attrs["end_time"])
+    if tlefilepath:
+        orb = Orbital(satname, tle_file=str(tlefilepath))
+    else:
+        orb = Orbital(satname)
+
     azimuth, elevation = orb.get_observer_look(obs_time, lon, lat, 0.)
     del azimuth
     sat_zen = 90. - elevation
@@ -156,10 +189,13 @@ if __name__ == "__main__":
     POLAR_DIR = base_dir / "polar_in/v2021"
     # POES_FILES = glob(os.path.join(POLAR_DIR, "S_NWC_*noaa19_72055_20230201T1651106Z*nc"))
     POES_FILES = [*POLAR_DIR.glob("S_NWC_*noaa19_72055_20230201T1651106Z*nc")]
-    NPP_FILES = [*POLAR_DIR.glob("S_NWC_*npp_00000_20230116T11*nc")]
+    # NPP_FILES = [*POLAR_DIR.glob("S_NWC_*npp_00000_20230116T11*nc")]
     METOP_FILES = [*POLAR_DIR.glob("S_NWC_*metopc_21988_20230201T1657001Z*nc")]
 
-    blended, group_name = blend_ct_products("ct", areaid, GEO_FILES, POES_FILES, NPP_FILES,
+    POLAR_FILES = [POES_FILES, METOP_FILES]
+    # blended, group_name = blend_ct_products("ct", areaid, GEO_FILES, POES_FILES,  # NPP_FILES,
+    #                                           cache_dir=gettempdir())
+    blended, group_name = blend_ct_products("ct", areaid, GEO_FILES, *POLAR_FILES,
                                             cache_dir=gettempdir())
     blended.save_dataset(group_name,
                          filename="./blended_stack_weighted_geo_polar_{area}.nc".format(area=areaid))

@@ -32,15 +32,15 @@ import tempfile
 from datetime import datetime, timedelta
 from glob import glob
 from logging import handlers
+from tempfile import gettempdir
 
 from satpy.utils import debug_on
 from trollsift import Parser, globify
 
 from mesan_compositer.composite_tools import METEOSAT, METOPS, MSGSATS, GeoMetaData, get_ppslist
 from mesan_compositer.config import get_config
-from mesan_compositer.ct_quicklooks import make_quicklooks
 from mesan_compositer.load_cloud_products import blend_ct_products
-from mesan_compositer.netcdf_io import ncCloudTypeComposite
+from mesan_compositer.quicklooks import ctype_quicklook_from_netcdf
 
 debug_on()
 
@@ -129,7 +129,14 @@ class ctCompositer:
         self.obstime = obstime
         self.timediff = tdiff
         self.time_window = (obstime - tdiff, obstime + tdiff)
-        LOG.debug("Time window: " + str(self.time_window[0]) + " - " + str(self.time_window[1]))
+        LOG.debug("Time window (used only for polar sat scenes): " +
+                  str(self.time_window[0]) + " - " + str(self.time_window[1]))
+
+        # geo_tdiff = timedelta(minutes=1)
+        # self._geo_time_window = (obstime - geo_tdiff, obstime + geo_tdiff)
+        # LOG.debug("Time window (used only for the Geo scenes): " +
+        #          str(self._geo_time_window[0]) + " - " + str(self._geo_time_window[1]))
+
         self.polar_satellites = config_options["polar_satellites"]
         LOG.debug("Polar satellites supported: %s", str(self.polar_satellites))
 
@@ -138,8 +145,6 @@ class ctCompositer:
         self.areaid = areaid
         self.longitude = None
         self.latitude = None
-        # A Satpy-scene area object:
-        self.area = None
 
         self._options = config_options
 
@@ -147,7 +152,8 @@ class ctCompositer:
         self.msg_scenes = []
 
         self.group_name = None  # Ex. 'CT_group'
-        self.composite = ncCloudTypeComposite()
+        self.blended_scene = None
+        # self.composite = ncCloudTypeComposite()
 
     def _get_all_pps_files(self, pps_dir):
         """Return list of pps files in directory."""
@@ -274,39 +280,53 @@ class ctCompositer:
         LOG.info("Get files inside time window: " + str(self.time_window[0]) + " - " + str(self.time_window[1]))
 
         self.msg_scenes = self.get_geo_scenes(msg_list)
-        self.msg_scenes.sort()
+        # Return only the most relevant (closest in time to the obstime):
+        found_idx = -1
+        tdiff = timedelta(minutes=120)
+        for idx in range(len(self.msg_scenes)):
+            scene = self.msg_scenes[idx]
+            LOG.debug("Time slot for scene: %s" % str(scene.timeslot))
+            if abs(scene.timeslot - self.obstime) < tdiff:
+                tdiff = abs(scene.timeslot - self.obstime)
+                print(tdiff)
+                found_idx = idx
+
+        if found_idx >= 0:
+            self.msg_scenes = [self.msg_scenes[found_idx]]
+            LOG.info("The scene closest in time to the analysis time: %s" % str(self.msg_scenes[0]))
 
     def blend_ct_products(self):
         """Blend the CT products together and create a cloud analysis."""
         areaid = self.areaid
 
-        geo_files = [pathlib.Path(f.uri) for f in self.msg_scenes]
-        pps_files = [pathlib.Path(f.uri) for f in self.pps_scenes]
+        cloud_scenes = []
+        for scene in self.msg_scenes:
+            cloud_product_filepath = pathlib.Path(scene.uri)
+            cloud_scenes.append([cloud_product_filepath, ])
 
-        # return blend_ct_products(areaid, msg_files, pps_files)
-        blended, group_name = blend_ct_products("ct", areaid, geo_files, pps_files)
+        for scene in self.pps_scenes:
+            ppsfile = pathlib.Path(scene.uri)
+            geofilename = pathlib.Path(scene.geofilename)
+            cloud_scenes.append([ppsfile, geofilename])
+
+        self.blended_scene, group_name = blend_ct_products("ct", areaid, *cloud_scenes, cache_dir=gettempdir())
         self.group_name = group_name
-        return blended
 
-    def write(self, blended_scene):
+    def write(self):
         """Write the composite to a netcdf file."""
-        tmpfname = tempfile.mktemp(suffix=os.path.basename(self.filename),
+        tmpfname = tempfile.mktemp(suffix=os.path.basename(self.filename)+".nc",
                                    dir=os.path.dirname(self.filename))
 
-        blended_scene.save_dataset(self.group_name, tmpfname)
+        self.blended_scene.save_dataset(self.group_name, filename=tmpfname)
         now = datetime.utcnow()
         fname_with_timestamp = str(self.filename) + now.strftime("_%Y%m%d%H%M%S.nc")
         shutil.copy(tmpfname, fname_with_timestamp)
         os.rename(tmpfname, self.filename + ".nc")
+        return self.filename + ".nc"
 
-        return
-
-    def make_quicklooks(self):
-        """Make quicklook images."""
-        breakpoint()
-
-        make_quicklooks(self.filename, self.composite.cloudtype,
-                        self.composite.id, self.composite.weight)
+    def quicklook(self, netcdf_filename):
+        """Make a quicklook image from the netCDF file."""
+        return ctype_quicklook_from_netcdf(self.group_name, netcdf_filename)
 
 
 if __name__ == "__main__":
@@ -334,26 +354,6 @@ if __name__ == "__main__":
 
     ctcomp = ctCompositer(time_of_analysis, delta_time_window, area_id, OPTIONS)
     ctcomp.get_catalogue()
-
-    blended, group_name = ctcomp.blend_ct_products()
-    ctcomp.write(blended)
-    # blended.save_dataset(group_name,
-    #                     filename="./blended_stack_weighted_geo_n18_{area}.nc".format(area=ctcomp.areaid))
-
-    ctcomp.make_quicklooks()
-
-    # ctcomp.make_composite()
-
-    # Just for testing purposes:
-    # values = {"area": area_id, }
-    # iparam = 71
-    # window_size = 24
-    # IPAR = str(iparam)
-    # NPIX = int(window_size)
-
-    # bname = time_of_analysis.strftime(OPTIONS['cloudamount_filename']) % values
-    # path = OPTIONS['composite_output_dir']
-    # filename = os.path.join(path, bname + '.dat')
-
-    # from mesan_compositer.prt_nwcsaf_cloudamount import derive_sobs
-    # derive_sobs(ctcomp.composite, IPAR, NPIX, filename)
+    ctcomp.blend_ct_products()
+    output_filepath = ctcomp.write()
+    qlook_filepath = ctcomp.quicklook(output_filepath)

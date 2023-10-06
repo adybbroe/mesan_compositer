@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2013, 2014, 2015, 2019 Adam Dybbroe
+# Copyright (c) 2013, 2014, 2015, 2019, 2023 Adam Dybbroe
 
 # Author(s):
 
@@ -32,57 +32,57 @@ except ImportError:
     pass
 
 try:
-    with open('./README.md', 'r') as fd:
+    with open("./README.md", "r") as fd:
         long_description = fd.read()
 except IOError:
-    long_description = ''
+    long_description = ""
 
-requires = ['docutils>=0.3',
-            'numpy>=1.5.1',
-            'satpy>=0.18.0',
-            'pyresample',
-            'trollsift',
-            'posttroll',
-            'netifaces',
-            'six',
-            'setuptools_scm']
+requires = ["docutils>=0.3",
+            "numpy>=1.5.1",
+            "satpy>=0.42",
+            "pyresample",
+            "trollsift",
+            "posttroll",
+            "netifaces",
+            "six",
+            "setuptools_scm"]
 
 SHORT_DESC = ("Mesan satellite compositer")
 
-NAME = 'mesan-compositer'
+NAME = "mesan-compositer"
 
 setup(name=NAME,
       description=SHORT_DESC,
-      author='Adam Dybbroe, Tomas Landelius',
-      author_email='adam.dybbroe@smhi.se, tomas.landelius@smhi.se',
-      classifiers=['Development Status :: 4 - Beta',
-                   'Intended Audience :: Science/Research',
-                   'License :: OSI Approved :: GNU General Public License v3 ' +
-                   'or later (GPLv3+)',
-                   'Operating System :: OS Independent',
-                   'Programming Language :: Python',
-                   'Topic :: Scientific/Engineering'],
-      url='https://github.com/adybbroe/mesan_compositer',
+      author="Adam Dybbroe, Tomas Landelius",
+      author_email="adam.dybbroe@smhi.se, tomas.landelius@smhi.se",
+      classifiers=["Development Status :: 4 - Beta",
+                   "Intended Audience :: Science/Research",
+                   "License :: OSI Approved :: GNU General Public License v3 " +
+                   "or later (GPLv3+)",
+                   "Operating System :: OS Independent",
+                   "Programming Language :: Python",
+                   "Topic :: Scientific/Engineering"],
+      url="https://github.com/adybbroe/mesan_compositer",
       # download_url="https://github.com/adybbroe/py....
       long_description=long_description,
-      license='GPLv3',
+      license="GPLv3",
 
-      packages=['mesan_compositer', 'nwcsaf_formats'],
+      packages=["mesan_compositer", "nwcsaf_formats"],
       package_data={},
 
       # Project should use reStructuredText, so ensure that the docutils get
       # installed or upgraded on the target machine
       install_requires=requires,
 
-      extras_require={'netcdf4-python': ['netCDF4']},
-      scripts=['mesan_compositer/make_ct_composite.py',
-               'mesan_compositer/make_ctth_composite.py',
-               'mesan_compositer/prt_nwcsaf_cloudamount.py',
-               'mesan_compositer/prt_nwcsaf_cloudheight.py',
-               'mesan_compositer/ct_quicklooks.py',
-               'mesan_compositer/ctth_quicklooks.py',
-               'mesan_compositer/mesan_composite_runner.py'],
-      test_suite='tests.suite',
+      extras_require={"netcdf4-python": ["netCDF4"]},
+      scripts=["mesan_compositer/make_ct_composite.py",
+               "mesan_compositer/make_ctth_composite.py",
+               "mesan_compositer/prt_nwcsaf_cloudamount.py",
+               "mesan_compositer/prt_nwcsaf_cloudheight.py",
+               "mesan_compositer/ct_quicklooks.py",
+               "mesan_compositer/ctth_quicklooks.py",
+               "mesan_compositer/mesan_composite_runner.py"],
+      test_suite="tests.suite",
       tests_requires=["mock"],
       zip_safe=False,
       use_scm_version=True
