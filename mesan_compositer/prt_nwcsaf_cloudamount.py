@@ -33,10 +33,11 @@ import sys
 from datetime import datetime
 from logging import handlers
 
+import dask.array as da
 import numpy as np
+import xarray as xr
 
 from mesan_compositer.config import get_config
-from mesan_compositer.netcdf_io import ncCloudTypeComposite
 
 LOG = logging.getLogger(__name__)
 
@@ -208,35 +209,9 @@ def derive_sobs(ct_comp, ipar, npix, resultfile):
                                dir=os.path.dirname(resultfile))
 
     # Get the lon,lat:
-    lon, lat = ct_comp.area_def.get_lonlats()
-
-    # Seems the cloudtype data can be three types of arrays at this stage:
-    # 1) a dask array (with 255 for no data)
-    # 2) a masked data array with fill-value = 255
-    # 3) a non masked numpy array with 255 for nodata
-    #
-    # This happens:
-    # 3. when only MSG data are present in the composite!
-    # 2. when data are read from netCDF file
-    # 1. when both MSG and PPS data are persent in the composite and
-    # when data are coming directly from the compositor
-    #
-    # FIXME!
-    try:
-        ctype = ct_comp.cloudtype.data.compute().astype("int")
-        # Put the nodata (255) to zero (non-processed):
-        ctype = np.where(np.equal(ctype, 255), 0, ctype)
-    except AttributeError:
-        ctype = ct_comp.cloudtype.data.astype("int")
-        # Put the nodata (255) to zero (non-processed):
-        try:
-            ctype = ctype.filled(0)
-        except AttributeError:
-            ctype = np.where(np.equal(ctype, 255), 0, ctype)
-
-    weight = ct_comp.weight.data
-    # obstime = ct_comp.time.data
-    # id = ct_comp.id.data
+    lons, lats = ct_comp.lon, ct_comp.lat
+    ctype = da.nan_to_num(ct_comp.data).astype("int32")
+    clamount = nctypecl["71"][ctype]
 
     # non overlapping superobservations
     # min 8x8 pixels = ca 8x8 km = 2*dlen x 2*dlen pixels for a
@@ -244,78 +219,66 @@ def derive_sobs(ct_comp, ipar, npix, resultfile):
     dlen = int(np.ceil(float(npix) / 2.0))
     dx = int(max(2 * DLENMIN, 2 * dlen))
     dy = dx
-    fpt = open(tmpfname, "w")
     LOG.info("\tUsing %d x %d pixels in a superobservation", dx, dy)
 
-    # initialize superobs data */
-    ny, nx = ctype.shape
+    clamount = xr.DataArray(data=clamount, dims=["y", "x"])
+    clamount = clamount.coarsen({"y": dy, "x": dx}, boundary="trim").mean()
 
-    # indices to super obs "midpoints"
-    lx = np.arange(dlen, nx - dlen + 1, dx)
-    ly = np.arange(ny - dlen, dlen - 1, -dy)
+    so_lon = lons[int(dy/2)::dy, int(dx/2)::dx]
+    so_lat = lats[int(dy/2)::dy, int(dx/2)::dx]
 
-    so_lon = lon[np.ix_(ly, lx)]
-    so_lat = lat[np.ix_(ly, lx)]
-
-    LOG.debug("Superobservation grid size: %d,%d", len(ly), len(lx))
-    LOG.debug("dlen = %d", dlen)
-    so_tot = 0
-    so_rejected = 0
-    for iy in range(len(ly)):
-        for ix in range(len(lx)):
-            # super ob domain is: ix-dlen:ix+dlen-1, iy-dlen:iy+dlen-1
-            x = lx[ix]
-            y = ly[iy]
-            so_x = np.arange(x - dlen, x + dlen - 1 + 1)
-            so_y = np.arange(y - dlen, y + dlen - 1 + 1)
-            so_ctype = ctype[np.ix_(so_y, so_x)]
-            so_w = weight[np.ix_(so_y, so_x)]
-            #
-            # pass all but: 00 Unprocessed and 20 Unclassified
-            so_ok = (so_ctype > 0) * (so_ctype < 20)
-            so_wtot = np.sum(so_w[so_ok])
-            so_nfound = np.sum(so_ok)
-            #
-            # observation quality
-            so_q = so_wtot / (so_nfound + 1e-6)
-            #
-            # check super obs statistics
-            # pdb.set_trace()
-            #
-            if float(so_nfound) / npix ** 2 > FPASS and so_q >= QPASS:
-                # enough number of OK pixels and quality
-                #      pdb.set_trace()
-                so_nc = nctypecl[ipar][so_ctype]
-                so_cloud = np.sum(so_nc * so_w / so_wtot)
-                #
-                # print data
-                if ipar == "71" and so_q >= 0.95:
-                    # 10 => checked uncorrelated observations
-                    # 11 => checked correlated observations
-                    # use 10 to override data from automatic stations
-                    cortyp = 10
-                else:
-                    cortyp = 1  # is this correct ???
-                #
-                # -999: no stn number, -60: satellite data */
-                result = "%8d %7.2f %7.2f %5d %2.2d %2.2d %8.2f %8.2f\n" % \
-                    (99999, so_lat[iy, ix], so_lon[iy, ix], -999, cortyp, -60,
-                     so_cloud, SDcc)
-                fpt.write(result)
-                so_tot += 1
-            else:
-                so_rejected = so_rejected + 1
-
-    LOG.info("\tCreated %d superobservations", so_tot)
-    LOG.debug("\t%d superobservations rejected", so_rejected)
-    fpt.close()
+    write_data(tmpfname, so_lon, so_lat, clamount)
 
     now = datetime.utcnow()
     fname_with_timestamp = str(resultfile) + now.strftime("_%Y%m%d%H%M%S")
     shutil.copy(tmpfname, fname_with_timestamp)
     os.rename(tmpfname, resultfile)
 
-    return
+
+def write_data(filepath, longitudes, latitudes, clamount):
+    """Write the data to file name."""
+    cortyp = 10
+    SDcc = 0.15
+
+    # Create a Dataset with lon, lat and cloud amount:
+    shape = clamount.shape
+    clamount_ds = xr.Dataset(data_vars={"clamount": clamount,
+                                        "lon": longitudes[:shape[0], :shape[1]],
+                                        # 'lat': latitudes[:shape[0], :shape[1]],
+                                        "minus_sixti": xr.DataArray(data=(np.ones(shape)*-60).astype("int32"),
+                                                                    dims=["y", "x"]),
+                                        "minus_999": xr.DataArray(data=(np.ones(shape)*-999).astype("int32"),
+                                                                  dims=["y", "x"]),
+                                        "five_nines": xr.DataArray(data=(np.ones(shape)*99999).astype("int32"),
+                                                                   dims=["y", "x"]),
+                                        "SDcc": xr.DataArray(data=np.ones(shape)*SDcc,
+                                                             dims=["y", "x"]),
+                                        "cortyp": xr.DataArray(data=(np.ones(shape)*cortyp).astype("int32"),
+                                                               dims=["y", "x"])
+                                        }
+                             )
+
+    df = clamount_ds.to_dataframe()
+    df.to_csv(filepath, columns=["five_nines", "latitude", "longitude",
+                                 "minus_999", "cortyp", "minus_sixti", "clamount", "SDcc"],
+              sep=" ",
+              index=False,
+              header=False)
+
+    # fpt = open(filepath, "w")
+
+    # ndims = clamount.shape
+    # for y in range(ndims[0]):
+    #     yidx = ndims[0]-1-y
+    #     for x in range(ndims[1]):
+    #         xidx = x
+    #         # print(latitudes[yidx, xidx], longitudes[yidx, xidx])
+    #         result = "%8d %7.2f %7.2f %5d %2.2d %2.2d %8.2f %8.2f\n" % \
+    #             (99999, latitudes[yidx, xidx], longitudes[yidx, xidx], -999, cortyp, -60,
+    #              clamount.data[yidx, xidx], SDcc)
+    #         fpt.write(result)
+
+    # fpt.close()
 
 
 if __name__ == "__main__":
@@ -354,8 +317,10 @@ if __name__ == "__main__":
         sys.exit(-1)
 
     # Load the Cloud Type composite from file
-    comp = ncCloudTypeComposite()
-    comp.load(filename)
+    # ctype = load_ct_composite(filename, 'CT_group')
+    from netcdf_io import cloudComposite
+    ctype = cloudComposite(filename, "CT", areaname=areaid)
+    ctype.load()
 
     IPAR = str(iparam)
     NPIX = int(window_size)
@@ -363,4 +328,5 @@ if __name__ == "__main__":
     bname = obstime.strftime(OPTIONS["cloudamount_filename"]) % values
     path = OPTIONS["composite_output_dir"]
     filename = os.path.join(path, bname + ".dat")
-    derive_sobs(comp, IPAR, NPIX, filename)
+
+    derive_sobs(ctype, IPAR, NPIX, filename)

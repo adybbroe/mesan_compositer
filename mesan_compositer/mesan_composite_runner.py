@@ -27,18 +27,20 @@ a mesan composite valid for the closest (whole) hour.
 
 """
 
+import argparse
+import logging.config
 import os
 import socket
-import argparse
-from logging import handlers
-import logging.config
 import sys
-from six.moves.urllib.parse import urlparse
-import posttroll.subscriber
-from posttroll.publisher import Publish
-from posttroll.message import Message
-from multiprocessing import Pool, Manager
 import threading
+from logging import handlers
+from multiprocessing import Manager, Pool
+
+import posttroll.subscriber
+from posttroll.message import Message
+from posttroll.publisher import Publish
+from six.moves.urllib.parse import urlparse
+
 try:
     # python 3
     from queue import Empty
@@ -46,16 +48,15 @@ except ImportError:
     # python 2
     from Queue import Empty
 
-from datetime import timedelta, datetime
+from datetime import datetime, timedelta
 
-from mesan_compositer.utils import check_uri
-from mesan_compositer.utils import get_local_ips
-from mesan_compositer.composite_tools import get_analysis_time
 from mesan_compositer import make_ct_composite as mcc
 from mesan_compositer import make_ctth_composite
+from mesan_compositer.composite_tools import get_analysis_time
+from mesan_compositer.config import get_config
 from mesan_compositer.prt_nwcsaf_cloudamount import derive_sobs as derive_sobs_clamount
 from mesan_compositer.prt_nwcsaf_cloudheight import derive_sobs as derive_sobs_clheight
-from mesan_compositer.config import get_config
+from mesan_compositer.utils import check_uri, get_local_ips
 
 LOG = logging.getLogger(__name__)
 
@@ -63,29 +64,29 @@ DEFAULT_AREA = "mesanX"
 DEFAULT_SUPEROBS_WINDOW_SIZE_NPIX = 32
 
 #: Default time format
-_DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
+_DEFAULT_TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 #: Default log format
-_DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
+_DEFAULT_LOG_FORMAT = "[%(levelname)s: %(asctime)s : %(name)s] %(message)s"
 
 
-SENSOR = {'NOAA-19': 'avhrr/3',
-          'NOAA-18': 'avhrr/3',
-          'NOAA-15': 'avhrr/3',
-          'Metop-A': 'avhrr/3',
-          'Metop-B': 'avhrr/3',
-          'Metop-C': 'avhrr/3',
-          'EOS-Terra': 'modis',
-          'EOS-Aqua': 'modis',
-          'Suomi-NPP': 'viirs',
-          'NOAA-20': 'viirs'}
+SENSOR = {"NOAA-19": "avhrr/3",
+          "NOAA-18": "avhrr/3",
+          "NOAA-15": "avhrr/3",
+          "Metop-A": "avhrr/3",
+          "Metop-B": "avhrr/3",
+          "Metop-C": "avhrr/3",
+          "EOS-Terra": "modis",
+          "EOS-Aqua": "modis",
+          "Suomi-NPP": "viirs",
+          "NOAA-20": "viirs"}
 
 
-GEO_SATS = ['Meteosat-10', 'Meteosat-9', 'Meteosat-8', 'Meteosat-11', ]
-MSG_NAME = {'Meteosat-10': 'MSG3', 'Meteosat-9': 'MSG2',
-            'Meteosat-8': 'MSG1', 'Meteosat-11': 'MSG4'}
+GEO_SATS = ["Meteosat-10", "Meteosat-9", "Meteosat-8", "Meteosat-11", ]
+MSG_NAME = {"Meteosat-10": "MSG3", "Meteosat-9": "MSG2",
+            "Meteosat-8": "MSG1", "Meteosat-11": "MSG4"}
 
-PRODUCT_NAMES = ['CMA', 'CT', 'CTTH', 'PC', 'CPP']
+PRODUCT_NAMES = ["CMA", "CT", "CTTH", "PC", "CPP"]
 
 
 def get_arguments():
@@ -93,15 +94,15 @@ def get_arguments():
 
     args.logging_conf_file, args.config_file, obs_time, area_id, wsize
 
-    Return
+    Return:
       File path of the logging.ini file
       File path of the application configuration file
 
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config_file',
+    parser.add_argument("-c", "--config_file",
                         type=str,
-                        dest='config_file',
+                        dest="config_file",
                         required=True,
                         help="The file containing configuration parameters e.g. mesan_sat_config.yaml")
     parser.add_argument("-l", "--logging",
@@ -111,7 +112,7 @@ def get_arguments():
                         required=False)
 
     args = parser.parse_args()
-    if 'template' in args.config_file:
+    if "template" in args.config_file:
         print("Template file given as master config, aborting!")
         sys.exit()
 
@@ -152,7 +153,7 @@ class FilePublisher(threading.Thread):
 
     def run(self):
         """Start the publisher thread and publish as adequate until interrupted/stopped."""
-        with Publish('mesan_composite_runner', 0, ['netCDF/3', ]) as publisher:
+        with Publish("mesan_composite_runner", 0, ["netCDF/3", ]) as publisher:
             while self.loop:
                 retv = self.queue.get()
                 if retv is not None:
@@ -179,9 +180,9 @@ class FileListener(threading.Thread):
 
     def run(self):
         """Start the runner and run indefinately until interrupted."""
-        with posttroll.subscriber.Subscribe('', ['CF/2',
-                                                 '2/nwcsaf-msg/0deg/ctth-plax-corrected',
-                                                 '2/nwcsaf-msg/0deg/ct-plax-corrected'], True) as subscr:
+        with posttroll.subscriber.Subscribe("", ["CF/2",
+                                                 "2/nwcsaf-msg/0deg/ctth-plax-corrected",
+                                                 "2/nwcsaf-msg/0deg/ct-plax-corrected"], True) as subscr:
             for msg in subscr.recv(timeout=90):
                 if not self.loop:
                     break
@@ -196,25 +197,25 @@ class FileListener(threading.Thread):
         if not msg:
             return False
 
-        urlobj = urlparse(msg.data['uri'])
+        urlobj = urlparse(msg.data["uri"])
         url_ip = socket.gethostbyname(urlobj.netloc)
         if urlobj.netloc and (url_ip not in get_local_ips()):
             LOG.warning("Server %s not the current one: %s", str(urlobj.netloc), socket.gethostname())
             return False
 
-        if ('platform_name' not in msg.data or
-                'orbit_number' not in msg.data or
-                'start_time' not in msg.data):
+        if ("platform_name" not in msg.data or
+                "orbit_number" not in msg.data or
+                "start_time" not in msg.data):
             LOG.info(
                 "Message is lacking crucial fields, probably an MSG scene...")
-            if ('platform_name' not in msg.data or
-                    'nominal_time' not in msg.data or
-                    'pge' not in msg.data):
+            if ("platform_name" not in msg.data or
+                    "nominal_time" not in msg.data or
+                    "pge" not in msg.data):
                 LOG.warning("Message is lacking crucial fields...")
                 return False
 
-        if msg.data['platform_name'] not in (GEO_SATS + POLAR_SATELLITES):
-            LOG.info(str(msg.data['platform_name']) + ": " +
+        if msg.data["platform_name"] not in (GEO_SATS + POLAR_SATELLITES):
+            LOG.info(str(msg.data["platform_name"]) + ": " +
                      "Not a MSG or a NOAA/Metop/S-NPP/Terra/Aqua scene. Continue...")
             return False
 
@@ -225,33 +226,33 @@ class FileListener(threading.Thread):
 def create_message(resultfile, scene):
     """Create the posttroll message."""
     to_send = {}
-    to_send['uri'] = ('ssh://%s/%s' % (SERVERNAME, resultfile))
-    to_send['uid'] = resultfile
-    to_send['sensor'] = scene.get('instrument')
-    if not to_send['sensor']:
-        to_send['sensor'] = scene.get('sensor')
+    to_send["uri"] = ("ssh://%s/%s" % (SERVERNAME, resultfile))
+    to_send["uid"] = resultfile
+    to_send["sensor"] = scene.get("instrument")
+    if not to_send["sensor"]:
+        to_send["sensor"] = scene.get("sensor")
 
-    to_send['platform_name'] = scene['platform_name']
-    to_send['orbit_number'] = scene.get('orbit_number')
-    to_send['type'] = 'netCDF'
-    to_send['format'] = 'MESAN'
-    to_send['data_processing_level'] = '3'
-    to_send['start_time'], to_send['end_time'] = scene[
-        'starttime'], scene['endtime']
-    pub_message = Message('/' + to_send['format'] + '/' + to_send['data_processing_level'] +
-                          '/polar/direct_readout/',
+    to_send["platform_name"] = scene["platform_name"]
+    to_send["orbit_number"] = scene.get("orbit_number")
+    to_send["type"] = "netCDF"
+    to_send["format"] = "MESAN"
+    to_send["data_processing_level"] = "3"
+    to_send["start_time"], to_send["end_time"] = scene[
+        "starttime"], scene["endtime"]
+    pub_message = Message("/" + to_send["format"] + "/" + to_send["data_processing_level"] +
+                          "/polar/direct_readout/",
                           "file", to_send).encode()
 
     return pub_message
 
 
-def ready2run(msg, files4comp, job_register, sceneid, product='CT'):
+def ready2run(msg, files4comp, job_register, sceneid, product="CT"):
     """Check whether we can start a composite generation on scene."""
     LOG.debug("Ready to run?")
     LOG.info("Got message: " + str(msg))
 
-    if msg.type == 'file':
-        uri = (msg.data['uri'])
+    if msg.type == "file":
+        uri = (msg.data["uri"])
     else:
         LOG.debug(
             "Ignoring this type of message data: type = " + str(msg.type))
@@ -260,16 +261,16 @@ def ready2run(msg, files4comp, job_register, sceneid, product='CT'):
     try:
         file4mesan = check_uri(uri)
     except IOError:
-        LOG.info('Requested file not present on this host!')
+        LOG.info("Requested file not present on this host!")
         return False
 
-    platform_name = msg.data['platform_name']
+    platform_name = msg.data["platform_name"]
 
-    sensors = msg.data['sensor']
+    sensors = msg.data["sensor"]
     if not isinstance(sensors, (list, tuple, set)):
         sensors = [sensors]
 
-    if 'start_time' not in msg.data and 'nominal_time' not in msg.data:
+    if "start_time" not in msg.data and "nominal_time" not in msg.data:
         LOG.warning("No start time in message!")
         return False
 
@@ -277,28 +278,28 @@ def ready2run(msg, files4comp, job_register, sceneid, product='CT'):
         LOG.info("Platform not supported: " + str(platform_name))
         return False
 
-    if platform_name in POLAR_SATELLITES and SENSOR.get(platform_name, 'avhrr/3') not in sensors:
+    if platform_name in POLAR_SATELLITES and SENSOR.get(platform_name, "avhrr/3") not in sensors:
         LOG.debug("Scene not applicable. platform and instrument: " +
-                  str(msg.data['platform_name']) + " " +
-                  str(msg.data['sensor']))
+                  str(msg.data["platform_name"]) + " " +
+                  str(msg.data["sensor"]))
         return False
-    elif platform_name in GEO_SATS and 'seviri' not in sensors:
+    elif platform_name in GEO_SATS and "seviri" not in sensors:
         LOG.debug("Scene not applicable. platform and instrument: " +
-                  str(msg.data['platform_name']) + " " +
-                  str(msg.data['sensor']))
+                  str(msg.data["platform_name"]) + " " +
+                  str(msg.data["sensor"]))
         return False
 
-    if 'uid' not in msg.data:
-        if 'uri' not in msg.data:
+    if "uid" not in msg.data:
+        if "uri" not in msg.data:
             raise IOError("No uri or url in message!")
         # Get uid from uri:
-        uri = urlparse(msg.data['uri'])
+        uri = urlparse(msg.data["uri"])
         uid = os.path.basename(uri.path)
     else:
-        uid = msg.data['uid']
-    prefixes = ['S_NWC_' + product + '_',
-                'SAFNWC_' + MSG_NAME.get(str(msg.data['platform_name']), 'MSG4') +
-                '_' + product + '_']
+        uid = msg.data["uid"]
+    prefixes = ["S_NWC_" + product + "_",
+                "SAFNWC_" + MSG_NAME.get(str(msg.data["platform_name"]), "MSG4") +
+                "_" + product + "_"]
     file_ok = False
     for prfx in prefixes:
         LOG.debug("File prefix to check for: %s", prfx)
@@ -337,12 +338,12 @@ def ctype_composite_worker(scene, job_id, publish_q, config_options):
         LOG.debug("Ctype: Start compositer...")
         # Get the time of analysis from start and end times:
         time_of_analysis = get_analysis_time(
-            scene['starttime'], scene['endtime'])
-        twindow = int(config_options.get('absolute_time_threshold_minutes', '30'))
+            scene["starttime"], scene["endtime"])
+        twindow = int(config_options.get("absolute_time_threshold_minutes", "30"))
         delta_t = timedelta(minutes=twindow)
         LOG.debug("Time window = " + str(twindow))
 
-        mesan_area_id = config_options.get('mesan_area_id', None)
+        mesan_area_id = config_options.get("mesan_area_id", None)
         if not mesan_area_id:
             LOG.warning("No area id specified in config file. Using default = " +
                         str(DEFAULT_AREA))
@@ -351,8 +352,8 @@ def ctype_composite_worker(scene, job_id, publish_q, config_options):
         LOG.info(
             "Make ctype composite for area id = " + str(mesan_area_id))
 
-        npix = int(config_options.get('number_of_pixels', DEFAULT_SUPEROBS_WINDOW_SIZE_NPIX))
-        ipar = str(config_options.get('cloud_amount_ipar'))
+        npix = int(config_options.get("number_of_pixels", DEFAULT_SUPEROBS_WINDOW_SIZE_NPIX))
+        ipar = str(config_options.get("cloud_amount_ipar"))
         if not ipar:
             raise IOError("No ipar value in config file!")
 
@@ -368,10 +369,9 @@ def ctype_composite_worker(scene, job_id, publish_q, config_options):
             LOG.info("Make Cloud Type super observations")
 
             values = {"area": mesan_area_id, }
-            bname = time_of_analysis.strftime(
-                config_options['cloudamount_filename']) % values
-            path = config_options['composite_output_dir']
-            filename = os.path.join(path, bname + '.dat')
+            bname = time_of_analysis.strftime(config_options["cloudamount_filename"]) % values
+            path = config_options["composite_output_dir"]
+            filename = os.path.join(path, bname + ".dat")
             derive_sobs_clamount(ctcomp.composite, ipar, npix, filename)
 
             result_file = ctcomp.filename
@@ -389,7 +389,7 @@ def ctype_composite_worker(scene, job_id, publish_q, config_options):
                     "Job entry is not a datetime instance: " + str(job_id))
 
     except Exception:
-        LOG.exception('Failed in ctype_composite_worker...')
+        LOG.exception("Failed in ctype_composite_worker...")
         raise
 
 
@@ -399,12 +399,12 @@ def ctth_composite_worker(scene, job_id, publish_q, config_options):
         LOG.debug("CTTH compositer: Start...")
         # Get the time of analysis from start and end times:
         time_of_analysis = get_analysis_time(
-            scene['starttime'], scene['endtime'])
-        twindow = int(config_options.get('absolute_time_threshold_minutes', '30'))
+            scene["starttime"], scene["endtime"])
+        twindow = int(config_options.get("absolute_time_threshold_minutes", "30"))
         delta_t = timedelta(minutes=twindow)
         LOG.debug("Time window = " + str(twindow))
 
-        mesan_area_id = config_options.get('mesan_area_id', None)
+        mesan_area_id = config_options.get("mesan_area_id", None)
         if not mesan_area_id:
             LOG.warning("No area id specified in config file. Using default = " +
                         str(DEFAULT_AREA))
@@ -412,8 +412,8 @@ def ctth_composite_worker(scene, job_id, publish_q, config_options):
 
         LOG.info("Make cloud height composite for area id = " + str(mesan_area_id))
 
-        npix = int(config_options.get('number_of_pixels', DEFAULT_SUPEROBS_WINDOW_SIZE_NPIX))
-        ipar = config_options.get('cloud_amount_ipar')
+        npix = int(config_options.get("number_of_pixels", DEFAULT_SUPEROBS_WINDOW_SIZE_NPIX))
+        ipar = config_options.get("cloud_amount_ipar")
         if not ipar:
             raise IOError("No ipar value in config file!")
 
@@ -427,9 +427,9 @@ def ctth_composite_worker(scene, job_id, publish_q, config_options):
 
             # Make Super observations:
             values = {"area": mesan_area_id, }
-            bname = time_of_analysis.strftime(OPTIONS['cloudheight_filename']) % values
-            path = config_options['composite_output_dir']
-            filename = os.path.join(path, bname + '.dat')
+            bname = time_of_analysis.strftime(OPTIONS["cloudheight_filename"]) % values
+            path = config_options["composite_output_dir"]
+            filename = os.path.join(path, bname + ".dat")
             LOG.info("Make Cloud Height super observations. Output file = %s", str(filename))
             derive_sobs_clheight(ctth_comp.composite, npix, filename)
 
@@ -448,7 +448,7 @@ def ctth_composite_worker(scene, job_id, publish_q, config_options):
                     "Job entry is not a datetime instance: " + str(job_id))
 
     except Exception:
-        LOG.exception('Failed in ctth_composite_worker...')
+        LOG.exception("Failed in ctth_composite_worker...")
         raise
 
 
@@ -464,7 +464,7 @@ def mesan_live_runner(config_options):
     """
     LOG.info("*** Start the runner for the Mesan composite generator:")
     LOG.debug("os.environ = " + str(os.environ))
-    npix = int(config_options.get('number_of_pixels', DEFAULT_SUPEROBS_WINDOW_SIZE_NPIX))
+    npix = int(config_options.get("number_of_pixels", DEFAULT_SUPEROBS_WINDOW_SIZE_NPIX))
     LOG.debug("Number of pixels = " + str(npix))
 
     pool = Pool(processes=6, maxtasksperchild=1)
@@ -489,67 +489,67 @@ def mesan_live_runner(config_options):
         LOG.debug(
             "Number of threads currently alive: " + str(threading.active_count()))
 
-        if 'start_time' in msg.data:
-            start_time = msg.data['start_time']
-        elif 'nominal_time' in msg.data:
-            start_time = msg.data['nominal_time']
+        if "start_time" in msg.data:
+            start_time = msg.data["start_time"]
+        elif "nominal_time" in msg.data:
+            start_time = msg.data["nominal_time"]
         else:
             LOG.warning("Neither start_time nor nominal_time in message!")
             start_time = None
 
-        if 'end_time' in msg.data:
-            end_time = msg.data['end_time']
+        if "end_time" in msg.data:
+            end_time = msg.data["end_time"]
         else:
             LOG.warning("No end_time in message!")
             end_time = None
 
-        sensor = str(msg.data['sensor'])
-        platform_name = msg.data['platform_name']
+        sensor = str(msg.data["sensor"])
+        platform_name = msg.data["platform_name"]
         if platform_name not in GEO_SATS:
-            orbit_number = int(msg.data['orbit_number'])
+            orbit_number = int(msg.data["orbit_number"])
             LOG.info("Polar satellite: " + str(platform_name))
         else:
-            orbit_number = '00000'
+            orbit_number = "00000"
             LOG.info("Geostationary satellite: " + str(platform_name))
 
-        keyname = (str(platform_name) + '_' +
-                   str(orbit_number) + '_' +
-                   str(start_time.strftime('%Y%m%d%H%M')))
+        keyname = (str(platform_name) + "_" +
+                   str(orbit_number) + "_" +
+                   str(start_time.strftime("%Y%m%d%H%M")))
 
-        product = 'UNKNOWN'
-        if 'pge' in msg.data:
-            product = msg.data['pge']
-        elif 'uid' in msg.data:
-            uid = msg.data['uid']
+        product = "UNKNOWN"
+        if "pge" in msg.data:
+            product = msg.data["pge"]
+        elif "uid" in msg.data:
+            uid = msg.data["uid"]
             for pge in PRODUCT_NAMES:
-                match = '_' + pge + '_'
+                match = "_" + pge + "_"
                 if match in uid:
                     product = pge
                     break
 
-        keyname = str(product) + '_' + keyname
+        keyname = str(product) + "_" + keyname
         status = ready2run(msg, composite_files,
                            jobs_dict, keyname, product)
 
         if status:
             # Start composite generation:
 
-            urlobj = urlparse(msg.data['uri'])
+            urlobj = urlparse(msg.data["uri"])
             path, fname = os.path.split(urlobj.path)
             LOG.debug("path " + str(path) + " filename = " + str(fname))
 
-            scene = {'platform_name': platform_name,
-                     'orbit_number': orbit_number,
-                     'starttime': start_time, 'endtime': end_time,
-                     'sensor': sensor,
-                     'filename': urlobj.path,
-                     'product': product}
+            scene = {"platform_name": platform_name,
+                     "orbit_number": orbit_number,
+                     "starttime": start_time, "endtime": end_time,
+                     "sensor": sensor,
+                     "filename": urlobj.path,
+                     "product": product}
 
             if keyname not in jobs_dict:
                 LOG.warning("Scene-run seems unregistered! Forget it...")
                 continue
 
-            if product == 'CT':
+            if product == "CT":
                 LOG.debug("Product is CT")
                 pool.apply_async(ctype_composite_worker,
                                  (scene,
@@ -558,7 +558,7 @@ def mesan_live_runner(config_options):
                                   publisher_q,
                                   config_options))
 
-            elif product == 'CTTH':
+            elif product == "CTTH":
                 LOG.debug("Product is CTTH")
                 pool.apply_async(ctth_composite_worker,
                                  (scene,
@@ -596,24 +596,24 @@ if __name__ == "__main__":
     handler.setFormatter(formatter)
     handler.setLevel(logging.DEBUG)
 
-    logging.getLogger('').addHandler(handler)
-    logging.getLogger('').setLevel(logging.DEBUG)
-    logging.getLogger('posttroll').setLevel(logging.INFO)
+    logging.getLogger("").addHandler(handler)
+    logging.getLogger("").setLevel(logging.DEBUG)
+    logging.getLogger("posttroll").setLevel(logging.INFO)
 
-    LOG = logging.getLogger('mesan_composite_runner')
+    LOG = logging.getLogger("mesan_composite_runner")
 
-    log_handlers = logging.getLogger('').handlers
+    log_handlers = logging.getLogger("").handlers
     for log_handle in log_handlers:
         if type(log_handle) is handlers.SMTPHandler:
             LOG.debug("Mail notifications to: %s", str(log_handle.toaddrs))
 
     OPTIONS = get_config(config_filename)
 
-    POLSATS_STR = OPTIONS.get('polar_satellites')
+    POLSATS_STR = OPTIONS.get("polar_satellites")
     POLAR_SATELLITES = POLSATS_STR.split()
 
     servername = None
     servername = socket.gethostname()
-    SERVERNAME = OPTIONS.get('servername', servername)
+    SERVERNAME = OPTIONS.get("servername", servername)
 
     mesan_live_runner(OPTIONS)

@@ -354,6 +354,10 @@ if __name__ == "__main__":
 
     ctcomp = ctCompositer(time_of_analysis, delta_time_window, area_id, OPTIONS)
     ctcomp.get_catalogue()
+    breakpoint()
     ctcomp.blend_ct_products()
     output_filepath = ctcomp.write()
     qlook_filepath = ctcomp.quicklook(output_filepath)
+    breakpoint()
+
+    x = 1

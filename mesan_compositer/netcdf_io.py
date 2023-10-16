@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 - 2019 Adam.Dybbroe
+# Copyright (c) 2014 - 2019, 2023 Adam.Dybbroe
 
 # Author(s):
 
@@ -20,14 +20,15 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Defining the netCDF4 mesan-composite object with read and write methods
-"""
+"""Defining the netCDF4 mesan-composite object with read and write methods."""
 
 import logging
-import numpy as np
-from mesan_compositer.utils import proj2cf
-import xarray as xr
 from datetime import datetime
+
+import numpy as np
+import xarray as xr
+
+from mesan_compositer.utils import proj2cf
 
 LOG = logging.getLogger(__name__)
 
@@ -35,20 +36,20 @@ TIME_UNITS = "seconds since 1970-01-01 00:00:00"
 CF_FLOAT_TYPE = np.float64
 CF_DATA_TYPE = np.int16
 # To be complete, get from appendix F of cf conventions
-MAPPING_ATTRIBUTES = {'grid_mapping_name': "proj",
-                      'standard_parallel': ["lat_1", "lat_2"],
-                      'latitude_of_projection_origin': "lat_0",
-                      'longitude_of_projection_origin': "lon_0",
-                      'longitude_of_central_meridian': "lon_0",
-                      'grid_north_pole_longitude': 'o_lon_p',
-                      'grid_north_pole_latitude': 'o_lat_p',
-                      'perspective_point_height': "h",
-                      'false_easting': "x_0",
-                      'false_northing': "y_0",
-                      'semi_major_axis': "a",
-                      'semi_minor_axis': "b",
-                      'inverse_flattening': "rf",
-                      'ellipsoid': "ellps",  # not in CF conventions...
+MAPPING_ATTRIBUTES = {"grid_mapping_name": "proj",
+                      "standard_parallel": ["lat_1", "lat_2"],
+                      "latitude_of_projection_origin": "lat_0",
+                      "longitude_of_projection_origin": "lon_0",
+                      "longitude_of_central_meridian": "lon_0",
+                      "grid_north_pole_longitude": "o_lon_p",
+                      "grid_north_pole_latitude": "o_lat_p",
+                      "perspective_point_height": "h",
+                      "false_easting": "x_0",
+                      "false_northing": "y_0",
+                      "semi_major_axis": "a",
+                      "semi_minor_axis": "b",
+                      "inverse_flattening": "rf",
+                      "ellipsoid": "ellps",  # not in CF conventions...
                       }
 
 # To be completed, get from appendix F of cf conventions
@@ -64,23 +65,21 @@ PROJNAME = {"vertical_perspective": "nsper",
 
 
 class InfoObject(object):
-
-    """Simple data and info container.
-    """
+    """Simple data and info container."""
 
     def __init__(self):
+        """Initialize."""
         self.info = {}
         self.data = None
 
 
 class ncCloudTypeComposite(object):
-
-    """netcdf cloud type composite object"""
+    """netcdf cloud type composite object."""
 
     def __init__(self):
-
+        """Initialize."""
         self.info = {}
-        #self.info["Conventions"] = "CF-1.6"
+        # self.info["Conventions"] = "CF-1.6"
         self.info["Conventions"] = "Undefined"
 
         self.time = InfoObject()
@@ -90,15 +89,14 @@ class ncCloudTypeComposite(object):
         self.area = InfoObject()
         self.area_def = None
 
-    def store(self, comp_dict, area_obj, product_id='MSG/PPS Cloud Type composite'):
-        """Store the composite into the object"""
-
+    def store(self, comp_dict, area_obj, product_id="MSG/PPS Cloud Type composite"):
+        """Store the composite into the object."""
         self.info["product"] = product_id
         self.area_def = area_obj
 
         resolution = 1000  # FIXME!
-        str_res = '1000 m'
-        dim_names = ['y' + str_res, 'x' + str_res]
+        str_res = "1000 m"
+        dim_names = ["y" + str_res, "x" + str_res]
 
         self.time.data = comp_dict["time"]
         valid_min, valid_max = (self.time.data.min(), self.time.data.max())
@@ -114,18 +112,18 @@ class ncCloudTypeComposite(object):
         valid_min, valid_max = (0, 20)
         self.cloudtype.info = {"var_name": "cloudtype",
                                "var_data": self.cloudtype.data,
-                               'var_dim_names': dim_names,
+                               "var_dim_names": dim_names,
                                "standard_name": "Cloudtype",
                                "valid_range": np.array([valid_min, valid_max]),
                                "resolution": resolution}
-        self.cloudtype.info["description"] = 'NWCSAF cloudtype classification'
+        self.cloudtype.info["description"] = "NWCSAF cloudtype classification"
 
         # Weight:
         self.weight.data = comp_dict["weight"]
         valid_min, valid_max = (self.weight.data.min(), self.weight.data.max())
         self.weight.info = {"var_name": "weight",
                             "var_data": self.weight.data,
-                            'var_dim_names': dim_names,
+                            "var_dim_names": dim_names,
                             "standard_name": "Cloud Type weight",
                             "valid_range": np.array([valid_min, valid_max]),
                             "resolution": 1000}
@@ -136,7 +134,7 @@ class ncCloudTypeComposite(object):
         valid_min, valid_max = (self.id.data.min(), self.id.data.max())
         self.id.info = {"var_name": "id",
                         "var_data": self.id.data,
-                        'var_dim_names': dim_names,
+                        "var_dim_names": dim_names,
                         "standard_name": "Cloud Type id",
                         "valid_range": np.array([valid_min, valid_max]),
                         "resolution": 1000}
@@ -145,7 +143,7 @@ class ncCloudTypeComposite(object):
 
         # Grid mapping:
         self.area.data = 0
-        self.area.info = {"var_name": 'area',
+        self.area.info = {"var_name": "area",
                           "var_data": self.area.data,
                           "var_dim_names": ()}
 
@@ -180,89 +178,88 @@ class ncCloudTypeComposite(object):
         self.time.info["grid_mapping"] = self.area.info["var_name"]
 
     def write(self, filename):
-        """Write the data to netCDF file"""
-
-        other_to_netcdf_kwargs = {'compute': True}
-        root = xr.Dataset({}, attrs={'history': 'Created by mesan_compositor on {}'.format(datetime.utcnow()),
-                                     'Conventions': 'Undefined'})
-        engine = 'netcdf4'
+        """Write the data to netCDF file."""
+        other_to_netcdf_kwargs = {"compute": True}
+        root = xr.Dataset({}, attrs={"history": "Created by mesan_compositor on {}".format(datetime.utcnow()),
+                                     "Conventions": "Undefined"})
+        engine = "netcdf4"
 
         xcoord, ycoord = self.area_def.get_proj_vectors()
         attrs = get_nc_attributes_from_object(self.cloudtype.info)
 
-        ctype = xr.DataArray(data=self.cloudtype.data, dims=['y1000 m', 'x1000 m'], attrs=attrs)
+        ctype = xr.DataArray(data=self.cloudtype.data, dims=["y1000 m", "x1000 m"], attrs=attrs)
 
         attrs = get_nc_attributes_from_object(self.id.info)
-        data_id = xr.DataArray(data=self.id.data, dims=['y1000 m', 'x1000 m'], attrs=attrs)
+        data_id = xr.DataArray(data=self.id.data, dims=["y1000 m", "x1000 m"], attrs=attrs)
 
         attrs = get_nc_attributes_from_object(self.time.info)
-        data_time = xr.DataArray(data=self.time.data, dims=['y1000 m', 'x1000 m'], attrs=attrs)
+        data_time = xr.DataArray(data=self.time.data, dims=["y1000 m", "x1000 m"], attrs=attrs)
 
         attrs = get_nc_attributes_from_object(self.weight.info)
-        weight = xr.DataArray(data=self.weight.data, dims=['y1000 m', 'x1000 m'], attrs=attrs)
+        weight = xr.DataArray(data=self.weight.data, dims=["y1000 m", "x1000 m"], attrs=attrs)
 
         attrs = get_nc_attributes_from_object(self.area.info)
         area_data = xr.DataArray(data=self.area.data, dims=None, attrs=attrs)
 
-        _ = root.to_netcdf(filename, engine=engine, mode='w')
+        _ = root.to_netcdf(filename, engine=engine, mode="w")
 
         data_arrays = [ctype, data_id, data_time, weight, area_data]
-        data_names = ['cloudtype', 'id', 'time', 'weight', 'area']
+        data_names = ["cloudtype", "id", "time", "weight", "area"]
 
-        encodings = {'dtype': ctype.dtype, 'scale_factor': 1, 'zlib': True,
-                     'complevel': 4, '_FillValue': 255, 'add_offset': 0}
-        encodings2 = {'complevel': 4, 'zlib': True}
+        encodings = {"dtype": ctype.dtype, "scale_factor": 1, "zlib": True,
+                     "complevel": 4, "_FillValue": 255, "add_offset": 0}
+        encodings2 = {"complevel": 4, "zlib": True}
 
         dataset_dict = {}
         encoding = {}
         for dataset_name, data_array in zip(data_names, data_arrays):
             dataset_dict[dataset_name] = data_array
-            if dataset_name in ['cloudtype', 'id']:
+            if dataset_name in ["cloudtype", "id"]:
                 encoding[dataset_name] = encodings
-            elif dataset_name not in ['area']:
+            elif dataset_name not in ["area"]:
                 encoding[dataset_name] = encodings2
 
-        dataset = xr.Dataset(dataset_dict, coords={'y1000 m': ycoord, 'x1000 m': xcoord})
-        _ = dataset.to_netcdf(filename, engine=engine, group=None, mode='a',
+        dataset = xr.Dataset(dataset_dict, coords={"y1000 m": ycoord, "x1000 m": xcoord})
+        _ = dataset.to_netcdf(filename, engine=engine, group=None, mode="a",
                               encoding=encoding, **other_to_netcdf_kwargs)
 
         return
 
     def load(self, filename):
-        """Read the cloudtype composite from file"""
-
+        """Read the cloudtype composite from file."""
         import numpy as np
         from netCDF4 import Dataset
 
-        rootgrp = Dataset(filename, 'r')
+        rootgrp = Dataset(filename, "r")
 
         self.info["Conventions"] = rootgrp.Conventions
         # self.info["product"] = rootgrp.product
-        self.info["product"] = 'Unknown'
+        self.info["product"] = "Unknown"
 
         for var_name in rootgrp.variables.keys():
             LOG.debug(str(var_name))
             var = rootgrp.variables[str(var_name)]
             dims = var.dimensions
 
-            cnt = 0
+            cnt_store = 0
             for cnt, dim in enumerate(dims):
+                cnt_store = cnt
                 if dim.startswith("x") or dim.startswith("y"):
                     break
 
             if hasattr(self, str(var_name)):
                 LOG.debug("set data...")
                 item = getattr(self, str(var_name))
-                setattr(item, 'data', var[:])
+                item.data = var[:]
 
                 info = {}
                 for attr in var.ncattrs():
                     info[str(attr)] = getattr(var, str(attr))
-                    setattr(item, 'info', info)
+                    item.info = info
 
             area = None
             try:
-                area_var_name = getattr(var, "grid_mapping")
+                area_var_name = var.grid_mapping
                 area_var = rootgrp.variables[area_var_name]
                 proj4_dict = {}
                 for attr, projattr in MAPPING_ATTRIBUTES.items():
@@ -270,7 +267,7 @@ class ncCloudTypeComposite(object):
                         the_attr = getattr(area_var, attr)
                         if projattr == "proj":
                             proj4_dict[projattr] = PROJNAME[the_attr]
-                        elif(isinstance(projattr, (list, tuple))):
+                        elif (isinstance(projattr, (list, tuple))):
                             try:
                                 for i, subattr in enumerate(the_attr):
                                     proj4_dict[projattr[i]] = subattr
@@ -280,12 +277,12 @@ class ncCloudTypeComposite(object):
                             proj4_dict[projattr] = the_attr
                     except AttributeError:
                         pass
-                y_name, x_name = dims[:cnt] + dims[cnt:]
+                y_name, x_name = dims[:cnt_store] + dims[cnt_store:]
                 x__ = rootgrp.variables[x_name][:]
                 y__ = rootgrp.variables[y_name][:]
 
                 if proj4_dict["proj"] == "ob_tran":
-                    proj4_dict["o_proj"] = 'eqc'  # FIXME!
+                    proj4_dict["o_proj"] = "eqc"  # FIXME!
                 elif proj4_dict["proj"] == "geos":
                     x__ *= proj4_dict["h"]
                     y__ *= proj4_dict["h"]
@@ -316,12 +313,12 @@ class ncCloudTypeComposite(object):
 
 
 class ncCTTHComposite(ncCloudTypeComposite):
-
-    """netcdf ctth composite object"""
+    """netcdf ctth composite object."""
 
     def __init__(self):
+        """Initialize."""
         self.info = {}
-        #self.info["Conventions"] = "CF-1.6"
+        # self.info["Conventions"] = "CF-1.6"
         self.info["Conventions"] = "Undefined"
 
         self.time = InfoObject()
@@ -334,15 +331,14 @@ class ncCTTHComposite(ncCloudTypeComposite):
         self.area = InfoObject()
         self.area_def = None
 
-    def store(self, comp_dict, area_obj, product_id='MSG/PPS CTTH composite'):
-        """Store the composite into the object"""
-
+    def store(self, comp_dict, area_obj, product_id="MSG/PPS CTTH composite"):
+        """Store the composite into the object."""
         self.info["product"] = product_id
         self.area_def = area_obj
 
         resolution = 1000  # FIXME!
-        str_res = '1000 m'
-        dim_names = ['y' + str_res, 'x' + str_res]
+        str_res = "1000 m"
+        dim_names = ["y" + str_res, "x" + str_res]
 
         self.time.data = comp_dict["time"]
         valid_min, valid_max = (self.time.data.min(), self.time.data.max())
@@ -360,14 +356,14 @@ class ncCTTHComposite(ncCloudTypeComposite):
             np.nanmin(self.temperature.data), np.nanmax(self.temperature.data))
         self.temperature.info = {"var_name": "temperature",
                                  "var_data": self.temperature.data,
-                                 'var_dim_names': dim_names,
+                                 "var_dim_names": dim_names,
                                  "standard_name": "Temperature",
                                  "_FillValue": np.nan,
                                  "scale_factor": 1.0,
                                  "add_offset": 0.0,
                                  "valid_range": np.array([valid_min, valid_max]),
                                  "resolution": resolution}
-        self.temperature.info["description"] = 'NWCSAF CTTH - temperature'
+        self.temperature.info["description"] = "NWCSAF CTTH - temperature"
 
         # Height
         self.height.data = comp_dict["height"]
@@ -375,14 +371,14 @@ class ncCTTHComposite(ncCloudTypeComposite):
             np.nanmin(self.height.data), np.nanmax(self.height.data))
         self.height.info = {"var_name": "height",
                             "var_data": self.height.data,
-                            'var_dim_names': dim_names,
+                            "var_dim_names": dim_names,
                             "standard_name": "Height",
                             "_FillValue": np.nan,
                             "scale_factor": 1.0,
                             "add_offset": 0.0,
                             "valid_range": np.array([valid_min, valid_max]),
                             "resolution": resolution}
-        self.height.info["description"] = 'NWCSAF CTTH - height'
+        self.height.info["description"] = "NWCSAF CTTH - height"
 
         # Pressure
         self.pressure.data = comp_dict["pressure"]
@@ -390,21 +386,21 @@ class ncCTTHComposite(ncCloudTypeComposite):
             np.nanmin(self.pressure.data), np.nanmax(self.pressure.data))
         self.pressure.info = {"var_name": "pressure",
                               "var_data": self.pressure.data,
-                              'var_dim_names': dim_names,
+                              "var_dim_names": dim_names,
                               "standard_name": "Pressure",
                               "_FillValue": np.nan,
                               "scale_factor": 1.0,
                               "add_offset": 0.0,
                               "valid_range": np.array([valid_min, valid_max]),
                               "resolution": resolution}
-        self.pressure.info["description"] = 'NWCSAF CTTH - pressure'
+        self.pressure.info["description"] = "NWCSAF CTTH - pressure"
 
         # Weight:
         self.weight.data = comp_dict["weight"]
         valid_min, valid_max = (self.weight.data.min(), self.weight.data.max())
         self.weight.info = {"var_name": "weight",
                             "var_data": self.weight.data,
-                            'var_dim_names': dim_names,
+                            "var_dim_names": dim_names,
                             "standard_name": "CTTH weight",
                             "valid_range": np.array([valid_min, valid_max]),
                             "resolution": 1000}
@@ -415,7 +411,7 @@ class ncCTTHComposite(ncCloudTypeComposite):
         valid_min, valid_max = (self.flags.data.min(), self.flags.data.max())
         self.flags.info = {"var_name": "flags",
                            "var_data": self.flags.data,
-                           'var_dim_names': dim_names,
+                           "var_dim_names": dim_names,
                            "standard_name": "CTTH processing flags",
                            "valid_range": np.array([valid_min, valid_max]),
                            "resolution": 1000}
@@ -426,7 +422,7 @@ class ncCTTHComposite(ncCloudTypeComposite):
         valid_min, valid_max = (self.id.data.min(), self.id.data.max())
         self.id.info = {"var_name": "id",
                         "var_data": self.id.data,
-                        'var_dim_names': dim_names,
+                        "var_dim_names": dim_names,
                         "standard_name": "CTTH id",
                         "valid_range": np.array([valid_min, valid_max]),
                         "resolution": 1000}
@@ -435,7 +431,7 @@ class ncCTTHComposite(ncCloudTypeComposite):
 
         # Grid mapping:
         self.area.data = 0
-        self.area.info = {"var_name": 'area',
+        self.area.info = {"var_name": "area",
                           "var_data": self.area.data,
                           "var_dim_names": ()}
         self.area.info.update(proj2cf(area_obj.proj_dict))
@@ -480,69 +476,105 @@ class ncCTTHComposite(ncCloudTypeComposite):
         self.time.info["grid_mapping"] = self.area.info["var_name"]
 
     def write(self, filename):
-        """Write the data to netCDF file"""
-
-        other_to_netcdf_kwargs = {'compute': True}
-        root = xr.Dataset({}, attrs={'history': 'Created by mesan_compositor on {}'.format(datetime.utcnow()),
-                                     'Conventions': 'Undefined'})
-        engine = 'netcdf4'
+        """Write the data to netCDF file."""
+        other_to_netcdf_kwargs = {"compute": True}
+        root = xr.Dataset({}, attrs={"history": "Created by mesan_compositor on {}".format(datetime.utcnow()),
+                                     "Conventions": "Undefined"})
+        engine = "netcdf4"
 
         xcoord, ycoord = self.area_def.get_proj_vectors()
 
         attrs = get_nc_attributes_from_object(self.height.info)
-        height = xr.DataArray(data=self.height.data, dims=['y1000 m', 'x1000 m'], attrs=attrs)
+        height = xr.DataArray(data=self.height.data, dims=["y1000 m", "x1000 m"], attrs=attrs)
 
         attrs = get_nc_attributes_from_object(self.temperature.info)
-        temperature = xr.DataArray(data=self.temperature.data, dims=['y1000 m', 'x1000 m'], attrs=attrs)
+        temperature = xr.DataArray(data=self.temperature.data, dims=["y1000 m", "x1000 m"], attrs=attrs)
 
         attrs = get_nc_attributes_from_object(self.pressure.info)
-        pressure = xr.DataArray(data=self.pressure.data, dims=['y1000 m', 'x1000 m'], attrs=attrs)
+        pressure = xr.DataArray(data=self.pressure.data, dims=["y1000 m", "x1000 m"], attrs=attrs)
 
         attrs = get_nc_attributes_from_object(self.weight.info)
-        weight = xr.DataArray(data=self.weight.data, dims=['y1000 m', 'x1000 m'], attrs=attrs)
+        weight = xr.DataArray(data=self.weight.data, dims=["y1000 m", "x1000 m"], attrs=attrs)
 
         attrs = get_nc_attributes_from_object(self.flags.info)
-        flags = xr.DataArray(data=self.flags.data, dims=['y1000 m', 'x1000 m'], attrs=attrs)
+        flags = xr.DataArray(data=self.flags.data, dims=["y1000 m", "x1000 m"], attrs=attrs)
 
         attrs = get_nc_attributes_from_object(self.id.info)
-        identifiers = xr.DataArray(data=self.id.data, dims=['y1000 m', 'x1000 m'], attrs=attrs)
+        identifiers = xr.DataArray(data=self.id.data, dims=["y1000 m", "x1000 m"], attrs=attrs)
 
         attrs = get_nc_attributes_from_object(self.time.info)
-        time_data = xr.DataArray(data=self.time.data, dims=['y1000 m', 'x1000 m'], attrs=attrs)
+        time_data = xr.DataArray(data=self.time.data, dims=["y1000 m", "x1000 m"], attrs=attrs)
 
         # More data sets here...
 
         attrs = get_nc_attributes_from_object(self.area.info)
         area_data = xr.DataArray(data=self.area.data, dims=None, attrs=attrs)
 
-        _ = root.to_netcdf(filename, engine=engine, mode='w')
+        _ = root.to_netcdf(filename, engine=engine, mode="w")
 
         data_arrays = [height, temperature, pressure, weight, flags, identifiers, time_data, area_data]
-        data_names = ['height', 'temperature', 'pressure', 'weight', 'flags', 'id', 'time', 'area']
+        data_names = ["height", "temperature", "pressure", "weight", "flags", "id", "time", "area"]
 
-        encodings = {'dtype': height.dtype, 'scale_factor': 1, 'zlib': True,
-                     'complevel': 4, '_FillValue': 255, 'add_offset': 0}
-        encodings2 = {'complevel': 4, 'zlib': True}
+        encodings2 = {"complevel": 4, "zlib": True}
 
         dataset_dict = {}
         encoding = {}
         for dataset_name, data_array in zip(data_names, data_arrays):
             dataset_dict[dataset_name] = data_array
-            if dataset_name not in ['area']:
+            if dataset_name not in ["area"]:
                 encoding[dataset_name] = encodings2
 
-        dataset = xr.Dataset(dataset_dict, coords={'y1000 m': ycoord, 'x1000 m': xcoord})
-        _ = dataset.to_netcdf(filename, engine=engine, group=None, mode='a',
+        dataset = xr.Dataset(dataset_dict, coords={"y1000 m": ycoord, "x1000 m": xcoord})
+        _ = dataset.to_netcdf(filename, engine=engine, group=None, mode="a",
                               encoding=encoding, **other_to_netcdf_kwargs)
 
         return
 
 
 def get_nc_attributes_from_object(info_dict):
+    """Get netCDF attributes from file object."""
     attrs = {}
     for key in info_dict.keys():
-        if key in ['var_data']:
+        if key in ["var_data"]:
             continue
         attrs[key] = info_dict[key]
 
     return attrs
+
+
+def load_ct_composite(netcdf_filepath, group_name):
+    """Load the blended cloud type composite."""
+    CHUNK_SIZE = 4096
+    nc_ = xr.open_dataset(netcdf_filepath, decode_cf=True,
+                          mask_and_scale=True,
+                          chunks={"columns": CHUNK_SIZE,
+                                  "rows": CHUNK_SIZE})
+
+    return nc_[group_name][:]
+
+
+class cloudComposite:
+    """Container for the cloud product composite."""
+
+    def __init__(self, filename, cp_name, areaname=None):
+        """Initialize the cloud product composite."""
+        self.netcdf_filepath = filename
+        self.group_name = cp_name + "_group"
+        self.area_name = areaname
+        self.area = None
+        self.lon = None
+        self.lat = None
+
+    def load(self):
+        """Load the cloud composite from file."""
+        CHUNK_SIZE = 4096
+        nc_ = xr.open_dataset(self.netcdf_filepath, decode_cf=True,
+                              mask_and_scale=True,
+                              chunks={"columns": CHUNK_SIZE,
+                                      "rows": CHUNK_SIZE})
+
+        self.data = nc_[self.group_name][:]
+        self.lon = nc_["longitude"][:]
+        self.lat = nc_["latitude"][:]
+        if self.area_name:
+            self.area = nc_[self.area_name]

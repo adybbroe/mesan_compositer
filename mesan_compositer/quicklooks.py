@@ -42,8 +42,7 @@ def ctype_quicklook_from_netcdf(group_name, netcdf_filename):
                           chunks={"columns": CHUNK_SIZE,
                                   "rows": CHUNK_SIZE})
 
-    breakpoint()
-    # cloudtype = nc_['CTY_group'][:]
+    # cloudtype = nc_[group_name][0][:]
     cloudtype = nc_[group_name][:]
 
     palette = nwcsaf_cloudtype_2021()
