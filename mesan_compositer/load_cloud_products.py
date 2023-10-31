@@ -206,6 +206,10 @@ def blend_cloud_products(product, areaid, *scenes, cache_dir=None):
     LOG.debug("Before resampling...")
     blended = resampled.blend(blend_function=stack_with_weights)
     # blended = resampled.blend(blend_function=stack_no_weights)
+    try:
+        blended['CTTH_ALTI_group'].attrs['_FillValue'] = 63535.
+    except KeyError:
+        pass
 
     LOG.debug("Before returning the blended scene")
     return blended, group_name
