@@ -169,6 +169,15 @@ def blend_cloud_products(product, areaid, *scenes, cache_dir=None):
         LOG.debug("Files: %s", str(files))
         loader = CloudProductsLoader(files)
         loader.load([product])
+        # Special handling of no-data/fill value for the CTTH:
+        try:
+            loader.scene["ctth_alti"] = loader.scene["ctth_alti"].fillna(
+                loader.scene["ctth_alti"].scaled_FillValue)
+
+            loader.scene["ctth_alti"].attrs["_FillValue"] = loader.scene["ctth_alti"].scaled_FillValue
+        except KeyError:
+            pass
+
         # import matplotlib.pyplot as plt
         # plt.bar(h_[1][1::], height=h_[0], width=800)
         # plt.savefig('barplot_{idx}'.format(idx=idx))
@@ -181,7 +190,7 @@ def blend_cloud_products(product, areaid, *scenes, cache_dir=None):
     groups = {DataQuery(name=group_name): [product]}
     mscn.group(groups)
 
-    LOG.debug("Before call to reaample on Multiscene...")
+    LOG.debug("Before call to resample on Multiscene...")
     resampled = mscn.resample(areaid, radius_of_influence=10000,
                               reduce_data=False, cache_dir=cache_dir, mask_area=False)
 

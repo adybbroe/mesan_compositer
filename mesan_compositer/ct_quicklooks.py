@@ -43,6 +43,7 @@ def ctth_quicklook_from_netcdf(group_name, netcdf_filename):
                                   "rows": CHUNK_SIZE})
 
     ctth_alti = nc_[group_name][:]
+    ctth_alti = ctth_alti.where(ctth_alti < 63535)
 
     ctth_data = ctth_alti.data
     ctth_data = ctth_data.clip(min=0) / 500 + 1
