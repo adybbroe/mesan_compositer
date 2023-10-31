@@ -110,6 +110,7 @@ def derive_sobs(ctth_comp, npix, resultfile):
     lons, lats = ctth_comp.lon, ctth_comp.lat
 
     ctth_height = da.nan_to_num(ctth_comp.data).astype("int32")
+    # ctth_height = ctth_comp.data.where(ctth_comp.data.isnull() | (ctth_comp.data < 63535), 0)#.astype('int32')
 
     # non overlapping super observations
     # min 8x8 pixels = ca 8x8 km = 2*dlen x 2*dlen pixels for a
@@ -119,6 +120,7 @@ def derive_sobs(ctth_comp, npix, resultfile):
     dy = dx
     LOG.info("\tUsing %d x %d pixels in a superobservation", dx, dy)
 
+    # height = xr.DataArray(data=ctth_height.data, dims=["y", "x"])
     height = xr.DataArray(data=ctth_height, dims=["y", "x"])
     height = height.coarsen({"y": dy, "x": dx}, boundary="trim").mean()
 
@@ -160,14 +162,20 @@ def write_data(filepath, longitudes, latitudes, clheight):
 
     # df = height_ds.to_dataframe()
 
+    height = clheight.data
+    # height = clheight.data.compute()
+
     with open(filepath, "w") as fpt:
         for y in range(shape[0]):
             yidx = shape[0]-1-y
             for x in range(shape[1]):
                 xidx = x
+                # if height[yidx, xidx] < 0:
+                #    continue
+
                 result = "%8d %7.2f %7.2f %5d %d %d %8.2f %8.2f\n" % \
                     (99999, latitudes[yidx, xidx], longitudes[yidx, xidx], -999, cortyp, -60,
-                     clheight.data[yidx, xidx], sd_)
+                     height[yidx, xidx], sd_)
                 fpt.write(result)
 
 

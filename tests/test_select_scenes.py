@@ -35,9 +35,9 @@ class TestFindCtScenes:
     """Test finding the correct NWCSAF Geo/PPS scenes."""
 
     @pytest.fixture(autouse=True)
-    def _setup_method(self, fake_yamlconfig_file):
+    def _setup_method(self, fake_yamlconfig_file_with_msg_dir):  # fake_yamlconfig_file):
         """Set the common test env."""
-        self.config = get_config(fake_yamlconfig_file)
+        self.config = get_config(fake_yamlconfig_file_with_msg_dir)
         self.area_id = "mesanEx"
 
     def test_get_geo_ctype_scenes(self, caplog, fake_empty_nwcsaf_geo_files):
@@ -130,9 +130,6 @@ class TestFindCtScenes:
     def test_get_correct_list_of_nwcsaf_geo_ct_scenes_from_filelist(self, fake_empty_nwcsaf_geo_files,
                                                                     time_of_analysis, minutes, expected):
         """Test get the correct nwcsaf/Geo CT scenes given a list of fake files."""
-        path = str(fake_empty_nwcsaf_geo_files[0].parent)
-        self.config["msg_dir"] = path
-
         delta_time_window = timedelta(minutes=minutes)
         ctcomp = CloudproductCompositer(time_of_analysis, delta_time_window, self.area_id, self.config, "CT")
         ctcomp.get_catalogue()

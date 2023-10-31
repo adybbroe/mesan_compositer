@@ -283,8 +283,10 @@ class CloudproductCompositer:
     def _get_geo_catalogue(self):
         """Get the catalougue of NWCSAF/PPS input data files."""
         # Get all geostationary satellite scenes:
-        prod_id = {"CT": "02", "CTTH": "03"}.get(self.product)
-        msg_dir = self._options["msg_dir"] % {"number": prod_id}
+        # prod_id = {"CT": "02", "CTTH": "03"}.get(self.product)
+        # msg_dir = self._options["msg_dir"] % {"number": prod_id}
+        p__ = Parser(self._options["msg_dir"])
+        msg_dir = p__.compose({"product": self.product})
         # What about EuropeCanary and possible other areas!? FIXME!
 
         msg_list = self._get_all_geo_files(msg_dir)
