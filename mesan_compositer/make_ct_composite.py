@@ -39,21 +39,22 @@ from trollsift import Parser, globify
 
 from mesan_compositer.composite_tools import METEOSAT, METOPS, MSGSATS, GeoMetaData, get_ppslist
 from mesan_compositer.config import get_config
-from mesan_compositer.load_cloud_products import blend_ct_products
-from mesan_compositer.quicklooks import ctype_quicklook_from_netcdf
+from mesan_compositer.ct_quicklooks import ctype_quicklook_from_netcdf
+from mesan_compositer.load_cloud_products import blend_cloud_products
 
 debug_on()
 
 LOG = logging.getLogger(__name__)
 
 
-PLATFORM_NAMES_FROM_PPS = {}
-
 #: Default time format
 _DEFAULT_TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 #: Default log format
 _DEFAULT_LOG_FORMAT = "[%(levelname)s: %(asctime)s : %(name)s] %(message)s"
+
+CPROD_GROUP_NAME = {"CT": "CT_group",
+                    "CTTH": "CTTH_group"}
 
 
 def get_arguments():
@@ -105,27 +106,31 @@ def get_arguments():
     return args.logging_conf_file, args.config_file, tanalysis, args.area_id, delta_t
 
 
-class ctCompositer:
-    """The Cloud Type Composite generator class."""
+class CloudproductCompositer:
+    """The NWCSAF Cloud product composite generator class."""
 
-    def __init__(self, obstime, tdiff, areaid, config_options, **kwargs):
+    def __init__(self, obstime, tdiff, areaid, config_options, product):
         """Initialize the cloud type composite instance."""
+        if product not in ["CT", "CTTH"]:
+            raise ValueError("Cloud products must be one of CT or CTTH!")
+        self.product = product
+
         values = {"area": areaid, }
 
-        if "filename" in kwargs:
-            self.filename = kwargs["filename"]
-        else:
-            # Generate the filename from the observation time and the
-            # specifcations in the config file:
-            LOG.info("Output file name is generated from observation " +
-                     "time and info in config file:")
-            bname = obstime.strftime(config_options["ct_composite_filename"]) % values
-            path = config_options["composite_output_dir"]
-            self.filename = os.path.join(path, bname)
+        # Generate the filename from the observation time and the
+        # specifcations in the config file:
+        LOG.info("Output file name is generated from observation " +
+                 "time and info in config file:")
+        cprod_comp_filename = "{name}_composite_filename".format(name=self.product.lower())
+        bname = obstime.strftime(config_options[cprod_comp_filename]) % values
+        path = config_options["composite_output_dir"]
+        self.filename = os.path.join(path, bname)
 
         LOG.info("Filename = " + str(self.filename))
 
-        self.description = "Cloud Type composite for Mesan"
+        description = {"CT": "Cloud Type",
+                       "CTTH": "Cloud Top Temperature and Height"}.get(self.product)
+        self.description = "{desc} composite for Mesan".format(desc=description)
         self.obstime = obstime
         self.timediff = tdiff
         self.time_window = (obstime - tdiff, obstime + tdiff)
@@ -151,9 +156,8 @@ class ctCompositer:
         self.pps_scenes = []
         self.msg_scenes = []
 
-        self.group_name = None  # Ex. 'CT_group'
+        self.group_name = CPROD_GROUP_NAME.get(self.product)  # Ex. 'CT_group'
         self.blended_scene = None
-        # self.composite = ncCloudTypeComposite()
 
     def _get_all_pps_files(self, pps_dir):
         """Return list of pps files in directory."""
@@ -163,7 +167,8 @@ class ctCompositer:
         LOG.debug("Get all PPS files in this directory = " + str(pps_dir))
         # Example: S_NWC_CT_metopb_14320_20150622T1642261Z_20150622T1654354Z.nc
         # return glob(os.path.join(pps_dir, 'S_NWC_CT_*nc'))
-        return glob(os.path.join(pps_dir, globify(self._options["pps_filename"], {"product": "CT"})))
+        return glob(os.path.join(pps_dir, globify(self._options["pps_filename"],
+                                                  {"product": self.product})))
 
     def _get_all_geo_files(self, geo_dir):
         """Return list of NWCSAF/Geo files in directory."""
@@ -172,7 +177,12 @@ class ctCompositer:
 
         LOG.debug("Get all NWCSAF/Geo files in this directory = " + str(geo_dir))
         # S_NWC_CT_MSG4_MSG-N-VISIR_20230118T103000Z_PLAX.nc
-        return glob(os.path.join(geo_dir, globify(self._options["msg_cty_filename"])))
+        return glob(os.path.join(geo_dir, globify(self._get_msg_filepattern_from_config())))
+
+    def _get_msg_filepattern_from_config(self):
+        msg_prod_filename = "msg_{prod}_filename".format(prod={"CT": "cty",
+                                                               "CTTH": "ctth"}.get(self.product))
+        return self._options[msg_prod_filename]
 
     def get_pps_scenes(self, pps_file_list, satellites=None, variant=None):
         """Get the list of valid pps scenes from file list."""
@@ -185,7 +195,7 @@ class ctCompositer:
     def get_geo_scenes(self, geo_file_list):
         """Get the list of valid NWCSAF/Geo scenes from file list."""
         metsats = [MSGSATS.get(s, "MSGx") for s in self.msg_satellites]
-        p__ = Parser(self._options["msg_cty_filename"])
+        p__ = Parser(self._get_msg_filepattern_from_config())
 
         mlist = []
         for geo_file in geo_file_list:
@@ -242,7 +252,9 @@ class ctCompositer:
         pps_dr_dir = self._options["pps_direct_readout_dir"]
 
         dr_list = self._get_all_pps_files(pps_dr_dir)
-        LOG.info("Number of direct readout pps cloudtype files in dir: %s", str(len(dr_list)))
+        LOG.info("Number of direct readout pps %s files in dir: %s",
+                 {"CT": "cloudtype", "CTTH": "ctth"}.get(self.product),
+                 str(len(dr_list)))
 
         if len(dr_list) <= min_num_of_pps_dr_files:
             LOG.critical("Too few PPS DR files found! (%d<=%d)\n" +
@@ -271,7 +283,8 @@ class ctCompositer:
     def _get_geo_catalogue(self):
         """Get the catalougue of NWCSAF/PPS input data files."""
         # Get all geostationary satellite scenes:
-        msg_dir = self._options["msg_dir"] % {"number": "02"}
+        prod_id = {"CT": "02", "CTTH": "03"}.get(self.product)
+        msg_dir = self._options["msg_dir"] % {"number": prod_id}
         # What about EuropeCanary and possible other areas!? FIXME!
 
         msg_list = self._get_all_geo_files(msg_dir)
@@ -295,8 +308,8 @@ class ctCompositer:
             self.msg_scenes = [self.msg_scenes[found_idx]]
             LOG.info("The scene closest in time to the analysis time: %s" % str(self.msg_scenes[0]))
 
-    def blend_ct_products(self):
-        """Blend the CT products together and create a cloud analysis."""
+    def blend_cloud_products(self):
+        """Blend the Cloud products together and create a cloud analysis."""
         areaid = self.areaid
 
         cloud_scenes = []
@@ -309,7 +322,10 @@ class ctCompositer:
             geofilename = pathlib.Path(scene.geofilename)
             cloud_scenes.append([ppsfile, geofilename])
 
-        self.blended_scene, group_name = blend_ct_products("ct", areaid, *cloud_scenes, cache_dir=gettempdir())
+        satpy_composite_name = {"CT": "ct", "CTTH": "ctth_alti"}.get(self.product)
+        self.blended_scene, group_name = blend_cloud_products(satpy_composite_name,
+                                                              areaid, *cloud_scenes,
+                                                              cache_dir=gettempdir())
         self.group_name = group_name
 
     def write(self):
@@ -326,6 +342,7 @@ class ctCompositer:
 
     def quicklook(self, netcdf_filename):
         """Make a quicklook image from the netCDF file."""
+        # FIXME! This is hard coded for a cloud type image!
         return ctype_quicklook_from_netcdf(self.group_name, netcdf_filename)
 
 
@@ -352,12 +369,8 @@ if __name__ == "__main__":
 
     OPTIONS = get_config(config_filename)
 
-    ctcomp = ctCompositer(time_of_analysis, delta_time_window, area_id, OPTIONS)
+    ctcomp = CloudproductCompositer(time_of_analysis, delta_time_window, area_id, OPTIONS, "CT")
     ctcomp.get_catalogue()
-    breakpoint()
-    ctcomp.blend_ct_products()
+    ctcomp.blend_cloud_products()
     output_filepath = ctcomp.write()
     qlook_filepath = ctcomp.quicklook(output_filepath)
-    breakpoint()
-
-    x = 1

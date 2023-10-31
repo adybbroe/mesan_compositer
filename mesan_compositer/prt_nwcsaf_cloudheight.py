@@ -5,7 +5,7 @@
 
 # Author(s):
 
-#   Adam.Dybbroe <adam.dybbroe@smhi.se>
+#   Adam.Dybbroe <Firstname.Lastname @ smhi.se>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,43 +26,31 @@ From the cloud top temperature and height composite retrieve super
 observations of cloud height and print to stdout
 """
 
-import numpy as np
 import argparse
-from datetime import datetime
+import logging
 import os
+import shutil
 import sys
 import tempfile
-import shutil
-import logging
+from datetime import datetime
 from logging import handlers
-from mesan_compositer.netcdf_io import ncCTTHComposite
-from mesan_compositer.pps_msg_conversions import get_bit_from_flags
+
+import dask.array as da
+import numpy as np
+import xarray as xr
+
 from mesan_compositer.config import get_config
-
-
-class cthError(Exception):
-    """Cloud Top Height exception."""
-
-    pass
-
 
 LOG = logging.getLogger(__name__)
 
-
 #: Default time format
-_DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
+_DEFAULT_TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 #: Default log format
-_DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
-
+_DEFAULT_LOG_FORMAT = "[%(levelname)s: %(asctime)s : %(name)s] %(message)s"
 
 # min 8 x 8 pixels in super obs
 DLENMIN = 4
-
-# Thresholds
-FPASS = 0.5  # min fraction of valid obs in a superob
-QPASS = 0.05  # min quality in a superobs
-OPASS = 0.25  # min fraction opaque in CT std calc
 
 
 def get_arguments():
@@ -70,7 +58,7 @@ def get_arguments():
 
     args.logging_conf_file, args.config_file, obs_time, area_id, wsize
 
-    Return
+    Return:
       File path of the logging.ini file
       File path of the application configuration file
       Observation/Analysis time
@@ -81,15 +69,15 @@ def get_arguments():
     parser = argparse.ArgumentParser()
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--datetime', '-d', help='Date and time of observation - yyyymmddhh',
+    parser.add_argument("--datetime", "-d", help="Date and time of observation - yyyymmddhh",
                         required=True)
-    parser.add_argument('--area_id', '-a', help='Area id',
+    parser.add_argument("--area_id", "-a", help="Area id",
                         required=True)
-    parser.add_argument('--size', '-s', help='Size of integration area in pixels',
+    parser.add_argument("--size", "-s", help="Size of integration area in pixels",
                         required=True)
-    parser.add_argument('-c', '--config_file',
+    parser.add_argument("-c", "--config_file",
                         type=str,
-                        dest='config_file',
+                        dest="config_file",
                         required=True,
                         help="The file containing configuration parameters e.g. mesan_sat_config.yaml")
     parser.add_argument("-l", "--logging",
@@ -105,119 +93,23 @@ def get_arguments():
 
     wsize = args.size
     area_id = args.area_id
-    obs_time = datetime.strptime(args.datetime, '%Y%m%d%H')
-    if 'template' in args.config_file:
+    obs_time = datetime.strptime(args.datetime, "%Y%m%d%H")
+    if "template" in args.config_file:
         print("Template file given as master config, aborting!")
         sys.exit()
 
     return args.logging_conf_file, args.config_file, obs_time, area_id, wsize
 
 
-def new_cloudtop(so_CTH, so_w):
-    """Derive cloud top super observations with a new simplified approach.
-
-    The weigting is done independent of the flags.
-    """
-    if so_CTH.max() == 0.0:
-        return None
-
-    # Get rid of data points which are masked out:
-    so_w = np.ma.masked_array(so_w, mask=so_CTH.mask).compressed()
-    so_CTH = so_CTH.compressed()
-    top = np.sum(so_w*so_CTH)/np.sum(so_w)
-
-    return top
-
-
-def cloudtop(so_CTH, so_w, so_flg, num_of_datapoints):
-    """Derive cloud top height super observations using the old method but not using the flags."""
-    # cloud top observation error [m] sd= a*top+b
-    # SDct_01a = 0.065  # 50  Opaque cloud
-    # SDct_01b = 385    # 50  Opaque cloud
-    # SDct_02a = 0.212  # 150 Windowing technique applied
-    # SDct_02b = 1075   # 150 Windowing technique applied
-
-    # Get rid of data points which are masked out:
-    so_flg = np.ma.masked_array(so_flg, mask=so_CTH.mask).compressed()
-    # Corresponds to where the weight is 0:
-    so_w = np.ma.masked_array(so_w, mask=so_CTH.mask).compressed()
-    so_CTH = so_CTH.compressed()
-
-    # nfound = len(so_CTH)
-
-    # unique top values
-    u_cth = np.unique(so_CTH)
-
-    # weight sum for each unique height
-    w_cth = [np.sum(so_w[so_CTH == u_cth[i]]) for i in range(len(u_cth))]
-    # n_cth = [np.sum(so_CTH == u_cth[i]) for i in range(len(u_cth))]
-
-    # top value associated with largest weight sum
-    # wsmax = np.max(w_cth)
-    imax = np.argmax(w_cth)
-    top = u_cth[imax]
-
-    return top, 999.9
-
-    # # nof obs with this cloud height
-    # ntop = n_cth[imax]
-
-    # # observation quality
-    # q = wsmax / (nfound + 1e-6)
-
-    # # flags associated with largest weight sum
-    # flgs = so_flg[so_CTH == u_cth[imax]]
-
-    # # find dominating method, opaque or non-opaque but window
-    # nopaque = np.sum(get_bit_from_flags(flgs, 2))
-    # nwindow = np.sum(
-    #     (0 == get_bit_from_flags(flgs, 2)) & get_bit_from_flags(flgs, 8))
-
-    # if (ntop != (nopaque + nwindow)):
-    #     # LOG.warning("Inconsistency in opaque and window flags: " +
-    #     #            "ntop=%d, nopaque=%d nwindow=%d", ntop, nopaque, nwindow)
-    #     # LOG.info("No super obs will be generated...")
-    #     return 0, 0
-    # else:
-    #     fopaque = nopaque / np.float(ntop)
-
-    # # check statistics and quality
-    # if (nfound / np.float(num_of_datapoints) > FPASS) and (q >= QPASS):
-    #     if (fopaque > OPASS):
-    #         # opaque
-    #         sd = SDct_01a * top + SDct_01b
-    #     else:
-    #         # windowing technique
-    #         sd = SDct_02a * top + SDct_02b
-    # else:
-    #     top = 0
-    #     sd = 0
-
-    # # LOG.debug('wsmax=%.3f, top=%.1f, fopaque=%.3f, q=%f, nfound=%d',
-    # #          wsmax, top, fopaque, q, nfound)
-    # return top, sd
-
-
 def derive_sobs(ctth_comp, npix, resultfile):
     """Derive the super observations and print data to file."""
-    tmpfname = tempfile.mktemp(suffix=('_' + os.path.basename(resultfile)),
+    tmpfname = tempfile.mktemp(suffix=("_" + os.path.basename(resultfile)),
                                dir=os.path.dirname(resultfile))
 
     # Get the lon,lat:
-    lon, lat = ctth_comp.area_def.get_lonlats()
+    lons, lats = ctth_comp.lon, ctth_comp.lat
 
-    # isinstance(ctth_comp.height.data, numpy.ma.core.MaskedArray)
-    try:
-        ctth_height = ctth_comp.height.data.compute()
-    except AttributeError:
-        ctth_height = ctth_comp.height.data
-
-    if not np.ma.is_masked(ctth_height):
-        ctth_height = np.ma.masked_invalid(ctth_height, np.nan)
-        ctth_height.fill_value = np.nan
-
-    flags = ctth_comp.flags.data
-    weight = ctth_comp.weight.data
+    ctth_height = da.nan_to_num(ctth_comp.data).astype("int32")
 
     # non overlapping super observations
     # min 8x8 pixels = ca 8x8 km = 2*dlen x 2*dlen pixels for a
@@ -225,75 +117,58 @@ def derive_sobs(ctth_comp, npix, resultfile):
     dlen = int(np.ceil(float(npix) / 2.0))
     dx = int(max(2 * DLENMIN, 2 * dlen))
     dy = dx
-    LOG.info('\tUsing %d x %d pixels in a superobservation', dx, dy)
+    LOG.info("\tUsing %d x %d pixels in a superobservation", dx, dy)
 
-    # initialize superobs data */
-    ny, nx = np.shape(ctth_height)
+    height = xr.DataArray(data=ctth_height, dims=["y", "x"])
+    height = height.coarsen({"y": dy, "x": dx}, boundary="trim").mean()
 
-    # indices to super obs "midpoints"
-    lx = np.arange(dlen, nx - dlen + 1, dx)
-    ly = np.arange(ny - dlen, dlen - 1, -dy)
+    so_lon = lons[int(dy/2)::dy, int(dx/2)::dx]
+    so_lat = lats[int(dy/2)::dy, int(dx/2)::dx]
 
-    so_lon = lon[np.ix_(ly, lx)]
-    so_lat = lat[np.ix_(ly, lx)]
-
-    npcount1 = 0
-    npcount2 = 0
-
-    so_tot = 0
-    with open(tmpfname, 'w') as fpt:
-        for iy in range(len(ly)):
-            for ix in range(len(lx)):
-                # super ob domain is: ix-dlen:ix+dlen-1, iy-dlen:iy+dlen-1
-                x = lx[ix]
-                y = ly[iy]
-                so_x = np.arange(x - dlen, x + dlen - 1 + 1)
-                so_y = np.arange(y - dlen, y + dlen - 1 + 1)
-                so_cth = ctth_height[np.ix_(so_y, so_x)]
-
-                so_w = weight[np.ix_(so_y, so_x)]
-                so_flg = flags[np.ix_(so_y, so_x)]
-                ii = (so_cth.filled() != so_cth.fill_value) & (
-                    get_bit_from_flags(so_flg, 0) != 1)
-
-                # any valid data?
-                if np.sum(ii) == 0:
-                    npcount1 += 1
-                    continue
-
-                if so_cth[ii].compressed().shape[0] == 0:
-                    npcount1 += 2
-                    continue
-
-                # # calculate top and std
-                # cth, sd = cloudtop(
-                #     so_cth[ii], so_w[ii], so_flg[ii], np.prod(so_w.shape))
-
-                # Calculate cloud top height for the super obs:
-                cth = new_cloudtop(so_cth[ii], so_w[ii])
-                sd = 999.9
-
-                if not cth:
-                    LOG.debug("iy, ix, so_y, so_x, so_lat, so_lon: %d %d %d %d %f %f",
-                              iy, ix, y, x, so_lat[iy, ix], so_lon[iy, ix])
-                else:
-                    result = '%8d %7.2f %7.2f %5d %d %d %8.2f %8.2f\n' % \
-                             (99999, so_lat[iy, ix], so_lon[iy, ix], -999, 1, -60,
-                              cth, sd)
-                    fpt.write(result)
-                    so_tot += 1
-
-    LOG.info("Number of omitted observations: npcount1=%d npcount2=%d",
-             npcount1, npcount2)
-
-    LOG.info('\tCreated %d superobservations', so_tot)
+    write_data(tmpfname, so_lon, so_lat, height)
 
     now = datetime.utcnow()
-    fname_with_timestamp = str(resultfile) + now.strftime('_%Y%m%d%H%M%S')
+    fname_with_timestamp = str(resultfile) + now.strftime("_%Y%m%d%H%M%S")
     shutil.copy(tmpfname, fname_with_timestamp)
     os.rename(tmpfname, resultfile)
 
     return
+
+
+def write_data(filepath, longitudes, latitudes, clheight):
+    """Write the cloud top height data to file name."""
+    cortyp = 1
+    sd_ = 999.9
+
+    # Create a Dataset with lon, lat and cloud top height in meters:
+    shape = clheight.shape
+    # height_ds = xr.Dataset(data_vars={"clheight": clheight,
+    #                                   "lon": longitudes[:shape[0], :shape[1]],
+    #                                   # 'lat': latitudes[:shape[0], :shape[1]],
+    #                                   "minus_sixti": xr.DataArray(data=(np.ones(shape)*-60).astype("int32"),
+    #                                                               dims=["y", "x"]),
+    #                                   "minus_999": xr.DataArray(data=(np.ones(shape)*-999).astype("int32"),
+    #                                                             dims=["y", "x"]),
+    #                                   "five_nines": xr.DataArray(data=(np.ones(shape)*99999).astype("int32"),
+    #                                                              dims=["y", "x"]),
+    #                                   "sdv": xr.DataArray(data=np.ones(shape)*sd_,
+    #                                                       dims=["y", "x"]),
+    #                                   "cortyp": xr.DataArray(data=(np.ones(shape)*cortyp).astype("int32"),
+    #                                                          dims=["y", "x"])
+    #                                   }
+    #                        )
+
+    # df = height_ds.to_dataframe()
+
+    with open(filepath, "w") as fpt:
+        for y in range(shape[0]):
+            yidx = shape[0]-1-y
+            for x in range(shape[1]):
+                xidx = x
+                result = "%8d %7.2f %7.2f %5d %d %d %8.2f %8.2f\n" % \
+                    (99999, latitudes[yidx, xidx], longitudes[yidx, xidx], -999, cortyp, -60,
+                     clheight.data[yidx, xidx], sd_)
+                fpt.write(result)
 
 
 if __name__ == "__main__":
@@ -311,12 +186,12 @@ if __name__ == "__main__":
                                       datefmt=_DEFAULT_TIME_FORMAT)
         handler.setFormatter(formatter)
 
-    logging.getLogger('').addHandler(handler)
-    logging.getLogger('').setLevel(logging.DEBUG)
+    logging.getLogger("").addHandler(handler)
+    logging.getLogger("").setLevel(logging.DEBUG)
 
-    LOG = logging.getLogger('prt_nwcsaf_cloudheight')
+    LOG = logging.getLogger("prt_nwcsaf_cloudheight")
 
-    log_handlers = logging.getLogger('').handlers
+    log_handlers = logging.getLogger("").handlers
     for log_handle in log_handlers:
         if type(log_handle) is handlers.SMTPHandler:
             LOG.debug("Mail notifications to: %s", str(log_handle.toaddrs))
@@ -324,20 +199,21 @@ if __name__ == "__main__":
     OPTIONS = get_config(config_filename)
 
     values = {"area": areaid, }
-    bname = obstime.strftime(OPTIONS['ctth_composite_filename']) % values
-    path = OPTIONS['composite_output_dir']
-    filename = os.path.join(path, bname) + '.nc'
+    bname = obstime.strftime(OPTIONS["ctth_composite_filename"]) % values
+    path = OPTIONS["composite_output_dir"]
+    filename = os.path.join(path, bname) + ".nc"
     if not os.path.exists(filename):
         LOG.error("File " + str(filename) + " does not exist!")
         sys.exit(-1)
 
     # Load the Cloud Height composite from file
-    COMP = ncCTTHComposite()
-    COMP.load(filename)
+    from netcdf_io import cloudComposite
+    ctth = cloudComposite(filename, "CTTH_ALTI", areaname=areaid)
+    ctth.load()
 
     NPIX = int(window_size)
 
-    bname = obstime.strftime(OPTIONS['cloudheight_filename']) % values
-    path = OPTIONS['composite_output_dir']
-    filename = os.path.join(path, bname + '.dat')
-    derive_sobs(COMP, NPIX, filename)
+    bname = obstime.strftime(OPTIONS["cloudheight_filename"]) % values
+    path = OPTIONS["composite_output_dir"]
+    filename = os.path.join(path, bname + ".dat")
+    derive_sobs(ctth, NPIX, filename)

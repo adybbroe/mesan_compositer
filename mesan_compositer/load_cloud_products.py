@@ -28,6 +28,7 @@ import pathlib
 from datetime import timedelta
 from tempfile import gettempdir
 
+import dask.array as da
 import numpy as np
 import xarray as xr
 from pyorbital.orbital import Orbital
@@ -58,10 +59,27 @@ class CloudProductsLoader:
         """Load the cloud products."""
         self.scene = Scene({self._reader: self._cloud_files})
         self.scene.load(to_load)
+        # GEO and PPS cloud top heights are not scaled the same!
+        # Convert Geo cloud top height to PPS cloud top height
+        # FIXME!
+        this = self.scene["ctth_alti"].data.compute()
+        hist = np.histogram(np.nan_to_num(this, nan=27000), bins=29)
+        if "ctth_alti" in to_load and self._reader == "nwcsaf-geo":
+            # breakpoint()
+            pass
+
+        return hist
 
     def prepare_satz_angles_on_area(self, product):
         """Derive the satellite zenith angles and attach data to Satpy scene object."""
         self.scene["satz"] = self._get_satz_angles(product)
+        # shape = self.scene["satz"].shape
+        # ndim = shape[0] * shape[1]
+        # print("Relative percentage of  nan's in satz: %f" % (100 *
+        #                                                      np.sum(da.isnan(
+        #                                                          self.scene["satz"])).data.compute() /
+        #                                                      ndim))
+
         self.scene["satz"].attrs["area"] = self.scene[product].attrs["area"]
 
     def _get_satz_angles(self, product):
@@ -144,13 +162,17 @@ def generate_observation_time_array(data_array):
     return obs_time[:, np.newaxis]
 
 
-def blend_ct_products(product, areaid, *scenes, cache_dir=None):
+def blend_cloud_products(product, areaid, *scenes, cache_dir=None):
     """Blend NWCSAF Geo and PPS cloud product scenes."""
     loaded_scenes = []
-    for files in scenes:
+    for _idx, files in enumerate(scenes):
         LOG.debug("Files: %s", str(files))
         loader = CloudProductsLoader(files)
         loader.load([product])
+        # import matplotlib.pyplot as plt
+        # plt.bar(h_[1][1::], height=h_[0], width=800)
+        # plt.savefig('barplot_{idx}'.format(idx=idx))
+        # plt.clf()
         loader.prepare_satz_angles_on_area(product)
         loaded_scenes.append(loader.scene)
 
@@ -160,15 +182,21 @@ def blend_ct_products(product, areaid, *scenes, cache_dir=None):
     mscn.group(groups)
 
     LOG.debug("Before call to reaample on Multiscene...")
-    resampled = mscn.resample(areaid, reduce_data=False, cache_dir=cache_dir, mask_area=False)
+    resampled = mscn.resample(areaid, radius_of_influence=10000,
+                              reduce_data=False, cache_dir=cache_dir, mask_area=False)
 
     LOG.debug("Getting the weights...")
-    weights = [1. / scene["satz"] for scene in resampled.scenes]
+    weights = []
+    for _i, scene in enumerate(resampled.scenes):
+        wgt = 1 / scene["satz"]
+        weights.append(da.nan_to_num(wgt))
 
     from functools import partial
     stack_with_weights = partial(stack, weights=weights)
+    # stack_no_weights = partial(stack)
     LOG.debug("Before resampling...")
     blended = resampled.blend(blend_function=stack_with_weights)
+    # blended = resampled.blend(blend_function=stack_no_weights)
 
     LOG.debug("Before returning the blended scene")
     return blended, group_name
@@ -178,24 +206,32 @@ if __name__ == "__main__":
     # base_dir = pathlib.Path("/data/lang/satellit/mesan/")
     base_dir = pathlib.Path("/home/a000680/data/mesan")
 
-    GEO_DIR = base_dir / "geo_in/v2021"
+    GEO_DIR = base_dir / "geo_in/20231006"
 
-    GEO_FILES = [*GEO_DIR.glob("S_NWC_*MSG4_MSG-N-VISIR_20230201T1700*_PLAX.nc")]
-    # glob(os.path.join(GEO_DIR, "S_NWC_*MSG4_MSG-N-VISIR_20230201T1700*_PLAX.nc"))
+    GEO_FILES = [*GEO_DIR.glob("S_NWC_*MSG3_MSG-N-VISIR_20231006T0700*_PLAX.nc")]
+    GEO_FILES2 = [*GEO_DIR.glob("S_NWC_*MSG3_MSG-N-VISIR_20231006T0715*_PLAX.nc")]
 
     # areaid = "mesanEx"
     areaid = "euro4"
 
-    POLAR_DIR = base_dir / "polar_in/v2021"
-    # POES_FILES = glob(os.path.join(POLAR_DIR, "S_NWC_*noaa19_72055_20230201T1651106Z*nc"))
-    POES_FILES = [*POLAR_DIR.glob("S_NWC_*noaa19_72055_20230201T1651106Z*nc")]
+    POLAR_DIR = base_dir / "polar_in/20231006"
+    # POES_FILES = [*POLAR_DIR.glob("S_NWC_*noaa19_72055_20230201T1651106Z*nc")]
+    POES_FILES = [*POLAR_DIR.glob("S_NWC_*_noaa18_00000_20231006T0756*Z*.nc")]
     # NPP_FILES = [*POLAR_DIR.glob("S_NWC_*npp_00000_20230116T11*nc")]
-    METOP_FILES = [*POLAR_DIR.glob("S_NWC_*metopc_21988_20230201T1657001Z*nc")]
+    # METOP_FILES = [*POLAR_DIR.glob("S_NWC_*metopc_21988_20230201T1657001Z*nc")]
+    METOP_FILES = [*POLAR_DIR.glob("S_NWC_*metopc_00000_20231006T0650001Z*nc")]
 
     POLAR_FILES = [POES_FILES, METOP_FILES]
     # blended, group_name = blend_ct_products("ct", areaid, GEO_FILES, POES_FILES,  # NPP_FILES,
     #                                           cache_dir=gettempdir())
-    blended, group_name = blend_ct_products("ct", areaid, GEO_FILES, *POLAR_FILES,
-                                            cache_dir=gettempdir())
+
+    # blended, group_name = blend_cloud_products("ct", areaid, GEO_FILES, METOP_FILES,
+    #                                            cache_dir=gettempdir())
+    # blended.save_dataset(group_name,
+    #                      filename="./blended_stack_weighted_geo_polar_{area}_ct.nc".format(area=areaid))
+
+    blended, group_name = blend_cloud_products("ctth_alti", areaid, GEO_FILES, METOP_FILES,
+                                               cache_dir=gettempdir())
     blended.save_dataset(group_name,
-                         filename="./blended_stack_weighted_geo_polar_{area}.nc".format(area=areaid))
+                         filename="./blended_stack_weighted_geo_polar_{area}_ctth.nc".format(area=areaid))
+    # filename="./blended_stack_weighted_geo_polar_{area}.nc".format(area=areaid))
