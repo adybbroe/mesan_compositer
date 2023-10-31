@@ -39,6 +39,8 @@ import xarray as xr
 
 from mesan_compositer.config import get_config
 
+FAST_AND_ROUGH = False
+
 LOG = logging.getLogger(__name__)
 
 #: Default time format
@@ -242,43 +244,39 @@ def write_data(filepath, longitudes, latitudes, clamount):
 
     # Create a Dataset with lon, lat and cloud amount:
     shape = clamount.shape
-    clamount_ds = xr.Dataset(data_vars={"clamount": clamount,
-                                        "lon": longitudes[:shape[0], :shape[1]],
-                                        # 'lat': latitudes[:shape[0], :shape[1]],
-                                        "minus_sixti": xr.DataArray(data=(np.ones(shape)*-60).astype("int32"),
-                                                                    dims=["y", "x"]),
-                                        "minus_999": xr.DataArray(data=(np.ones(shape)*-999).astype("int32"),
-                                                                  dims=["y", "x"]),
-                                        "five_nines": xr.DataArray(data=(np.ones(shape)*99999).astype("int32"),
-                                                                   dims=["y", "x"]),
-                                        "SDcc": xr.DataArray(data=np.ones(shape)*SDcc,
-                                                             dims=["y", "x"]),
-                                        "cortyp": xr.DataArray(data=(np.ones(shape)*cortyp).astype("int32"),
-                                                               dims=["y", "x"])
-                                        }
-                             )
+    if FAST_AND_ROUGH:
+        clamount_ds = xr.Dataset(data_vars={"clamount": clamount,
+                                            "lon": longitudes[:shape[0], :shape[1]],
+                                            # 'lat': latitudes[:shape[0], :shape[1]],
+                                            "minus_sixti": xr.DataArray(data=(np.ones(shape)*-60).astype("int32"),
+                                                                        dims=["y", "x"]),
+                                            "minus_999": xr.DataArray(data=(np.ones(shape)*-999).astype("int32"),
+                                                                      dims=["y", "x"]),
+                                            "five_nines": xr.DataArray(data=(np.ones(shape)*99999).astype("int32"),
+                                                                       dims=["y", "x"]),
+                                            "SDcc": xr.DataArray(data=np.ones(shape)*SDcc,
+                                                                 dims=["y", "x"]),
+                                            "cortyp": xr.DataArray(data=(np.ones(shape)*cortyp).astype("int32"),
+                                                                   dims=["y", "x"])
+                                            }
+                                 )
 
-    df = clamount_ds.to_dataframe()
-    df.to_csv(filepath, columns=["five_nines", "latitude", "longitude",
-                                 "minus_999", "cortyp", "minus_sixti", "clamount", "SDcc"],
-              sep=" ",
-              index=False,
-              header=False)
+        df = clamount_ds.to_dataframe()
+        df.to_csv(filepath, columns=["five_nines", "latitude", "longitude",
+                                     "minus_999", "cortyp", "minus_sixti", "clamount", "SDcc"],
+                  sep=" ", index=False, header=False)
 
-    # fpt = open(filepath, "w")
-
-    # ndims = clamount.shape
-    # for y in range(ndims[0]):
-    #     yidx = ndims[0]-1-y
-    #     for x in range(ndims[1]):
-    #         xidx = x
-    #         # print(latitudes[yidx, xidx], longitudes[yidx, xidx])
-    #         result = "%8d %7.2f %7.2f %5d %2.2d %2.2d %8.2f %8.2f\n" % \
-    #             (99999, latitudes[yidx, xidx], longitudes[yidx, xidx], -999, cortyp, -60,
-    #              clamount.data[yidx, xidx], SDcc)
-    #         fpt.write(result)
-
-    # fpt.close()
+    else:
+        with open(filepath, "w") as fpt:
+            for y in range(shape[0]):
+                yidx = shape[0]-1-y
+                for x in range(shape[1]):
+                    xidx = x
+                    # print(latitudes[yidx, xidx], longitudes[yidx, xidx])
+                    result = "%8d %7.2f %7.2f %5d %2.2d %2.2d %8.2f %8.2f\n" % \
+                        (99999, latitudes[yidx, xidx], longitudes[yidx, xidx], -999, cortyp, -60,
+                         clamount.data[yidx, xidx], SDcc)
+                    fpt.write(result)
 
 
 if __name__ == "__main__":
