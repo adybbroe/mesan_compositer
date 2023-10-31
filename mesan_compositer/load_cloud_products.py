@@ -60,12 +60,12 @@ class CloudProductsLoader:
         self.scene = Scene({self._reader: self._cloud_files})
         self.scene.load(to_load)
         # GEO and PPS cloud top heights are not scaled the same!
-        # Convert Geo cloud top height to PPS cloud top height
+        # Convert Geo cloud top height to PPS cloud top height?
         # FIXME!
-        this = self.scene["ctth_alti"].data.compute()
-        hist = np.histogram(np.nan_to_num(this, nan=27000), bins=29)
+        hist = None
+        # this = self.scene["ctth_alti"].data.compute()
+        # hist = np.histogram(np.nan_to_num(this, nan=27000), bins=29)
         if "ctth_alti" in to_load and self._reader == "nwcsaf-geo":
-            # breakpoint()
             pass
 
         return hist

@@ -28,7 +28,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from mesan_compositer.config import get_config
-from mesan_compositer.make_ct_composite import ctCompositer
+from mesan_compositer.make_ct_composite import CloudproductCompositer
 
 
 class TestFindCtScenes:
@@ -48,7 +48,8 @@ class TestFindCtScenes:
         path = str(fake_empty_nwcsaf_geo_files[0].parent)
         self.config["msg_dir"] = path
 
-        ctcomp = ctCompositer(time_of_analysis, delta_time_window, "unknown_area", self.config)
+        ctcomp = CloudproductCompositer(time_of_analysis, delta_time_window, "unknown_area",
+                                        self.config, "CT")
         with caplog.at_level(logging.ERROR):
             ctcomp.get_catalogue()
 
@@ -74,7 +75,7 @@ class TestFindCtScenes:
         self.config["msg_dir"] = path
 
         self.config["msg_areaname"] = "UNKNOWN-AREA-ID"
-        ctcomp = ctCompositer(time_of_analysis, delta_time_window, self.area_id, self.config)
+        ctcomp = CloudproductCompositer(time_of_analysis, delta_time_window, self.area_id, self.config, "CT")
         geo_file_list = [str(f) for f in fake_empty_nwcsaf_geo_files]
 
         with caplog.at_level(logging.DEBUG):
@@ -91,7 +92,7 @@ class TestFindCtScenes:
 
         path = str(fake_empty_nwcsaf_pps_files[0].parent)
         self.config["pps_direct_readout_dir"] = path
-        ctcomp = ctCompositer(time_of_analysis, delta_time_window, self.area_id, self.config)
+        ctcomp = CloudproductCompositer(time_of_analysis, delta_time_window, self.area_id, self.config, "CT")
         ctcomp.get_catalogue()
 
         assert len(ctcomp.msg_scenes) == 0
@@ -133,7 +134,7 @@ class TestFindCtScenes:
         self.config["msg_dir"] = path
 
         delta_time_window = timedelta(minutes=minutes)
-        ctcomp = ctCompositer(time_of_analysis, delta_time_window, self.area_id, self.config)
+        ctcomp = CloudproductCompositer(time_of_analysis, delta_time_window, self.area_id, self.config, "CT")
         ctcomp.get_catalogue()
 
         assert len(ctcomp.msg_scenes) == len(expected)
@@ -154,7 +155,7 @@ class TestFindCtScenes:
         self.config["pps_direct_readout_dir"] = str(fake_empty_nwcsaf_pps_files[0].parent)
 
         delta_time_window = timedelta(minutes=minutes)
-        ctcomp = ctCompositer(time_of_analysis, delta_time_window, self.area_id, self.config)
+        ctcomp = CloudproductCompositer(time_of_analysis, delta_time_window, self.area_id, self.config, "CT")
         ctcomp.get_catalogue()
 
         assert len(ctcomp.pps_scenes) == len(expected)
