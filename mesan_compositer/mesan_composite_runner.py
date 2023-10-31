@@ -33,27 +33,22 @@ import os
 import socket
 import sys
 import threading
+from datetime import datetime, timedelta
 from logging import handlers
 from multiprocessing import Manager, Pool
+from queue import Empty
+from urllib.parse import urlparse
 
 import posttroll.subscriber
 from posttroll.message import Message
 from posttroll.publisher import Publish
-from six.moves.urllib.parse import urlparse
 
-try:
-    # python 3
-    from queue import Empty
-except ImportError:
-    # python 2
-    from Queue import Empty
-
-from datetime import datetime, timedelta
-
-from mesan_compositer import make_ct_composite as mcc
-from mesan_compositer import make_ctth_composite
+# from mesan_compositer import make_ct_composite as mcc
+# from mesan_compositer import make_ctth_composite
 from mesan_compositer.composite_tools import get_analysis_time
 from mesan_compositer.config import get_config
+from mesan_compositer.ct_quicklooks import ctth_quicklook_from_netcdf
+from mesan_compositer.make_ct_composite import CloudproductCompositer
 from mesan_compositer.prt_nwcsaf_cloudamount import derive_sobs as derive_sobs_clamount
 from mesan_compositer.prt_nwcsaf_cloudheight import derive_sobs as derive_sobs_clheight
 from mesan_compositer.utils import check_uri, get_local_ips
@@ -352,30 +347,8 @@ def ctype_composite_worker(scene, job_id, publish_q, config_options):
         LOG.info(
             "Make ctype composite for area id = " + str(mesan_area_id))
 
-        npix = int(config_options.get("number_of_pixels", DEFAULT_SUPEROBS_WINDOW_SIZE_NPIX))
-        ipar = str(config_options.get("cloud_amount_ipar"))
-        if not ipar:
-            raise IOError("No ipar value in config file!")
-
-        ctcomp = mcc.ctCompositer(time_of_analysis, delta_t, mesan_area_id, config_options)
-        ctcomp.get_catalogue()
-        if not ctcomp.make_composite():
-            LOG.error("Failed creating ctype composite...")
-        else:
-            ctcomp.write()
-            ctcomp.make_quicklooks()
-
-            # Make Super observations:
-            LOG.info("Make Cloud Type super observations")
-
-            values = {"area": mesan_area_id, }
-            bname = time_of_analysis.strftime(config_options["cloudamount_filename"]) % values
-            path = config_options["composite_output_dir"]
-            filename = os.path.join(path, bname + ".dat")
-            derive_sobs_clamount(ctcomp.composite, ipar, npix, filename)
-
-            result_file = ctcomp.filename
-
+        result_file = do_cloud_type_composite(time_of_analysis, delta_t, mesan_area_id, config_options)
+        if result_file:
             pubmsg = create_message(result_file, scene)
             LOG.info("Sending: " + str(pubmsg))
             publish_q.put(pubmsg)
@@ -387,6 +360,9 @@ def ctype_composite_worker(scene, job_id, publish_q, config_options):
             else:
                 LOG.warning(
                     "Job entry is not a datetime instance: " + str(job_id))
+
+        super_obs_filename = do_cloudamount(result_file, time_of_analysis, mesan_area_id, config_options)
+        LOG.info("Cloud amount super observations generated: %s", super_obs_filename)
 
     except Exception:
         LOG.exception("Failed in ctype_composite_worker...")
@@ -412,29 +388,9 @@ def ctth_composite_worker(scene, job_id, publish_q, config_options):
 
         LOG.info("Make cloud height composite for area id = " + str(mesan_area_id))
 
-        npix = int(config_options.get("number_of_pixels", DEFAULT_SUPEROBS_WINDOW_SIZE_NPIX))
-        ipar = config_options.get("cloud_amount_ipar")
-        if not ipar:
-            raise IOError("No ipar value in config file!")
+        result_file = do_ctth_composite(time_of_analysis, delta_t, mesan_area_id, config_options)
 
-        ctth_comp = make_ctth_composite.ctthComposite(time_of_analysis, delta_t, mesan_area_id, config_options)
-        ctth_comp.get_catalogue()
-        if not ctth_comp.make_composite():
-            LOG.error("Failed creating ctth composite...")
-        else:
-            ctth_comp.write()
-            ctth_comp.make_quicklooks()
-
-            # Make Super observations:
-            values = {"area": mesan_area_id, }
-            bname = time_of_analysis.strftime(OPTIONS["cloudheight_filename"]) % values
-            path = config_options["composite_output_dir"]
-            filename = os.path.join(path, bname + ".dat")
-            LOG.info("Make Cloud Height super observations. Output file = %s", str(filename))
-            derive_sobs_clheight(ctth_comp.composite, npix, filename)
-
-            result_file = ctth_comp.filename
-
+        if result_file:
             pubmsg = create_message(result_file, scene)
             LOG.info("Sending: " + str(pubmsg))
             publish_q.put(pubmsg)
@@ -446,6 +402,9 @@ def ctth_composite_worker(scene, job_id, publish_q, config_options):
             else:
                 LOG.warning(
                     "Job entry is not a datetime instance: " + str(job_id))
+
+        super_obs_filename = do_cloudheight(result_file, time_of_analysis, mesan_area_id, config_options)
+        LOG.info("Cloud height super observations generated: %s", super_obs_filename)
 
     except Exception:
         LOG.exception("Failed in ctth_composite_worker...")
@@ -581,6 +540,73 @@ def mesan_live_runner(config_options):
 
     pub_thread.stop()
     listen_thread.stop()
+
+
+def do_cloud_type_composite(time_of_analysis, delta_t, area_id, config_options):
+    """Make the cloud type composite."""
+    ctcomp = CloudproductCompositer(time_of_analysis, delta_t, area_id, config_options, "CT")
+    ctcomp.get_catalogue()
+    ctcomp.blend_cloud_products()
+    output_filepath = ctcomp.write()
+    ctcomp.quicklook(output_filepath)
+
+    return output_filepath
+
+
+def do_ctth_composite(time_of_analysis, delta_t, area_id, config_options):
+    """Make the cloud top temperature height composite."""
+    ctcomp = CloudproductCompositer(time_of_analysis, delta_t, area_id, config_options, "CTTH")
+    ctcomp.get_catalogue()
+    ctcomp.blend_cloud_products()
+    output_filepath = ctcomp.write()
+
+    ctth_quicklook_from_netcdf("CTTH_ALTI_group", output_filepath)
+    return output_filepath
+
+
+def do_cloudamount(filename, time_of_analysis, area_id, config_options):
+    """Make the cloud amount super observations."""
+    from netcdf_io import cloudComposite
+
+    npix = int(config_options.get("number_of_pixels", DEFAULT_SUPEROBS_WINDOW_SIZE_NPIX))
+    ipar = str(config_options.get("cloud_amount_ipar"))
+    if not ipar:
+        raise IOError("No ipar value in config file!")
+
+    # Make Super observations:
+    LOG.info("Make Cloud Type super observations")
+
+    ctype = cloudComposite(filename, "CT", areaname=area_id)
+    ctype.load()
+
+    values = {"area": area_id, }
+    bname = time_of_analysis.strftime(config_options["cloudamount_filename"]) % values
+    path = config_options["composite_output_dir"]
+    filename = os.path.join(path, bname + ".dat")
+
+    derive_sobs_clamount(ctype, ipar, npix, filename)
+    return filename
+
+
+def do_cloudheight(filename, time_of_analysis, area_id, config_options):
+    """Make the cloud height super observations."""
+    from netcdf_io import cloudComposite
+
+    npix = int(config_options.get("number_of_pixels", DEFAULT_SUPEROBS_WINDOW_SIZE_NPIX))
+
+    # Make Super observations:
+    LOG.info("Make Cloud Top Height super observations")
+    ctth = cloudComposite(filename, "CTTH_ALTI", areaname=area_id)
+    ctth.load()
+
+    values = {"area": area_id, }
+
+    bname = time_of_analysis.strftime(OPTIONS["cloudheight_filename"]) % values
+    path = config_options["composite_output_dir"]
+    filename = os.path.join(path, bname + ".dat")
+    LOG.info("Make Cloud Height super observations. Output file = %s", str(filename))
+    derive_sobs_clheight(ctth, npix, filename)
+    return filename
 
 
 if __name__ == "__main__":
