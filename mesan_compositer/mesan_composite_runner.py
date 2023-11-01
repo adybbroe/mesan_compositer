@@ -34,7 +34,6 @@ import socket
 import sys
 import threading
 from datetime import datetime, timedelta
-from logging import handlers
 from multiprocessing import Manager, Pool
 from queue import Empty
 from urllib.parse import urlparse
@@ -43,11 +42,10 @@ import posttroll.subscriber
 from posttroll.message import Message
 from posttroll.publisher import Publish
 
-# from mesan_compositer import make_ct_composite as mcc
-# from mesan_compositer import make_ctth_composite
 from mesan_compositer.composite_tools import get_analysis_time
 from mesan_compositer.config import get_config
 from mesan_compositer.ct_quicklooks import ctth_quicklook_from_netcdf
+from mesan_compositer.logger import setup_logging
 from mesan_compositer.make_ct_composite import CloudproductCompositer
 from mesan_compositer.prt_nwcsaf_cloudamount import derive_sobs as derive_sobs_clamount
 from mesan_compositer.prt_nwcsaf_cloudheight import derive_sobs as derive_sobs_clheight
@@ -57,12 +55,6 @@ LOG = logging.getLogger(__name__)
 
 DEFAULT_AREA = "mesanX"
 DEFAULT_SUPEROBS_WINDOW_SIZE_NPIX = 32
-
-#: Default time format
-_DEFAULT_TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
-
-#: Default log format
-_DEFAULT_LOG_FORMAT = "[%(levelname)s: %(asctime)s : %(name)s] %(message)s"
 
 
 SENSOR = {"NOAA-19": "avhrr/3",
@@ -101,17 +93,21 @@ def get_arguments():
                         required=True,
                         help="The file containing configuration parameters e.g. mesan_sat_config.yaml")
     parser.add_argument("-l", "--logging",
-                        help="The path to the log-configuration file (e.g. './logging.ini')",
-                        dest="logging_conf_file",
+                        help="The path to the log-configuration file (e.g. './log_config.yaml')",
+                        dest="log_config_file",
                         type=str,
                         required=False)
+    parser.add_argument("-v", "--verbose", dest="verbosity", action="count", default=0,
+                        help="Verbosity (between 1 and 2 occurrences with more leading to more "
+                        "verbose logging). WARN=0, INFO=1, "
+                        "DEBUG=2. This is overridden by the log config file if specified.")
 
     args = parser.parse_args()
     if "template" in args.config_file:
         print("Template file given as master config, aborting!")
         sys.exit()
 
-    return args.logging_conf_file, args.config_file
+    return args
 
 
 def reset_job_registry(objdict, key):
@@ -611,29 +607,11 @@ def do_cloudheight(filename, time_of_analysis, area_id, config_options):
 
 if __name__ == "__main__":
 
-    (logfile, config_filename) = get_arguments()
+    cmd_args = get_arguments()
 
-    if logfile:
-        logging.config.fileConfig(logfile, disable_existing_loggers=False)
+    setup_logging(cmd_args)
 
-    handler = logging.StreamHandler(sys.stderr)
-    formatter = logging.Formatter(fmt=_DEFAULT_LOG_FORMAT,
-                                  datefmt=_DEFAULT_TIME_FORMAT)
-    handler.setFormatter(formatter)
-    handler.setLevel(logging.DEBUG)
-
-    logging.getLogger("").addHandler(handler)
-    logging.getLogger("").setLevel(logging.DEBUG)
-    logging.getLogger("posttroll").setLevel(logging.INFO)
-
-    LOG = logging.getLogger("mesan_composite_runner")
-
-    log_handlers = logging.getLogger("").handlers
-    for log_handle in log_handlers:
-        if type(log_handle) is handlers.SMTPHandler:
-            LOG.debug("Mail notifications to: %s", str(log_handle.toaddrs))
-
-    OPTIONS = get_config(config_filename)
+    OPTIONS = get_config(cmd_args.config_file)
 
     POLSATS_STR = OPTIONS.get("polar_satellites")
     POLAR_SATELLITES = POLSATS_STR.split()
