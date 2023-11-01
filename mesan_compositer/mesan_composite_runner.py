@@ -176,8 +176,8 @@ class FileListener(threading.Thread):
     def run(self):
         """Start the runner and run indefinately until interrupted."""
         with posttroll.subscriber.Subscribe("", ["CF/2",
-                                                 "2/nwcsaf-msg/0deg/ctth-plax-corrected",
-                                                 "2/nwcsaf-msg/0deg/ct-plax-corrected"], True) as subscr:
+                                                 "2/nwcsaf-geo/0deg/ctth-plax-corrected",
+                                                 "2/nwcsaf-geo/0deg/ct-plax-corrected"], True) as subscr:
             for msg in subscr.recv(timeout=90):
                 if not self.loop:
                     break
