@@ -177,7 +177,9 @@ class CloudproductCompositer:
 
         LOG.debug("Get all NWCSAF/Geo files in this directory = " + str(geo_dir))
         # S_NWC_CT_MSG4_MSG-N-VISIR_20230118T103000Z_PLAX.nc
-        return glob(os.path.join(geo_dir, globify(self._get_msg_filepattern_from_config())))
+        glob_str = globify(self._get_msg_filepattern_from_config())
+        LOG.debug("Glob string = %s", str(glob_str))
+        return glob(os.path.join(geo_dir, glob_str))
 
     def _get_msg_filepattern_from_config(self):
         msg_prod_filename = "msg_{prod}_filename".format(prod={"CT": "cty",

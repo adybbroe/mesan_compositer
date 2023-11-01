@@ -22,63 +22,68 @@
 
 """Collection of minor helper tools for the generation of Mesan composites."""
 
+import logging
 import os
-from trollsift import Parser
 from datetime import datetime, timedelta
 
 import six
+from trollsift import Parser
+
 from mesan_compositer.pps_msg_conversions import get_bit_from_flags
-import logging
 
 LOG = logging.getLogger(__name__)
 
 
-MSGSATS = {'Meteosat-9': 'MSG2',
-           'Meteosat-8': 'MSG1',
-           'Meteosat-10': 'MSG3',
-           'Meteosat-11': 'MSG4'}
-METEOSAT = {'MSG1': 'Meteosat-8',
-            'MSG2': 'Meteosat-9',
-            'MSG3': 'Meteosat-10',
-            'MSG4': 'Meteosat-11'}
+MSGSATS = {"Meteosat-9": "MSG2",
+           "Meteosat-8": "MSG1",
+           "Meteosat-10": "MSG3",
+           "Meteosat-11": "MSG4"}
+METEOSAT = {"MSG1": "Meteosat-8",
+            "MSG2": "Meteosat-9",
+            "MSG3": "Meteosat-10",
+            "MSG4": "Meteosat-11"}
 
-TERRA_AQUA_NAMES = {'eos1': 'EOS-Terra',
-                    'eos2': 'EOS-Aqua'}
+TERRA_AQUA_NAMES = {"eos1": "EOS-Terra",
+                    "eos2": "EOS-Aqua"}
 
-PLATFORM_NAME_INV = {'Suomi-NPP': 'npp',
-                     'NOAA-20': 'noaa20',
-                     'EOS-Terra': 'eos1',
-                     'EOS-Aqua': 'eos2',
-                     'Metop-A': 'metopa',
-                     'Metop-B': 'metopb',
-                     'Metop-C': 'metopc',
-                     'NOAA-18': 'noaa18',
-                     'NOAA-15': 'noaa15',
-                     'NOAA-19': 'noaa19'}
-PLATFORM_NAME = {'npp': 'Suomi-NPP',
-                 'noaa20': 'NOAA-20',
-                 'eos1': 'EOS-Terra',
-                 'eos2': 'EOS-Aqua',
-                 'metopa': 'Metop-A',
-                 'metopb': 'Metop-B',
-                 'metopc': 'Metop-C',
-                 'noaa18': 'NOAA-18',
-                 'noaa15': 'NOAA-15',
-                 'noaa19': 'NOAA-19'}
+PLATFORM_NAME_INV = {"Suomi-NPP": "npp",
+                     "NOAA-20": "noaa20",
+                     "NOAA-21": "noaa21",
+                     "EOS-Terra": "eos1",
+                     "EOS-Aqua": "eos2",
+                     "Metop-A": "metopa",
+                     "Metop-B": "metopb",
+                     "Metop-C": "metopc",
+                     "NOAA-18": "noaa18",
+                     "NOAA-15": "noaa15",
+                     "NOAA-19": "noaa19"}
+PLATFORM_NAME = {"npp": "Suomi-NPP",
+                 "noaa20": "NOAA-20",
+                 "noaa21": "NOAA-21",
+                 "eos1": "EOS-Terra",
+                 "eos2": "EOS-Aqua",
+                 "metopa": "Metop-A",
+                 "metopb": "Metop-B",
+                 "metopc": "Metop-C",
+                 "noaa18": "NOAA-18",
+                 "noaa15": "NOAA-15",
+                 "noaa19": "NOAA-19"}
 
-METOPS = ['metop03', 'metop02', 'metop01']
+METOPS = ["metop03", "metop02", "metop01"]
 
-SENSOR = {'NOAA-19': 'avhrr/3',
-          'NOAA-18': 'avhrr/3',
-          'NOAA-15': 'avhrr/3',
-          'Metop-A': 'avhrr/3',
-          'Metop-B': 'avhrr/3',
-          'Metop-C': 'avhrr/3',
-          'EOS-Terra': 'modis',
-          'EOS-Aqua': 'modis',
-          'Suomi-NPP': 'viirs',
-          'JPSS-1': 'viirs',
-          'NOAA-20': 'viirs'}
+SENSOR = {"NOAA-19": "avhrr/3",
+          "NOAA-18": "avhrr/3",
+          "NOAA-15": "avhrr/3",
+          "Metop-A": "avhrr/3",
+          "Metop-B": "avhrr/3",
+          "Metop-C": "avhrr/3",
+          "EOS-Terra": "modis",
+          "EOS-Aqua": "modis",
+          "Suomi-NPP": "viirs",
+          "JPSS-1": "viirs",
+          "JPSS-2": "viirs",
+          "NOAA-20": "viirs",
+          "NOAA-21": "viirs"}
 
 
 PPS_FILENAME = "S_NWC_{product:s}_{platform_name:s}_{orbit:05d}_{start_time:%Y%m%dT%H%M%S%f}Z_{end_time:%Y%m%dT%H%M%S%f}Z.nc"  # noqa
@@ -102,12 +107,12 @@ class PpsMetaData(object):
 
     def __str__(self):
         """Print the metadata content in human readable form."""
-        return "\n".join(['filename=' + str(self.uri),
-                          'geofilename=' + str(self.geofilename),
-                          'platform_name=' + str(self.platform_name),
-                          'orbit=' + self.orbit,
-                          'timeslot=' + str(self.timeslot),
-                          'variant=' + str(self.variant)])
+        return "\n".join(["filename=" + str(self.uri),
+                          "geofilename=" + str(self.geofilename),
+                          "platform_name=" + str(self.platform_name),
+                          "orbit=" + self.orbit,
+                          "timeslot=" + str(self.timeslot),
+                          "variant=" + str(self.variant)])
 
     def __lt__(self, other):
         """Less than."""
@@ -157,10 +162,10 @@ class GeoMetaData:
 
     def __str__(self):
         """Print out the metadata content in human readable form."""
-        return "\n".join(['filename=' + str(self.uri),
-                          'platform_name=' + str(self.platform_name),
-                          'areaid=' + self.areaid,
-                          'timeslot=' + str(self.timeslot)])
+        return "\n".join(["filename=" + str(self.uri),
+                          "platform_name=" + str(self.platform_name),
+                          "areaid=" + self.areaid,
+                          "timeslot=" + str(self.timeslot)])
 
     def __lt__(self, other):
         """Less than."""
@@ -217,28 +222,28 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
         try:
             res = prod_p.parse(bname)
         except ValueError:
-            LOG.exception('Failed processing filename %s', filename)
-            LOG.warning('Probably wrong date time string in PPS file, skip it...')
+            LOG.exception("Failed processing filename %s", filename)
+            LOG.warning("Probably wrong date time string in PPS file, skip it...")
             continue
 
-        sat = res['platform_name']
+        sat = res["platform_name"]
 
         if satellites and PLATFORM_NAME.get(sat, sat) not in satellites:
-            LOG.debug("Satellite not in the list of platforms! platform=%s", PLATFORM_NAME.get(sat, sat))
+            LOG.warning("Satellite not in the list of platforms! platform=%s", PLATFORM_NAME.get(sat, sat))
             continue
 
-        product = res['product']
-        geofilename = filename.replace(product, 'CMA')
-        orbit = '%05d' % res['orbit']
-        if 'end_time' in res.keys():
+        product = res["product"]
+        geofilename = filename.replace(product, "CMA")
+        orbit = "%05d" % res["orbit"]
+        if "end_time" in res.keys():
             if six.PY2:
                 # Requires Python 2.7:
-                delta_seconds = (res['end_time']-res['start_time']).total_seconds()
-                timeslot = res['start_time'] + timedelta(seconds=delta_seconds/2.)
+                delta_seconds = (res["end_time"]-res["start_time"]).total_seconds()
+                timeslot = res["start_time"] + timedelta(seconds=delta_seconds/2.)
             else:
-                timeslot = res['start_time'] + (res['end_time']-res['start_time'])/2.
+                timeslot = res["start_time"] + (res["end_time"]-res["start_time"])/2.
         else:
-            timeslot = res['start_time']
+            timeslot = res["start_time"]
 
         if timeslot > latest_file_time:
             latest_file_time = timeslot
@@ -328,7 +333,7 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
 def get_nwcsaf_files(basedir, file_ext):
     """Get list of file names of msg or pps products."""
     from glob import glob
-    return glob(os.path.join(basedir, '*' + file_ext))
+    return glob(os.path.join(basedir, "*" + file_ext))
 
 
 def get_weight_ctth(ctth_flag, lat, tdiff, is_msg):
@@ -491,7 +496,7 @@ def get_weight_cloudtype(ctype, ctype_flag, lat, tdiff, is_msg, fill_value=20):
     ctype[ctype > 20] = fill_value
     #
     # dependence on cloud type
-    weight *= weights_ctype_class[ctype.astype('int')]
+    weight *= weights_ctype_class[ctype.astype("int")]
     #
     # np.savez('input_output.npz',
     #          CTYPE=ctype.data[1200:1210, 1000:1010],
