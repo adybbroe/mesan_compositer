@@ -228,8 +228,8 @@ def create_message(resultfile, scene):
     to_send["type"] = "netCDF"
     to_send["format"] = "MESAN"
     to_send["data_processing_level"] = "3"
-    to_send["start_time"], to_send["end_time"] = scene[
-        "starttime"], scene["endtime"]
+    to_send["start_time"] = scene["starttime"]
+    to_send["end_time"] = scene["endtime"]
     pub_message = Message("/" + to_send["format"] + "/" + to_send["data_processing_level"] +
                           "/polar/direct_readout/",
                           "file", to_send).encode()
