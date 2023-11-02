@@ -455,7 +455,7 @@ def mesan_live_runner(config_options):
         if "end_time" in msg.data:
             end_time = msg.data["end_time"]
         else:
-            LOG.warning("No end_time in message!")
+            LOG.debug("No end_time in message!")
             end_time = None
 
         sensor = str(msg.data["sensor"])
