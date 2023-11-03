@@ -34,7 +34,6 @@ from glob import glob
 from logging import handlers
 from tempfile import gettempdir
 
-from mesan.compositer.utils import NoGeoScenesError
 from satpy.utils import debug_on
 from trollsift import Parser, globify
 
@@ -42,6 +41,7 @@ from mesan_compositer.composite_tools import METEOSAT, METOPS, MSGSATS, GeoMetaD
 from mesan_compositer.config import get_config
 from mesan_compositer.ct_quicklooks import ctype_quicklook_from_netcdf
 from mesan_compositer.load_cloud_products import blend_cloud_products
+from mesan_compositer.utils import NoGeoScenesError
 
 debug_on()
 
