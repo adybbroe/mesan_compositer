@@ -243,7 +243,11 @@ class CloudproductCompositer:
             LOG.debug("Polar scene:\n" + str(scene))
 
         self._get_geo_catalogue()
-        LOG.info(str(len(self.msg_scenes)) + " MSG scenes located")
+        if len(self.msg_scenes) > 0:
+            LOG.info(str(len(self.msg_scenes)) + " Geo scenes located")
+        else:
+            LOG.warning("No Geo scenes located!")
+
         for scene in self.msg_scenes:
             LOG.debug("Geo scene:\n" + str(scene))
 
@@ -292,8 +296,7 @@ class CloudproductCompositer:
         # What about EuropeCanary and possible other areas!? FIXME!
 
         msg_list = self._get_all_geo_files(msg_dir)
-        LOG.debug(
-            "MSG files in directory " + str(msg_dir) + " : " + str(msg_list))
+        LOG.debug("MSG files in directory " + str(msg_dir) + " : " + str(msg_list))
         LOG.info("Get files inside time window: " + str(self.time_window[0]) + " - " + str(self.time_window[1]))
 
         self.msg_scenes = self.get_geo_scenes(msg_list)
