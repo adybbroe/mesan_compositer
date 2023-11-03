@@ -613,8 +613,7 @@ if __name__ == "__main__":
 
     OPTIONS = get_config(cmd_args.config_file)
 
-    POLSATS_STR = OPTIONS.get("polar_satellites")
-    POLAR_SATELLITES = POLSATS_STR.split()
+    POLAR_SATELLITES = OPTIONS.get("polar_satellites")
 
     servername = None
     servername = socket.gethostname()
