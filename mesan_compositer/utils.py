@@ -32,7 +32,7 @@ from six.moves.urllib.parse import urlparse
 LOG = logging.getLogger(__name__)
 
 
-class NoGeoScenesError:
+class NoGeoScenesError(Exception):
     """Custom Exception to capture cases where no Geo scenes can be found."""
     pass
 
