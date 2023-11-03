@@ -34,6 +34,7 @@ from glob import glob
 from logging import handlers
 from tempfile import gettempdir
 
+from mesan.compositer.utils import NoGeoScenesError
 from satpy.utils import debug_on
 from trollsift import Parser, globify
 
@@ -237,11 +238,6 @@ class CloudproductCompositer:
         will be done by simple file globbing. In the future this might be
         done by doing a DB search.
         """
-        self._get_pps_catalogue()
-        LOG.info(str(len(self.pps_scenes)) + " PPS scenes located")
-        for scene in self.pps_scenes:
-            LOG.debug("Polar scene:\n" + str(scene))
-
         self._get_geo_catalogue()
         if len(self.msg_scenes) > 0:
             LOG.info(str(len(self.msg_scenes)) + " Geo scenes located")
@@ -250,6 +246,11 @@ class CloudproductCompositer:
 
         for scene in self.msg_scenes:
             LOG.debug("Geo scene:\n" + str(scene))
+
+        self._get_pps_catalogue()
+        LOG.info(str(len(self.pps_scenes)) + " PPS scenes located")
+        for scene in self.pps_scenes:
+            LOG.debug("Polar scene:\n" + str(scene))
 
     def _get_pps_catalogue(self):
         """Get the catalougue of NWCSAF/PPS input data files."""
@@ -308,12 +309,14 @@ class CloudproductCompositer:
             LOG.debug("Time slot for scene: %s" % str(scene.timeslot))
             if abs(scene.timeslot - self.obstime) < tdiff:
                 tdiff = abs(scene.timeslot - self.obstime)
-                print(tdiff)
+                LOG.debug("Absolute time difference (|start time minus obs time|) = ", str(tdiff))
                 found_idx = idx
 
         if found_idx >= 0:
             self.msg_scenes = [self.msg_scenes[found_idx]]
             LOG.info("The scene closest in time to the analysis time: %s" % str(self.msg_scenes[0]))
+        else:
+            raise NoGeoScenesError("No valid Geo Scene within time window!")
 
     def blend_cloud_products(self):
         """Blend the Cloud products together and create a cloud analysis."""

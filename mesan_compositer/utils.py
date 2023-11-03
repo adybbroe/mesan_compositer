@@ -32,6 +32,11 @@ from six.moves.urllib.parse import urlparse
 LOG = logging.getLogger(__name__)
 
 
+class NoGeoScenesError:
+    """Custom Exception to capture cases where no Geo scenes can be found."""
+    pass
+
+
 def check_uri(uri):
     """Check that the provided *uri* is on the local host and return the file path."""
     if isinstance(uri, (list, set, tuple)):

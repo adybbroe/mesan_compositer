@@ -47,9 +47,10 @@ from mesan_compositer.config import get_config
 from mesan_compositer.ct_quicklooks import ctth_quicklook_from_netcdf
 from mesan_compositer.logger import setup_logging
 from mesan_compositer.make_ct_composite import CloudproductCompositer
+from mesan_compositer.netcdf_io import cloudComposite
 from mesan_compositer.prt_nwcsaf_cloudamount import derive_sobs as derive_sobs_clamount
 from mesan_compositer.prt_nwcsaf_cloudheight import derive_sobs as derive_sobs_clheight
-from mesan_compositer.utils import check_uri, get_local_ips
+from mesan_compositer.utils import NoGeoScenesError, check_uri, get_local_ips
 
 LOG = logging.getLogger(__name__)
 
@@ -357,8 +358,8 @@ def ctype_composite_worker(scene, job_id, publish_q, config_options):
                 LOG.warning(
                     "Job entry is not a datetime instance: " + str(job_id))
 
-        super_obs_filename = do_cloudamount(result_file, time_of_analysis, mesan_area_id, config_options)
-        LOG.info("Cloud amount super observations generated: %s", super_obs_filename)
+            super_obs_filename = do_cloudamount(result_file, time_of_analysis, mesan_area_id, config_options)
+            LOG.info("Cloud amount super observations generated: %s", super_obs_filename)
 
     except Exception:
         LOG.exception("Failed in ctype_composite_worker...")
@@ -385,7 +386,7 @@ def ctth_composite_worker(scene, job_id, publish_q, config_options):
         LOG.info("Make cloud height composite for area id = " + str(mesan_area_id))
 
         result_file = do_ctth_composite(time_of_analysis, delta_t, mesan_area_id, config_options)
-
+        LOG.debug("After CTTH compositer part. Filename returned = %s", str(result_file))
         if result_file:
             pubmsg = create_message(result_file, scene)
             LOG.info("Sending: " + str(pubmsg))
@@ -399,8 +400,8 @@ def ctth_composite_worker(scene, job_id, publish_q, config_options):
                 LOG.warning(
                     "Job entry is not a datetime instance: " + str(job_id))
 
-        super_obs_filename = do_cloudheight(result_file, time_of_analysis, mesan_area_id, config_options)
-        LOG.info("Cloud height super observations generated: %s", super_obs_filename)
+            super_obs_filename = do_cloudheight(result_file, time_of_analysis, mesan_area_id, config_options)
+            LOG.info("Cloud height super observations generated: %s", super_obs_filename)
 
     except Exception:
         LOG.exception("Failed in ctth_composite_worker...")
@@ -541,7 +542,12 @@ def mesan_live_runner(config_options):
 def do_cloud_type_composite(time_of_analysis, delta_t, area_id, config_options):
     """Make the cloud type composite."""
     ctcomp = CloudproductCompositer(time_of_analysis, delta_t, area_id, config_options, "CT")
-    ctcomp.get_catalogue()
+    try:
+        ctcomp.get_catalogue()
+    except NoGeoScenesError:
+        LOG.info("No Geo scenes for composite, so skip further processing.")
+        return
+
     ctcomp.blend_cloud_products()
     output_filepath = ctcomp.write()
     ctcomp.quicklook(output_filepath)
@@ -552,18 +558,23 @@ def do_cloud_type_composite(time_of_analysis, delta_t, area_id, config_options):
 def do_ctth_composite(time_of_analysis, delta_t, area_id, config_options):
     """Make the cloud top temperature height composite."""
     ctcomp = CloudproductCompositer(time_of_analysis, delta_t, area_id, config_options, "CTTH")
-    ctcomp.get_catalogue()
+    try:
+        ctcomp.get_catalogue()
+    except NoGeoScenesError:
+        LOG.info("No Geo scenes for composite, so skip further processing.")
+        return
+
+    LOG.debug("CTTH catalogue created. Now do the blending...")
     ctcomp.blend_cloud_products()
     output_filepath = ctcomp.write()
 
     ctth_quicklook_from_netcdf("CTTH_ALTI_group", output_filepath)
+    LOG.debug("CTTH quicklook done.")
     return output_filepath
 
 
 def do_cloudamount(filename, time_of_analysis, area_id, config_options):
     """Make the cloud amount super observations."""
-    from netcdf_io import cloudComposite
-
     npix = int(config_options.get("number_of_pixels", DEFAULT_SUPEROBS_WINDOW_SIZE_NPIX))
     ipar = str(config_options.get("cloud_amount_ipar"))
     if not ipar:
@@ -586,8 +597,6 @@ def do_cloudamount(filename, time_of_analysis, area_id, config_options):
 
 def do_cloudheight(filename, time_of_analysis, area_id, config_options):
     """Make the cloud height super observations."""
-    from netcdf_io import cloudComposite
-
     npix = int(config_options.get("number_of_pixels", DEFAULT_SUPEROBS_WINDOW_SIZE_NPIX))
 
     # Make Super observations:
