@@ -309,7 +309,7 @@ class CloudproductCompositer:
             LOG.debug("Time slot for scene: %s" % str(scene.timeslot))
             if abs(scene.timeslot - self.obstime) < tdiff:
                 tdiff = abs(scene.timeslot - self.obstime)
-                LOG.debug("Absolute time difference (|start time minus obs time|) = ", str(tdiff))
+                LOG.debug("Absolute time difference (|start time minus obs time|) = %s", str(tdiff))
                 found_idx = idx
 
         if found_idx >= 0:
