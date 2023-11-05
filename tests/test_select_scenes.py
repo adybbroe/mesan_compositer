@@ -93,7 +93,9 @@ class TestFindCtScenes:
         path = str(fake_empty_nwcsaf_pps_files[0].parent)
         self.config["pps_direct_readout_dir"] = path
         ctcomp = CloudproductCompositer(time_of_analysis, delta_time_window, self.area_id, self.config, "CT")
-        ctcomp.get_catalogue()
+
+        # ctcomp.get_catalogue()
+        ctcomp._get_pps_catalogue()
 
         assert len(ctcomp.msg_scenes) == 0
         assert len(ctcomp.pps_scenes) == 2
@@ -130,9 +132,14 @@ class TestFindCtScenes:
     def test_get_correct_list_of_nwcsaf_geo_ct_scenes_from_filelist(self, fake_empty_nwcsaf_geo_files,
                                                                     time_of_analysis, minutes, expected):
         """Test get the correct nwcsaf/Geo CT scenes given a list of fake files."""
+        from mesan_compositer.utils import NoGeoScenesError
+
         delta_time_window = timedelta(minutes=minutes)
         ctcomp = CloudproductCompositer(time_of_analysis, delta_time_window, self.area_id, self.config, "CT")
-        ctcomp.get_catalogue()
+        try:
+            ctcomp.get_catalogue()
+        except NoGeoScenesError:
+            pass
 
         assert len(ctcomp.msg_scenes) == len(expected)
 
@@ -153,7 +160,8 @@ class TestFindCtScenes:
 
         delta_time_window = timedelta(minutes=minutes)
         ctcomp = CloudproductCompositer(time_of_analysis, delta_time_window, self.area_id, self.config, "CT")
-        ctcomp.get_catalogue()
+        # ctcomp.get_catalogue()
+        ctcomp._get_pps_catalogue()
 
         assert len(ctcomp.pps_scenes) == len(expected)
 

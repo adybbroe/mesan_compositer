@@ -33,6 +33,7 @@ from satpy.tests.reader_tests.test_nwcsaf_nc import create_nwcsaf_geo_ct_file
 from mesan_compositer.composite_tools import GeoMetaData, PpsMetaData
 from mesan_compositer.config import get_config
 from mesan_compositer.make_ct_composite import CloudproductCompositer
+from mesan_compositer.utils import NoGeoScenesError
 
 
 @pytest.fixture()
@@ -189,11 +190,17 @@ class TestctCompositor:
 
         with patch.object(CloudproductCompositer, "get_pps_scenes") as get_pps_scenes:
             ctcomp = CloudproductCompositer(t_analysis, delta_t, areaid, CONFIG_OPTIONS, "CT")
-            ctcomp.get_catalogue()
-            get_pps_scenes.assert_called()
 
-            ctcomp.pps_scenes = self.ppsdr
-            ctcomp.msg_scenes = self.msg_scenes
+            with pytest.raises(NoGeoScenesError) as exec_info:
+                ctcomp.get_catalogue()
+
+            # assert exec_info.type == NoGeoScenesError
+            assert str(exec_info.value) == "No valid Geo Scene within time window!"
+
+            get_pps_scenes.assert_not_called()
+
+            # ctcomp.pps_scenes = self.ppsdr
+            # ctcomp.msg_scenes = self.msg_scenes
 
             # TODO: Here we should try test the generation of the composite
 
@@ -212,6 +219,7 @@ def test_setup_ct_compositer(fake_yamlconfig_file,
     config["pps_direct_readout_dir"] = str(nwcsaf_pps_ct_filename.parent)
 
     ctcomp = CloudproductCompositer(time_of_analysis, delta_time_window, area_id, config, "CT")
+
     ctcomp.get_catalogue()
 
     assert len(ctcomp.pps_scenes) == 1

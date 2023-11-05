@@ -23,6 +23,7 @@
 """Make cloud composite quicklooks."""
 
 import argparse
+import os
 
 import dask.array as da
 import numpy as np
@@ -35,7 +36,7 @@ from mesan_compositer import ctth_height, nwcsaf_cloudtype_2021
 CHUNK_SIZE = 4096
 
 
-def ctth_quicklook_from_netcdf(group_name, netcdf_filename):
+def ctth_quicklook_from_netcdf(group_name, netcdf_filename, destpath=None):
     """Make a Cloud Top Height quicklook image from the netCDF file."""
     nc_ = xr.open_dataset(netcdf_filename, decode_cf=True,
                           mask_and_scale=True,
@@ -62,6 +63,8 @@ def ctth_quicklook_from_netcdf(group_name, netcdf_filename):
     pcol = PaletteCompositor("mesan_cloud_top_height_composite")((xdata, pdata))
     ximg = XRImage(pcol)
     outfile = netcdf_filename.strip(".nc") + "_height.png"
+    if destpath:
+        outfile = os.path.join(destpath, os.path.basename(outfile))
     ximg.save(outfile)
 
     return outfile
@@ -122,4 +125,4 @@ if __name__ == "__main__":
 
     netcdfpath = get_arguments()
     # ctype_quicklook_from_netcdf("CT_group", netcdfpath)
-    ctth_quicklook_from_netcdf("CTTH_ALTI_group", netcdfpath)
+    ctth_quicklook_from_netcdf("CTTH_ALTI_group", netcdfpath, destpath="./")

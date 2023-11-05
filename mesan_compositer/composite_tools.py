@@ -184,7 +184,7 @@ class GeoMetaData:
         return self.timeslot >= other.timeslot
 
 
-def get_analysis_time(start_t, end_t):
+def get_analysis_time(start_t, end_t, minutes_resolution=60):
     """Get the analysis time within a time interval specified.
 
     From two times defining an interval, determine the closest hour (zero
@@ -198,10 +198,16 @@ def get_analysis_time(start_t, end_t):
         LOG.warning(
             "No end time, so assuming equal to start time + 5 minutes!")
     mean_time = (end_t - start_t) / 2 + start_t
-    mean_time = mean_time + timedelta(seconds=1800)
+    midnight = mean_time.replace(hour=0, minute=0, second=0, microsecond=0)
+    seconds_since_midnight = (mean_time - midnight).total_seconds()
+    minutes_since_midnight = int(seconds_since_midnight / 60 + 0.5)
 
-    return datetime(
-        mean_time.year, mean_time.month, mean_time.day, mean_time.hour, 0, 0)
+    n_units = int(minutes_since_midnight / minutes_resolution + 0.5)
+    res = minutes_since_midnight % minutes_resolution
+
+    retv_time = midnight + timedelta(minutes=n_units * minutes_resolution +
+                                     int(res/minutes_resolution))
+    return retv_time
 
 
 def get_ppslist(filelist, timewindow, satellites=None, variant=None):
@@ -339,6 +345,7 @@ def get_nwcsaf_files(basedir, file_ext):
 def get_weight_ctth(ctth_flag, lat, tdiff, is_msg):
     """Weights for given CTTH flag, time diff and latitude (only MSG)."""
     import numpy as np
+
     #
     #  limits; linear lat dependence for MSG
     latmin_msg = 52.0  # weight factor is 1 if lat < LATMIN_MSG
