@@ -88,7 +88,8 @@ class CloudProductsLoader:
         try:
             return get_satellite_zenith_angle(data_array)
         except KeyError:
-            return compute_satz_with_pyorbital(data_array)
+            with satpy.config.set(cache_sensor_angles=True):
+                return compute_satz_with_pyorbital(data_array)
 
 
 def get_tle_file(start_time, end_time):
