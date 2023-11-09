@@ -37,7 +37,8 @@ from tempfile import gettempdir
 from satpy.utils import debug_on
 from trollsift import Parser, globify
 
-from mesan_compositer.composite_tools import METEOSAT, METOPS, MSGSATS, GeoMetaData, get_ppslist
+from mesan_compositer.composite_tools import (METEOSAT, METOPS, MSGSATS,
+                                              GeoMetaData, get_ppslist)
 from mesan_compositer.config import get_config
 from mesan_compositer.ct_quicklooks import ctype_quicklook_from_netcdf
 from mesan_compositer.load_cloud_products import blend_cloud_products
@@ -290,18 +291,16 @@ class CloudproductCompositer:
     def _get_geo_catalogue(self):
         """Get the catalougue of NWCSAF/PPS input data files."""
         # Get all geostationary satellite scenes:
-        # prod_id = {"CT": "02", "CTTH": "03"}.get(self.product)
-        # msg_dir = self._options["msg_dir"] % {"number": prod_id}
         p__ = Parser(self._options["msg_dir"])
         msg_dir = p__.compose({"product": self.product})
-        # What about EuropeCanary and possible other areas!? FIXME!
 
         msg_list = self._get_all_geo_files(msg_dir)
         LOG.debug("MSG files in directory " + str(msg_dir) + " : " + str(msg_list))
         LOG.info("Get files inside time window: " + str(self.time_window[0]) + " - " + str(self.time_window[1]))
 
         self.msg_scenes = self.get_geo_scenes(msg_list)
-        # Return only the most relevant (closest in time to the obstime):
+        # Now find the scene closest in time and make list with that one first.
+        # FIXME! Here we should rather just sort the scenes by time relative to the nominal/obstime.
         found_idx = -1
         tdiff = timedelta(minutes=120)
         for idx in range(len(self.msg_scenes)):
@@ -313,7 +312,8 @@ class CloudproductCompositer:
                 found_idx = idx
 
         if found_idx >= 0:
-            self.msg_scenes = [self.msg_scenes[found_idx]]
+            best_scene = self.msg_scenes.pop(found_idx)
+            self.msg_scenes = [best_scene] + self.msg_scenes
             LOG.info("The scene closest in time to the analysis time: %s" % str(self.msg_scenes[0]))
         else:
             raise NoGeoScenesError("No valid Geo Scene within time window!")
@@ -340,8 +340,8 @@ class CloudproductCompositer:
 
     def write(self):
         """Write the composite to a netcdf file."""
-        tmpfname = tempfile.mktemp(suffix=os.path.basename(self.filename)+".nc",
-                                   dir=os.path.dirname(self.filename))
+        tmpfname = tempfile.mkstemp(suffix=os.path.basename(self.filename)+".nc",
+                                    dir=os.path.dirname(self.filename))
 
         self.blended_scene.save_dataset(self.group_name, filename=tmpfname)
         now = datetime.utcnow()

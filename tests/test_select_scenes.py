@@ -57,7 +57,7 @@ class TestFindCtScenes:
         assert "CRITICAL" in caplog.text
 
         assert len(ctcomp.pps_scenes) == 0
-        assert len(ctcomp.msg_scenes) == 1
+        assert len(ctcomp.msg_scenes) == 3
 
         result = str(ctcomp.msg_scenes[0]).split("\n")
         expected = ["filename={filepath}/S_NWC_CT_MSG4_MSG-N-VISIR_20230116T110000Z_PLAX.nc".format(filepath=path),
@@ -123,10 +123,17 @@ class TestFindCtScenes:
         assert result == expected
 
     @pytest.mark.parametrize(("time_of_analysis", "minutes", "expected"),
-                             [(datetime(2023, 1, 16, 11, 0), 35, ["2023-01-16 11:00:00"]),
+                             [(datetime(2023, 1, 16, 11, 0), 35, ["2023-01-16 11:00:00",
+                                                                  "2023-01-16 11:15:00",
+                                                                  "2023-01-16 11:30:00",
+                                                                  "2023-01-16 10:45:00",
+                                                                  "2023-01-16 10:30:00"]),
                               (datetime(2023, 1, 16, 11, 0), 10, ["2023-01-16 11:00:00"]),
                               (datetime(2023, 1, 15, 11, 0), 100, []),
-                              (datetime(2023, 1, 16, 11, 0), 25, ["2023-01-16 11:00:00"])
+                              (datetime(2023, 1, 16, 11, 0), 25, ["2023-01-16 11:00:00",
+                                                                  "2023-01-16 11:15:00",
+                                                                  "2023-01-16 10:45:00",
+                                                                  ])
                               ]
                              )
     def test_get_correct_list_of_nwcsaf_geo_ct_scenes_from_filelist(self, fake_empty_nwcsaf_geo_files,
