@@ -340,8 +340,8 @@ class CloudproductCompositer:
 
     def write(self):
         """Write the composite to a netcdf file."""
-        tmpfname = tempfile.mkstemp(suffix=os.path.basename(self.filename)+".nc",
-                                    dir=os.path.dirname(self.filename))
+        _, tmpfname = tempfile.mkstemp(suffix=os.path.basename(self.filename)+".nc",
+                                       dir=os.path.dirname(self.filename))
 
         self.blended_scene.save_dataset(self.group_name, filename=tmpfname)
         now = datetime.utcnow()
