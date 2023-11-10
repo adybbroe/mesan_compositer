@@ -33,6 +33,7 @@ import numpy as np
 import xarray as xr
 from pyorbital.orbital import Orbital
 from satpy import DataQuery, MultiScene, Scene
+from satpy import config as satpy_config
 from satpy.modifiers.angles import get_satellite_zenith_angle
 from satpy.multiscene import stack
 from satpy.utils import debug_on
@@ -88,7 +89,7 @@ class CloudProductsLoader:
         try:
             return get_satellite_zenith_angle(data_array)
         except KeyError:
-            with satpy.config.set(cache_sensor_angles=True):
+            with satpy_config.set(cache_sensor_angles=True):
                 return compute_satz_with_pyorbital(data_array)
 
 
