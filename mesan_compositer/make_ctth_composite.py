@@ -114,8 +114,7 @@ if __name__ == "__main__":
 
     OPTIONS = get_config(config_filename)
 
-    ctcomp = CloudproductCompositer(time_of_analysis, delta_time_window, area_id, OPTIONS,
-                                    "CTTH")
+    ctcomp = CloudproductCompositer(time_of_analysis, delta_time_window, area_id, OPTIONS, "CTTH")
     ctcomp.get_catalogue()
     ctcomp.blend_cloud_products()
     output_filepath = ctcomp.write()

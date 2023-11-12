@@ -124,5 +124,7 @@ if __name__ == "__main__":
     # FILEPATH = "./blended_stack_weighted_geo_n18_{area}.nc".format(area=areaid)
 
     netcdfpath = get_arguments()
+    group_name = 'CTTH_ALTI_group'
+    # group_name = 'ctth_alti'
     # ctype_quicklook_from_netcdf("CT_group", netcdfpath)
-    ctth_quicklook_from_netcdf("CTTH_ALTI_group", netcdfpath, destpath="./")
+    ctth_quicklook_from_netcdf(group_name, netcdfpath, destpath="./")

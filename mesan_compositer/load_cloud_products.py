@@ -187,8 +187,14 @@ def blend_cloud_products(product, areaid, *scenes, cache_dir=None):
         loader.prepare_satz_angles_on_area(product)
         loaded_scenes.append(loader.scene)
 
-    mscn = MultiScene(loaded_scenes)
     group_name = product.upper() + "_group"
+    if len(loaded_scenes) == 1:
+        local = loaded_scenes[0].resample(areaid, radius_of_influence=10000,
+                                          reduce_data=False, cache_dir=cache_dir,
+                                          mask_area=False)
+        return local, product
+
+    mscn = MultiScene(loaded_scenes)
     groups = {DataQuery(name=group_name): [product]}
     mscn.group(groups)
 
@@ -204,10 +210,8 @@ def blend_cloud_products(product, areaid, *scenes, cache_dir=None):
 
     from functools import partial
     stack_with_weights = partial(stack, weights=weights)
-    # stack_no_weights = partial(stack)
     LOG.debug("Before resampling...")
     blended = resampled.blend(blend_function=stack_with_weights)
-    # blended = resampled.blend(blend_function=stack_no_weights)
     try:
         blended['CTTH_ALTI_group'].attrs['_FillValue'] = 63535.
     except KeyError:
