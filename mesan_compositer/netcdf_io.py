@@ -57,7 +57,8 @@ class cloudComposite:
     def __init__(self, filename, cp_name, areaname=None):
         """Initialize the cloud product composite."""
         self.netcdf_filepath = filename
-        self.group_name = cp_name + "_group"
+        # self.group_name = cp_name + "_group"
+        self.group_name = cp_name
         self.area_name = areaname
         self.area = None
         self.lon = None

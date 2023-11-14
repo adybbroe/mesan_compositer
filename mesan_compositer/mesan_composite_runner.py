@@ -425,7 +425,7 @@ def mesan_live_runner(config_options):
     npix = int(config_options.get("number_of_pixels", DEFAULT_SUPEROBS_WINDOW_SIZE_NPIX))
     LOG.debug("Number of pixels = " + str(npix))
 
-    pool = Pool(processes=6, maxtasksperchild=1)
+    pool = Pool(processes=1, maxtasksperchild=1)
     manager = Manager()
     listener_q = manager.Queue()
     publisher_q = manager.Queue()
@@ -585,8 +585,12 @@ def do_cloudamount(filename, time_of_analysis, area_id, config_options):
     # Make Super observations:
     LOG.info("Make Cloud Type super observations")
 
-    ctype = cloudComposite(filename, "CT", areaname=area_id)
-    ctype.load()
+    try:
+        ctype = cloudComposite(filename, "CT_group", areaname=area_id)
+        ctype.load()
+    except KeyError:
+        ctype = cloudComposite(filename, "ct", areaname=area_id)
+        ctype.load()
 
     values = {"area": area_id, }
     bname = time_of_analysis.strftime(config_options["cloudamount_filename"]) % values
@@ -603,8 +607,12 @@ def do_cloudheight(filename, time_of_analysis, area_id, config_options):
 
     # Make Super observations:
     LOG.info("Make Cloud Top Height super observations")
-    ctth = cloudComposite(filename, "CTTH_ALTI", areaname=area_id)
-    ctth.load()
+    try:
+        ctth = cloudComposite(filename, "CTTH_ALTI_group", areaname=area_id)
+        ctth.load()
+    except KeyError:
+        ctth = cloudComposite(filename, "ctth_alti", areaname=area_id)
+        ctth.load()
 
     values = {"area": area_id, }
 
