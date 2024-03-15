@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2013, 2014, 2015, 2019, 2023 Adam Dybbroe
+# Copyright (c) 2013 - 2024 Adam Dybbroe
 
 # Author(s):
 
@@ -21,15 +21,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """Setup the project."""
 
-from setuptools import setup
+import os.path
 
-try:
-    # HACK: https://github.com/pypa/setuptools_scm/issues/190#issuecomment-351181286
-    # Stop setuptools_scm from including all repository files
-    import setuptools_scm.integration
-    setuptools_scm.integration.find_files = lambda _: []
-except ImportError:
-    pass
+from setuptools import find_packages, setup
 
 try:
     with open("./README.md", "r") as fd:
@@ -44,15 +38,17 @@ requires = ["docutils>=0.3",
             "trollsift",
             "posttroll",
             "netifaces",
-            "six",
-            "setuptools_scm"]
+            "six"]
 
-SHORT_DESC = ("Mesan satellite compositer")
+
+test_requires = ['mock', 'pytest']
+
+description = ("Mesan satellite compositer")
 
 NAME = "mesan-compositer"
 
 setup(name=NAME,
-      description=SHORT_DESC,
+      description=description,
       author="Adam Dybbroe, Tomas Landelius",
       author_email="adam.dybbroe@smhi.se, tomas.landelius@smhi.se",
       classifiers=["Development Status :: 4 - Beta",
@@ -63,11 +59,11 @@ setup(name=NAME,
                    "Programming Language :: Python",
                    "Topic :: Scientific/Engineering"],
       url="https://github.com/adybbroe/mesan_compositer",
-      # download_url="https://github.com/adybbroe/py....
       long_description=long_description,
       license="GPLv3",
-
-      packages=["mesan_compositer", "nwcsaf_formats"],
+      packages=find_packages(),
+      #packages=["mesan_compositer", "nwcsaf_formats"],
+      include_package_data=True,
       package_data={},
 
       # Project should use reStructuredText, so ensure that the docutils get
@@ -83,7 +79,8 @@ setup(name=NAME,
                "mesan_compositer/ctth_quicklooks.py",
                "mesan_compositer/mesan_composite_runner.py"],
       test_suite="tests.suite",
-      tests_requires=["mock"],
-      zip_safe=False,
-      use_scm_version=True
+      tests_requires=test_requires,
+      python_requires='>=3.10',
+      #use_scm_version=True,
+      zip_safe=False
       )
