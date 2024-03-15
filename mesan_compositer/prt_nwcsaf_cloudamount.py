@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014-2023 Adam.Dybbroe
+# Copyright (c) 2014-2024 Adam.Dybbroe
 
 # Author(s):
 
@@ -72,7 +72,8 @@ SDcc = 0.15   # All cloud types
 
 # ipar= 71; total cloud cover: cloud amount per type
 ntctypecl = np.array([
-    0.0,  # 00 Not processed
+    # 0.0,  # 00 Not processed
+    np.nan,  # 00 Not processed
     0.0,  # 01 Cloud free land
     0.0,  # 02 Cloud free sea
     0.0,  # 03 Snow/ice contaminated land
@@ -207,13 +208,10 @@ def derive_sobs(ct_comp, ipar, npix, resultfile):
     import shutil
     import tempfile
 
-    tmpfname = tempfile.mktemp(suffix=("_" + os.path.basename(resultfile)),
-                               dir=os.path.dirname(resultfile))
-
     # Get the lon,lat:
     lons, lats = ct_comp.lon, ct_comp.lat
     ctype = da.nan_to_num(ct_comp.data).astype("int32")
-    clamount = nctypecl["71"][ctype]
+    clamount = nctypecl[ipar][ctype]
 
     # non overlapping superobservations
     # min 8x8 pixels = ca 8x8 km = 2*dlen x 2*dlen pixels for a
@@ -229,15 +227,17 @@ def derive_sobs(ct_comp, ipar, npix, resultfile):
     so_lon = lons[int(dy/2)::dy, int(dx/2)::dx]
     so_lat = lats[int(dy/2)::dy, int(dx/2)::dx]
 
-    write_data(tmpfname, so_lon, so_lat, clamount)
+    with tempfile.NamedTemporaryFile(suffix=("_" + os.path.basename(filepath)),
+                                     dir=os.path.dirname(filepath)) as file_obj:
+        write_data(file_obj, so_lon, so_lat, clamount)
 
     now = datetime.utcnow()
     fname_with_timestamp = str(resultfile) + now.strftime("_%Y%m%d%H%M%S")
-    shutil.copy(tmpfname, fname_with_timestamp)
-    os.rename(tmpfname, resultfile)
+    shutil.copy(file_obj.name, fname_with_timestamp)
+    os.rename(file_obj.name, resultfile)
 
 
-def write_data(filepath, longitudes, latitudes, clamount):
+def write_data(fileobj, longitudes, latitudes, clamount):
     """Write the data to file name."""
     cortyp = 10
     SDcc = 0.15
@@ -262,21 +262,22 @@ def write_data(filepath, longitudes, latitudes, clamount):
                                  )
 
         df = clamount_ds.to_dataframe()
-        df.to_csv(filepath, columns=["five_nines", "latitude", "longitude",
-                                     "minus_999", "cortyp", "minus_sixti", "clamount", "SDcc"],
+        df.to_csv(fileobj, columns=["five_nines", "latitude", "longitude",
+                                    "minus_999", "cortyp", "minus_sixti", "clamount", "SDcc"],
                   sep=" ", index=False, header=False)
 
     else:
-        with open(filepath, "w") as fpt:
-            for y in range(shape[0]):
-                yidx = shape[0]-1-y
-                for x in range(shape[1]):
-                    xidx = x
-                    # print(latitudes[yidx, xidx], longitudes[yidx, xidx])
-                    result = "%8d %7.2f %7.2f %5d %2.2d %2.2d %8.2f %8.2f\n" % \
-                        (99999, latitudes[yidx, xidx], longitudes[yidx, xidx], -999, cortyp, -60,
-                         clamount.data[yidx, xidx], SDcc)
-                    fpt.write(result)
+        for y in range(shape[0]):
+            yidx = shape[0]-1-y
+            for x in range(shape[1]):
+                xidx = x
+                if np.isnan(clamount.data[yidx, xidx]):
+                    continue
+                # print(latitudes[yidx, xidx], longitudes[yidx, xidx])
+                result = "%8d %7.2f %7.2f %5d %2.2d %2.2d %8.2f %8.2f\n" % \
+                    (99999, latitudes[yidx, xidx], longitudes[yidx, xidx], -999, cortyp, -60,
+                     clamount.data[yidx, xidx], SDcc)
+                fileobj.write(result)
 
 
 if __name__ == "__main__":
@@ -317,7 +318,9 @@ if __name__ == "__main__":
     # Load the Cloud Type composite from file
     # ctype = load_ct_composite(filename, 'CT_group')
     from netcdf_io import cloudComposite
-    ctype = cloudComposite(filename, "CT", areaname=areaid)
+
+    # ctype = cloudComposite(filename, "CT", areaname=areaid)
+    ctype = cloudComposite(filename, "CT_group", areaname=areaid)
     ctype.load()
 
     IPAR = str(iparam)
