@@ -81,6 +81,6 @@ setup(name=NAME,
       test_suite="tests.suite",
       tests_requires=test_requires,
       python_requires='>=3.10',
-      #use_scm_version=True,
+      use_scm_version=True,
       zip_safe=False
       )
