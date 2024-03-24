@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2015-2023 Adam.Dybbroe
+# Copyright (c) 2015-2024 Adam.Dybbroe
 
 # Author(s):
 
@@ -101,17 +101,8 @@ def get_arguments():
     return args.logging_conf_file, args.config_file, obs_time, area_id, wsize
 
 
-def derive_sobs(ctth_comp, npix, resultfile):
+def derive_sobs(ctth_comp, npix, filepath):
     """Derive the super observations and print data to file."""
-    tmpfname = tempfile.mktemp(suffix=("_" + os.path.basename(resultfile)),
-                               dir=os.path.dirname(resultfile))
-
-    # Get the lon,lat:
-    lons, lats = ctth_comp.lon, ctth_comp.lat
-
-    ctth_height = da.nan_to_num(ctth_comp.data).astype("int32")
-    # ctth_height = ctth_comp.data.where(ctth_comp.data.isnull() | (ctth_comp.data < 63535), 0)#.astype('int32')
-
     # non overlapping super observations
     # min 8x8 pixels = ca 8x8 km = 2*dlen x 2*dlen pixels for a
     # superobservation
@@ -120,24 +111,27 @@ def derive_sobs(ctth_comp, npix, resultfile):
     dy = dx
     LOG.info("\tUsing %d x %d pixels in a superobservation", dx, dy)
 
-    # height = xr.DataArray(data=ctth_height.data, dims=["y", "x"])
-    height = xr.DataArray(data=ctth_height, dims=["y", "x"])
-    height = height.coarsen({"y": dy, "x": dx}, boundary="trim").mean()
+    # Get the lon,lat:
+    lons, lats = ctth_comp.lon, ctth_comp.lat
+    height = xr.DataArray(data=ctth_comp.data, dims=["y", "x"])
+    height = height.coarsen({"y": dy, "x": dx}, boundary="trim").mean(skipna=True)
 
     so_lon = lons[int(dy/2)::dy, int(dx/2)::dx]
     so_lat = lats[int(dy/2)::dy, int(dx/2)::dx]
 
-    write_data(tmpfname, so_lon, so_lat, height)
+    height = da.nan_to_num(height, nan=-1.0).astype("int32")
+    with  tempfile.NamedTemporaryFile(suffix=("_" + os.path.basename(filepath)),
+                                      dir=os.path.dirname(filepath),
+                                      mode='w', delete=False) as file_obj:
+        write_data(file_obj, so_lon, so_lat, height)
 
     now = datetime.utcnow()
-    fname_with_timestamp = str(resultfile) + now.strftime("_%Y%m%d%H%M%S")
-    shutil.copy(tmpfname, fname_with_timestamp)
-    os.rename(tmpfname, resultfile)
-
-    return
+    fname_with_timestamp = str(filepath) + now.strftime("_%Y%m%d%H%M%S")
+    shutil.copy(file_obj.name, fname_with_timestamp)
+    os.rename(file_obj.name, filepath)
 
 
-def write_data(filepath, longitudes, latitudes, clheight):
+def write_data(fileobj, longitudes, latitudes, clheight):
     """Write the cloud top height data to file name."""
     cortyp = 1
     sd_ = 999.9
@@ -165,19 +159,17 @@ def write_data(filepath, longitudes, latitudes, clheight):
     height = clheight.data
     # height = clheight.data.compute()
 
-    with open(filepath, "w") as fpt:
-        for y in range(shape[0]):
-            yidx = shape[0]-1-y
-            for x in range(shape[1]):
-                xidx = x
-                # if height[yidx, xidx] < 0:
-                #    continue
+    for y in range(shape[0]):
+        yidx = shape[0]-1-y
+        for x in range(shape[1]):
+            xidx = x
+            if height[yidx, xidx] < 0:
+                continue
 
-                result = "%8d %7.2f %7.2f %5d %d %d %8.2f %8.2f\n" % \
-                    (99999, latitudes[yidx, xidx], longitudes[yidx, xidx], -999, cortyp, -60,
-                     height[yidx, xidx], sd_)
-                fpt.write(result)
-
+            result = "%8d %7.2f %7.2f %5d %d %d %8.2f %8.2f\n" % \
+                (99999, latitudes[yidx, xidx], longitudes[yidx, xidx], -999, cortyp, -60,
+                 height[yidx, xidx], sd_)
+            fileobj.write(result)
 
 if __name__ == "__main__":
 
@@ -216,7 +208,10 @@ if __name__ == "__main__":
 
     # Load the Cloud Height composite from file
     from netcdf_io import cloudComposite
-    ctth = cloudComposite(filename, "CTTH_ALTI", areaname=areaid)
+
+    #ctth = cloudComposite(filename, "CTTH_ALTI", areaname=areaid)
+    ctth = cloudComposite(filename, "CTTH_ALTI_group", areaname=areaid)
+
     ctth.load()
 
     NPIX = int(window_size)

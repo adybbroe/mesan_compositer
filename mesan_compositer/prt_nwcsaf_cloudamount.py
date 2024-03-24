@@ -227,8 +227,9 @@ def derive_sobs(ct_comp, ipar, npix, resultfile):
     so_lon = lons[int(dy/2)::dy, int(dx/2)::dx]
     so_lat = lats[int(dy/2)::dy, int(dx/2)::dx]
 
-    with tempfile.NamedTemporaryFile(suffix=("_" + os.path.basename(filepath)),
-                                     dir=os.path.dirname(filepath)) as file_obj:
+    with tempfile.NamedTemporaryFile(suffix=("_" + os.path.basename(resultfile)),
+                                     dir=os.path.dirname(resultfile),
+                                     mode='w', delete=False) as file_obj:
         write_data(file_obj, so_lon, so_lat, clamount)
 
     now = datetime.utcnow()
