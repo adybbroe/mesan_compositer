@@ -127,6 +127,11 @@ def derive_sobs(ctth_comp, npix, filepath):
 
     now = datetime.utcnow()
     fname_with_timestamp = str(filepath) + now.strftime("_%Y%m%d%H%M%S")
+    # Change the file permissions to match current umask:
+    umask = os.umask(0o666)
+    os.umask(umask)
+    os.chmod(file_obj.name, 0o666 & ~umask)
+
     shutil.copy(file_obj.name, fname_with_timestamp)
     os.rename(file_obj.name, filepath)
 

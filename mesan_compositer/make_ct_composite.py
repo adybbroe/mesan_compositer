@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014-2023 Adam.Dybbroe
+# Copyright (c) 2014-2024 Adam.Dybbroe
 
 # Author(s):
 
@@ -346,6 +346,12 @@ class CloudproductCompositer:
         self.blended_scene.save_dataset(self.group_name, filename=tmpfname)
         now = datetime.utcnow()
         fname_with_timestamp = str(self.filename) + now.strftime("_%Y%m%d%H%M%S.nc")
+
+        # Change the file permissions to match current umask:
+        umask = os.umask(0o666)
+        os.umask(umask)
+        os.chmod(tmpfname, 0o666 & ~umask)
+
         shutil.copy(tmpfname, fname_with_timestamp)
         os.rename(tmpfname, self.filename + ".nc")
         return self.filename + ".nc"
