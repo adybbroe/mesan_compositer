@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2019 Adam.Dybbroe
+# Copyright (c) 2014-2023 Adam.Dybbroe
 
 # Author(s):
 
@@ -23,11 +23,6 @@
 """Package file for the mesan_compositer."""
 
 import logging
-import yaml
-try:
-    from yaml import UnsafeLoader
-except ImportError:
-    from yaml import Loader as UnsafeLoader
 
 from pkg_resources import get_distribution, DistributionNotFound
 try:
@@ -52,17 +47,30 @@ class LoadException(Exception):
     pass
 
 
-def get_config(configfile):
-    """Get the configuration from file."""
-    with open(configfile, 'r') as fp_:
-        config = yaml.load(fp_, Loader=UnsafeLoader)
+def nwcsaf_cloudtype_2021():
+    """Palette for NWCSAF cloud type product - v2021."""
+    legend = []
+    legend.append((0, 0, 0))  # Unprocessed: Grey
+    legend.append((0, 120,   0))
+    legend.append((0,   0,   0))  # Sea: Black
+    legend.append((250, 190, 250))  # Snow
+    legend.append((220, 160, 220))  # Sea-ice
 
-    options = {}
-    for item in config:
-        if not isinstance(config[item], dict):
-            options[item] = config[item]
+    legend.append((255, 100,   0))
+    legend.append((255, 180,   0))
+    legend.append((240, 240,   0))
 
-    return options
+    legend.append((215, 215, 150))
+    legend.append((230, 230, 230))
+
+    legend.append((200,  0, 200))
+    legend.append((0, 80, 215))
+    legend.append((0, 180, 230))
+    legend.append((0, 240, 240))
+    legend.append((90, 200, 160))
+    legend.append((200, 175, 250))
+
+    return convert_palette(legend)
 
 
 def nwcsaf_cloudtype():

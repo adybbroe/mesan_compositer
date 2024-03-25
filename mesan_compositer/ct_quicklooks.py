@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 - 2019 Adam.Dybbroe
+# Copyright (c) 2023 Adam.Dybbroe
 
 # Author(s):
 
-#   Adam.Dybbroe <adam.dybbroe@smhi.se>
+#   Adam.Dybbroe <a000680@c21856.ad.smhi.se>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,151 +20,111 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Make quick look images of the cloudtype composite."""
+"""Make cloud composite quicklooks."""
 
 import argparse
-from datetime import datetime
+import os
+
+import dask.array as da
 import numpy as np
 import xarray as xr
-from trollimage.xrimage import XRImage
-from mesan_compositer import get_config
 from satpy.composites import PaletteCompositor
-from mesan_compositer import nwcsaf_cloudtype
-from mesan_compositer.netcdf_io import ncCloudTypeComposite
-import sys
-import os
-from logging import handlers
-import logging
+from trollimage.xrimage import XRImage
 
-LOG = logging.getLogger(__name__)
+from mesan_compositer import ctth_height, nwcsaf_cloudtype_2021
 
-#: Default time format
-_DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
+CHUNK_SIZE = 4096
 
-#: Default log format
-_DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
+
+def ctth_quicklook_from_netcdf(group_name, netcdf_filename, destpath=None):
+    """Make a Cloud Top Height quicklook image from the netCDF file."""
+    nc_ = xr.open_dataset(netcdf_filename, decode_cf=True,
+                          mask_and_scale=True,
+                          chunks={"columns": CHUNK_SIZE,
+                                  "rows": CHUNK_SIZE})
+
+    ctth_alti = nc_[group_name][:]
+    ctth_alti = ctth_alti.where(ctth_alti < 63535)
+
+    ctth_data = ctth_alti.data
+    ctth_data = ctth_data.clip(min=0) / 500 + 1
+    ctth_data = ctth_data.astype("int32")
+
+    palette = ctth_height()
+
+    attrs = {"_FillValue": np.nan, "valid_range": (1, 100)}
+    palette_attrs = {"palette_meanings": list(range(100))}
+
+    pdata = xr.DataArray(palette, attrs=palette_attrs)
+
+    masked_data = np.ma.masked_outside(ctth_data, 1, 100)
+    xdata = xr.DataArray(da.from_array(masked_data), dims=["y", "x"], attrs=attrs)
+
+    pcol = PaletteCompositor("mesan_cloud_top_height_composite")((xdata, pdata))
+    ximg = XRImage(pcol)
+    outfile = netcdf_filename.strip(".nc") + "_height.png"
+    if destpath:
+        outfile = os.path.join(destpath, os.path.basename(outfile))
+    ximg.save(outfile)
+
+    return outfile
+
+
+def ctype_quicklook_from_netcdf(group_name, netcdf_filename):
+    """Make a CLoud Type quicklook image from the netCDF file."""
+    nc_ = xr.open_dataset(netcdf_filename, decode_cf=True,
+                          mask_and_scale=True,
+                          chunks={"columns": CHUNK_SIZE,
+                                  "rows": CHUNK_SIZE})
+
+    # cloudtype = nc_[group_name][0][:]
+    cloudtype = nc_[group_name][:]
+
+    palette = nwcsaf_cloudtype_2021()
+
+    # Cloud type field:
+    attrs = {"_FillValue": np.nan, "valid_range": (0, 15)}
+    palette_attrs = {"palette_meanings": list(range(16))}
+
+    pdata = xr.DataArray(palette, attrs=palette_attrs)
+
+    masked_data = np.ma.masked_outside(cloudtype.data, 0, 15)
+    xdata = xr.DataArray(da.from_array(masked_data), dims=["y", "x"], attrs=attrs)
+
+    pcol = PaletteCompositor("mesan_cloudtype_composite")((xdata, pdata))
+    ximg = XRImage(pcol)
+    outfile = netcdf_filename.strip(".nc") + "_cloudtype.png"
+    ximg.save(outfile)
+
+    return outfile
 
 
 def get_arguments():
-    """
-    Get command line arguments.
-
-    args.logging_conf_file, args.config_file, obs_time, area_id, wsize
-
-    Return
-      File path of the logging.ini file
-      File path of the application configuration file
-      Observation/Analysis time
-      Area id
-      Window size
-
-    """
+    """Get command line arguments."""
     parser = argparse.ArgumentParser()
-    parser.add_argument('--datetime', '-d', help='Date and time of observation - yyyymmddhh',
-                        required=True)
-    parser.add_argument('--area_id', '-a', help='Area id',
-                        required=True)
-    parser.add_argument('-c', '--config_file',
+    parser.add_argument("-f", "--netcdf_filepath",
                         type=str,
-                        dest='config_file',
+                        dest="netcdf_filepath",
                         required=True,
-                        help="The file containing configuration parameters e.g. mesan_sat_config.yaml")
-    parser.add_argument("-l", "--logging",
-                        help="The path to the log-configuration file (e.g. './logging.ini')",
-                        dest="logging_conf_file",
-                        type=str,
-                        required=False)
-    parser.add_argument("-v", "--verbose",
-                        help="print debug messages too",
-                        action="store_true")
+                        help="The netcdf file path of the cloud type composite.")
 
     args = parser.parse_args()
 
-    tanalysis = datetime.strptime(args.datetime, '%Y%m%d%H')
-    area_id = args.area_id
-    if 'template' in args.config_file:
-        print("Template file given as master config, aborting!")
-        sys.exit()
-
-    return args.logging_conf_file, args.config_file, tanalysis, area_id
-
-
-def make_quicklooks(netcdf_filename, cloudtype, ids, weights):
-    """Make Cloudtype composite quicklook imagery.
-
-    A cloudtype composite image is created along side images of the id's (MSG
-    or PPS) and pixel weights.
-
-    """
-    palette = nwcsaf_cloudtype()
-
-    # Cloud type field:
-    attrs = {'_FillValue': np.nan, 'valid_range': (0, 20)}
-    palette_attrs = {'palette_meanings': list(range(21))}
-
-    pdata = xr.DataArray(palette, attrs=palette_attrs)
-
-    # xdata = xr.DataArray(cloudtype.data, dims=['y', 'x'], attrs=attrs)
-    masked_data = np.ma.masked_outside(cloudtype.data, 0, 20)
-    xdata = xr.DataArray(masked_data, dims=['y', 'x'], attrs=attrs)
-    pcol = PaletteCompositor('mesan_cloudtype_composite')((xdata, pdata))
-    ximg = XRImage(pcol)
-    ximg.save(netcdf_filename.strip('.nc') + '_cloudtype.png')
-
-    # Id field:
-    pdata = xr.DataArray(palette, attrs=palette_attrs)
-    data = (ids.data * 13).astype(np.dtype('uint8'))
-    xdata = xr.DataArray(data, dims=['y', 'x'], attrs=attrs)
-    pcol = PaletteCompositor('mesan_cloudtype_composite')((xdata, pdata))
-    ximg = XRImage(pcol)
-    ximg.save(netcdf_filename.strip('.nc') + '_id.png')
-
-    # Weight field:
-    pdata = xr.DataArray(palette, attrs=palette_attrs)
-    data = (weights.data * 20).astype(np.dtype('uint8'))
-    xdata = xr.DataArray(data, dims=['y', 'x'], attrs=attrs)
-    pcol = PaletteCompositor('mesan_cloudtype_composite')((xdata, pdata))
-    ximg = XRImage(pcol)
-    ximg.save(netcdf_filename.strip('.nc') + '_weight.png')
-
-    return
+    return args.netcdf_filepath
 
 
 if __name__ == "__main__":
 
-    (logfile, config_filename, time_of_analysis, areaid) = get_arguments()
+    # areaid = "euro4"
+    # areaid = 'mesanEx'
+    # FILEPATH = "./blended_stack_weighted_geo_noaa-19_metop-c_{area}.nc".format(area=areaid)
+    # FILEPATH = "./blended_stack_weighted_geo_noaa-19_{area}.nc".format(area=areaid)
+    # FILEPATH = "./blended_stack_weighted_geo_polar_euro4.nc"
+    # FILEPATH = "/home/a000680/data/mesan/output/mesan_composite_euro4_20230201_1700_ct_20231005181316.nc"
+    # FILEPATH = "./blended_stack_weighted_geo_n18_{area}.nc".format(area=areaid)
 
-    if logfile:
-        logging.config.fileConfig(logfile)
-
-    handler = logging.StreamHandler(sys.stderr)
-    formatter = logging.Formatter(fmt=_DEFAULT_LOG_FORMAT,
-                                  datefmt=_DEFAULT_TIME_FORMAT)
-    handler.setFormatter(formatter)
-    handler.setLevel(logging.DEBUG)
-
-    logging.getLogger('').addHandler(handler)
-    logging.getLogger('').setLevel(logging.DEBUG)
-    logging.getLogger('satpy').setLevel(logging.INFO)
-
-    LOG = logging.getLogger('ct_quicklooks')
-
-    log_handlers = logging.getLogger('').handlers
-    for log_handle in log_handlers:
-        if type(log_handle) is handlers.SMTPHandler:
-            LOG.debug("Mail notifications to: %s", str(log_handle.toaddrs))
-
-    OPTIONS = get_config(config_filename)
-
-    values = {"area": areaid, }
-    bname = time_of_analysis.strftime(OPTIONS['ct_composite_filename']) % values
-    path = OPTIONS['composite_output_dir']
-    FILENAME = os.path.join(path, bname) + '.nc'
-    if not os.path.exists(FILENAME):
-        LOG.error("File " + str(FILENAME) + " does not exist!")
-        sys.exit(-1)
-
-    comp = ncCloudTypeComposite()
-    comp.load(FILENAME)
-
-    make_quicklooks(FILENAME, comp.cloudtype, comp.id, comp.weight)
+    netcdfpath = get_arguments()
+    group_name = 'CTTH_ALTI_group'
+    # group_name = 'ctth_alti'
+    # ctype_quicklook_from_netcdf("CT_group", netcdfpath)
+    ctth_quicklook_from_netcdf(group_name, netcdfpath, destpath="./")

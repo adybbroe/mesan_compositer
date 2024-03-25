@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2013, 2014, 2015, 2019 Adam Dybbroe
+# Copyright (c) 2013 - 2024 Adam Dybbroe
 
 # Author(s):
 
@@ -21,69 +21,66 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """Setup the project."""
 
-from setuptools import setup
+import os.path
+
+from setuptools import find_packages, setup
 
 try:
-    # HACK: https://github.com/pypa/setuptools_scm/issues/190#issuecomment-351181286
-    # Stop setuptools_scm from including all repository files
-    import setuptools_scm.integration
-    setuptools_scm.integration.find_files = lambda _: []
-except ImportError:
-    pass
-
-try:
-    with open('./README.md', 'r') as fd:
+    with open("./README.md", "r") as fd:
         long_description = fd.read()
 except IOError:
-    long_description = ''
+    long_description = ""
 
-requires = ['docutils>=0.3',
-            'numpy>=1.5.1',
-            'satpy>=0.18.0',
-            'pyresample',
-            'trollsift',
-            'posttroll',
-            'netifaces',
-            'six',
-            'setuptools_scm']
+requires = ["docutils>=0.3",
+            "numpy>=1.5.1",
+            "satpy>=0.42",
+            "pyresample",
+            "trollsift",
+            "posttroll",
+            "netifaces",
+            "six"]
 
-SHORT_DESC = ("Mesan satellite compositer")
 
-NAME = 'mesan-compositer'
+test_requires = ['mock', 'pytest']
+
+description = ("Mesan satellite compositer")
+
+NAME = "mesan-compositer"
 
 setup(name=NAME,
-      description=SHORT_DESC,
-      author='Adam Dybbroe, Tomas Landelius',
-      author_email='adam.dybbroe@smhi.se, tomas.landelius@smhi.se',
-      classifiers=['Development Status :: 4 - Beta',
-                   'Intended Audience :: Science/Research',
-                   'License :: OSI Approved :: GNU General Public License v3 ' +
-                   'or later (GPLv3+)',
-                   'Operating System :: OS Independent',
-                   'Programming Language :: Python',
-                   'Topic :: Scientific/Engineering'],
-      url='https://github.com/adybbroe/mesan_compositer',
-      # download_url="https://github.com/adybbroe/py....
+      description=description,
+      author="Adam Dybbroe, Tomas Landelius",
+      author_email="adam.dybbroe@smhi.se, tomas.landelius@smhi.se",
+      classifiers=["Development Status :: 4 - Beta",
+                   "Intended Audience :: Science/Research",
+                   "License :: OSI Approved :: GNU General Public License v3 " +
+                   "or later (GPLv3+)",
+                   "Operating System :: OS Independent",
+                   "Programming Language :: Python",
+                   "Topic :: Scientific/Engineering"],
+      url="https://github.com/adybbroe/mesan_compositer",
       long_description=long_description,
-      license='GPLv3',
-
-      packages=['mesan_compositer', 'nwcsaf_formats'],
+      license="GPLv3",
+      packages=find_packages(),
+      #packages=["mesan_compositer", "nwcsaf_formats"],
+      include_package_data=True,
       package_data={},
 
       # Project should use reStructuredText, so ensure that the docutils get
       # installed or upgraded on the target machine
       install_requires=requires,
 
-      extras_require={'netcdf4-python': ['netCDF4']},
-      scripts=['mesan_compositer/make_ct_composite.py',
-               'mesan_compositer/make_ctth_composite.py',
-               'mesan_compositer/prt_nwcsaf_cloudamount.py',
-               'mesan_compositer/prt_nwcsaf_cloudheight.py',
-               'mesan_compositer/ct_quicklooks.py',
-               'mesan_compositer/ctth_quicklooks.py',
-               'mesan_compositer/mesan_composite_runner.py'],
-      test_suite='tests.suite',
-      tests_requires=["mock"],
-      zip_safe=False,
-      use_scm_version=True
+      extras_require={"netcdf4-python": ["netCDF4"]},
+      scripts=["mesan_compositer/make_ct_composite.py",
+               "mesan_compositer/make_ctth_composite.py",
+               "mesan_compositer/prt_nwcsaf_cloudamount.py",
+               "mesan_compositer/prt_nwcsaf_cloudheight.py",
+               "mesan_compositer/ct_quicklooks.py",
+               "mesan_compositer/ctth_quicklooks.py",
+               "mesan_compositer/mesan_composite_runner.py"],
+      test_suite="tests.suite",
+      tests_requires=test_requires,
+      python_requires='>=3.10',
+      use_scm_version=True,
+      zip_safe=False
       )

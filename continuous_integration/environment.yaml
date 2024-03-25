@@ -25,6 +25,8 @@ dependencies:
   - pillow
   - pyresample
   - netcdf4
+  - h5netcdf
+  - h5py
   - pytest
   - pytest-cov
   - pip
