@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 - 2019 Adam.Dybbroe
+# Copyright (c) 2014 - 2019, 2021 Adam.Dybbroe
 
 # Author(s):
 
@@ -28,6 +28,8 @@ import numpy as np
 from mesan_compositer.utils import proj2cf
 import xarray as xr
 from datetime import datetime
+
+CHUNK_SIZE = 4096
 
 LOG = logging.getLogger(__name__)
 
@@ -80,7 +82,7 @@ class ncCloudTypeComposite(object):
     def __init__(self):
 
         self.info = {}
-        #self.info["Conventions"] = "CF-1.6"
+        # self.info["Conventions"] = "CF-1.6"
         self.info["Conventions"] = "Undefined"
 
         self.time = InfoObject()
@@ -229,6 +231,27 @@ class ncCloudTypeComposite(object):
         return
 
     def load(self, filename):
+        """Read the cloudtype composite from file using xarrays open_dataset."""
+
+        nc_ = xr.open_dataset(filename, decode_cf=True,
+                              mask_and_scale=True,
+                              chunks={'columns': CHUNK_SIZE,
+                                      'rows': CHUNK_SIZE})
+
+        # self.cloudtype.data = nc_.cloudtype.data
+        # self.cloudtype.info = nc_.cloudtype.attrs
+
+        for var_name in nc_.data_vars.keys():
+            if hasattr(self, str(var_name)):
+
+                item = getattr(self, str(var_name))
+                var = getattr(nc_, str(var_name))
+                setattr(item, 'data', getattr(var, 'data'))
+                setattr(item, 'info', getattr(var, 'attrs'))
+
+        self.area_def = xr_create_area_def_from_file(nc_)
+
+    def _old_load(self, filename):
         """Read the cloudtype composite from file"""
 
         import numpy as np
@@ -260,59 +283,123 @@ class ncCloudTypeComposite(object):
                     info[str(attr)] = getattr(var, str(attr))
                     setattr(item, 'info', info)
 
-            area = None
-            try:
-                area_var_name = getattr(var, "grid_mapping")
-                area_var = rootgrp.variables[area_var_name]
-                proj4_dict = {}
-                for attr, projattr in MAPPING_ATTRIBUTES.items():
-                    try:
-                        the_attr = getattr(area_var, attr)
-                        if projattr == "proj":
-                            proj4_dict[projattr] = PROJNAME[the_attr]
-                        elif(isinstance(projattr, (list, tuple))):
-                            try:
-                                for i, subattr in enumerate(the_attr):
-                                    proj4_dict[projattr[i]] = subattr
-                            except TypeError:
-                                proj4_dict[projattr[0]] = the_attr
-                        else:
-                            proj4_dict[projattr] = the_attr
-                    except AttributeError:
-                        pass
-                y_name, x_name = dims[:cnt] + dims[cnt:]
-                x__ = rootgrp.variables[x_name][:]
-                y__ = rootgrp.variables[y_name][:]
-
-                if proj4_dict["proj"] == "ob_tran":
-                    proj4_dict["o_proj"] = 'eqc'  # FIXME!
-                elif proj4_dict["proj"] == "geos":
-                    x__ *= proj4_dict["h"]
-                    y__ *= proj4_dict["h"]
-
-                x_pixel_size = abs((np.diff(x__)).mean())
-                y_pixel_size = abs((np.diff(y__)).mean())
-
-                llx = x__[0] - x_pixel_size / 2.0
-                lly = y__[-1] - y_pixel_size / 2.0
-                urx = x__[-1] + x_pixel_size / 2.0
-                ury = y__[0] + y_pixel_size / 2.0
-
-                area_extent = (llx, lly, urx, ury)
+            if not self.area_def:
                 try:
-                    # create the pyresample areadef
-                    from pyresample.geometry import AreaDefinition
-                    area = AreaDefinition("myareaid", "myareaname",
-                                          "myprojid", proj4_dict,
-                                          len(x__), len(y__),
-                                          area_extent)
-                    self.area_def = area
-                except ImportError:
-                    LOG.error("Pyresample not found, "
-                              "cannot load area descrition")
-                LOG.info("Grid mapping found and used")
-            except AttributeError:
-                LOG.info("No grid mapping found")
+                    self.area_def = create_area_def_from_file(rootgrp, var, cnt)
+                except AttributeError:
+                    LOG.info("No grid mapping found")
+
+
+def xr_create_area_def_from_file(nc_obj):
+    """Create area definition from file using xarray open_dataset object."""
+
+    area_var = nc_obj.area
+    proj4_dict = {}
+    for attr, projattr in MAPPING_ATTRIBUTES.items():
+        print(attr, projattr)
+        try:
+            the_attr = getattr(area_var, attr)
+            if projattr == "proj":
+                proj4_dict[projattr] = PROJNAME[the_attr]
+            elif(isinstance(projattr, (list, tuple))):
+                try:
+                    for i, subattr in enumerate(the_attr):
+                        proj4_dict[projattr[i]] = subattr
+                except TypeError:
+                    proj4_dict[projattr[0]] = the_attr
+            else:
+                proj4_dict[projattr] = the_attr
+        except AttributeError:
+            pass
+
+    x__ = nc_obj.coords['x1000 m'].data
+    y__ = nc_obj.coords['y1000 m'].data
+
+    if proj4_dict["proj"] == "ob_tran":
+        proj4_dict["o_proj"] = 'eqc'  # FIXME!
+    elif proj4_dict["proj"] == "geos":
+        x__ *= proj4_dict["h"]
+        y__ *= proj4_dict["h"]
+
+    x_pixel_size = abs((np.diff(x__)).mean())
+    y_pixel_size = abs((np.diff(y__)).mean())
+
+    llx = x__[0] - x_pixel_size / 2.0
+    lly = y__[-1] - y_pixel_size / 2.0
+    urx = x__[-1] + x_pixel_size / 2.0
+    ury = y__[0] + y_pixel_size / 2.0
+
+    area_extent = (llx, lly, urx, ury)
+    try:
+        # create the pyresample areadef
+        from pyresample.geometry import AreaDefinition
+        area_def = AreaDefinition("myareaid", "myareaname",
+                                  "myprojid", proj4_dict,
+                                  len(x__), len(y__),
+                                  area_extent)
+    except ImportError:
+        LOG.error("Pyresample not found, cannot load area descrition")
+    LOG.info("Grid mapping found and used")
+
+    return area_def
+
+
+def create_area_def_from_file(rootgrp, var, cnt):
+    """Create area definition from file."""
+
+    area_def = None
+    dims = var.dimensions
+    area_var_name = getattr(var, "grid_mapping")
+    area_var = rootgrp.variables[area_var_name]
+    proj4_dict = {}
+    for attr, projattr in MAPPING_ATTRIBUTES.items():
+        try:
+            the_attr = getattr(area_var, attr)
+            if projattr == "proj":
+                proj4_dict[projattr] = PROJNAME[the_attr]
+            elif(isinstance(projattr, (list, tuple))):
+                try:
+                    for i, subattr in enumerate(the_attr):
+                        proj4_dict[projattr[i]] = subattr
+                except TypeError:
+                    proj4_dict[projattr[0]] = the_attr
+            else:
+                proj4_dict[projattr] = the_attr
+        except AttributeError:
+            pass
+
+    y_name, x_name = dims[:cnt] + dims[cnt:]
+    x__ = rootgrp.variables[x_name][:]
+    y__ = rootgrp.variables[y_name][:]
+
+    if proj4_dict["proj"] == "ob_tran":
+        proj4_dict["o_proj"] = 'eqc'  # FIXME!
+    elif proj4_dict["proj"] == "geos":
+        x__ *= proj4_dict["h"]
+        y__ *= proj4_dict["h"]
+
+    x_pixel_size = abs((np.diff(x__)).mean())
+    y_pixel_size = abs((np.diff(y__)).mean())
+
+    llx = x__[0] - x_pixel_size / 2.0
+    lly = y__[-1] - y_pixel_size / 2.0
+    urx = x__[-1] + x_pixel_size / 2.0
+    ury = y__[0] + y_pixel_size / 2.0
+
+    area_extent = (llx, lly, urx, ury)
+    try:
+        # create the pyresample areadef
+        from pyresample.geometry import AreaDefinition
+        area_def = AreaDefinition("myareaid", "myareaname",
+                                  "myprojid", proj4_dict,
+                                  len(x__), len(y__),
+                                  area_extent)
+
+    except ImportError:
+        LOG.error("Pyresample not found, cannot load area descrition")
+    LOG.info("Grid mapping found and used")
+
+    return area_def
 
 
 class ncCTTHComposite(ncCloudTypeComposite):
@@ -321,7 +408,7 @@ class ncCTTHComposite(ncCloudTypeComposite):
 
     def __init__(self):
         self.info = {}
-        #self.info["Conventions"] = "CF-1.6"
+        # self.info["Conventions"] = "CF-1.6"
         self.info["Conventions"] = "Undefined"
 
         self.time = InfoObject()

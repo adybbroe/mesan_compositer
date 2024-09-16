@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2013, 2014, 2015, 2019 Adam Dybbroe
+# Copyright (c) 2013, 2014, 2015, 2019, 2022 Adam Dybbroe
 
 # Author(s):
 
@@ -84,6 +84,7 @@ setup(name=NAME,
                'mesan_compositer/mesan_composite_runner.py'],
       test_suite='tests.suite',
       tests_requires=["mock"],
+      python_requires='>=3.7',
       zip_safe=False,
       use_scm_version=True
       )

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 - 2019 Adam.Dybbroe
+# Copyright (c) 2014 - 2019, 2021 Adam.Dybbroe
 
 # Author(s):
 
@@ -26,6 +26,7 @@ import argparse
 from datetime import datetime
 import numpy as np
 import xarray as xr
+import dask.array as da
 from trollimage.xrimage import XRImage
 from mesan_compositer import get_config
 from satpy.composites import PaletteCompositor
@@ -36,6 +37,7 @@ import os
 from logging import handlers
 import logging
 
+CHUNK_SIZE = 4096
 LOG = logging.getLogger(__name__)
 
 #: Default time format
@@ -104,8 +106,7 @@ def make_quicklooks(netcdf_filename, cloudtype, ids, weights):
 
     pdata = xr.DataArray(palette, attrs=palette_attrs)
 
-    # xdata = xr.DataArray(cloudtype.data, dims=['y', 'x'], attrs=attrs)
-    masked_data = np.ma.masked_outside(cloudtype.data, 0, 20)
+    masked_data = da.ma.masked_outside(cloudtype.data, 0, 20)
     xdata = xr.DataArray(masked_data, dims=['y', 'x'], attrs=attrs)
     pcol = PaletteCompositor('mesan_cloudtype_composite')((xdata, pdata))
     ximg = XRImage(pcol)
@@ -113,7 +114,10 @@ def make_quicklooks(netcdf_filename, cloudtype, ids, weights):
 
     # Id field:
     pdata = xr.DataArray(palette, attrs=palette_attrs)
-    data = (ids.data * 13).astype(np.dtype('uint8'))
+    if isinstance(ids.data, np.ndarray):
+        data = da.from_array((ids.data * 13).astype(np.dtype('uint8')), chunks=(CHUNK_SIZE, CHUNK_SIZE))
+    else:
+        data = (ids.data * 13).astype(np.dtype('uint8'))
     xdata = xr.DataArray(data, dims=['y', 'x'], attrs=attrs)
     pcol = PaletteCompositor('mesan_cloudtype_composite')((xdata, pdata))
     ximg = XRImage(pcol)
@@ -121,7 +125,10 @@ def make_quicklooks(netcdf_filename, cloudtype, ids, weights):
 
     # Weight field:
     pdata = xr.DataArray(palette, attrs=palette_attrs)
-    data = (weights.data * 20).astype(np.dtype('uint8'))
+    if isinstance(ids.data, np.ndarray):
+        data = da.from_array((weights.data * 20).astype(np.dtype('uint8')), chunks=(CHUNK_SIZE, CHUNK_SIZE))
+    else:
+        data = (weights.data * 20).astype(np.dtype('uint8'))
     xdata = xr.DataArray(data, dims=['y', 'x'], attrs=attrs)
     pcol = PaletteCompositor('mesan_cloudtype_composite')((xdata, pdata))
     ximg = XRImage(pcol)
