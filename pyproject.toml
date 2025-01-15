@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
@@ -23,7 +23,7 @@ dependencies = [
     "satpy>=0.42",
     "pyresample",
     "pyorbital",
-    "python-pillow",
+    "pillow",
     "trollsift",
     "posttroll",
     "netifaces",
@@ -49,9 +49,10 @@ include = ["README.md", "LICENSE"]
 include = ["README.md", "LICENSE"]
 
 [tool.hatch.version]
-# If you'd like to use dynamic versioning:
-source = "scm"
-version_file = "mesan_compositer/__init__.py"
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "mesan_compositer/version.py"
 
 [tool.hatch.scripts]
 make_ct_composite = "mesan_compositer.make_ct_composite:main"

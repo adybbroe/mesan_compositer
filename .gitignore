@@ -52,3 +52,7 @@ docs/_build/
 
 # PyBuilder
 target/
+
+# Version
+# this should be generated automatically when installed
+mesan_compositer/version.py
