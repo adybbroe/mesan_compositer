@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014-2023 Adam.Dybbroe
+# Copyright (c) 2014-2025 Adam.Dybbroe
 
 # Author(s):
 
@@ -24,7 +24,8 @@
 
 import logging
 
-from pkg_resources import get_distribution, DistributionNotFound
+from pkg_resources import DistributionNotFound, get_distribution
+
 try:
     __version__ = get_distribution(__name__).version
 except DistributionNotFound:
@@ -49,6 +50,22 @@ class LoadException(Exception):
 
 def nwcsaf_cloudtype_2021():
     """Palette for NWCSAF cloud type product - v2021."""
+    # 255 : Unprocessed
+    # 1   : Cloud free land (0%)
+    # 2   : Cloud free sea (0%)
+    # 3   : Snow on cloudfree land (0%)
+    # 4   : Snow/Ice on cloudfree Sea (0%)
+    # 5   : Very low opaque clouds (100%)
+    # 6   : Low opaque clouds (100%)
+    # 7   : Medium level opaque clouds (100%)
+    # 8   : High opaque clouds (100%)
+    # 9   : Very high opaque clouds (100%)
+    # 10  : Fractional clouds (50%)
+    # 11  : Very thin cirrus (50%)
+    # 12  : Thin cirrus (75%)
+    # 13  : Thick cirrus (100%)
+    # 14  : Cirrus above low clouds (100%)
+    # 15  : Thin cirrus above Snow/Ice (50%)
     legend = []
     legend.append((0, 0, 0))  # Unprocessed: Grey
     legend.append((0, 120,   0))

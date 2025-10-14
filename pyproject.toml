@@ -1,17 +1,71 @@
-[project]
-name = "mesan_compositer"
-dynamic = ["version"]
-dependencies = ["satpy"]
-
 [build-system]
-requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2", 'setuptools_scm_git_archive']
-build-backend = "setuptools.build_meta"
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
 
-[tool.setuptools_scm]
-# write_to = "mesan_compositer/version.py"
+[project]
+name = "mesan-compositer"
+dynamic = ["version"]
+description = "Mesan satellite compositer"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "GPLv3"}
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Topic :: Scientific/Engineering"
+]
+dependencies = [
+    "docutils>=0.3",
+    "numpy>=1.5.1",
+    "satpy>=0.42",
+    "pyresample",
+    "pyorbital",
+    "pillow",
+    "trollsift",
+    "posttroll",
+    "netifaces",
+    "six"
+]
 
-[project.scripts]
-pytroll-runner = "mesan_compositer.load_cloud_products:main"
+[project.optional-dependencies]
+test = ["mock", "pytest"]
+netcdf4-python = ["netCDF4"]
+
+
+[project.urls]
+Homepage = "https://github.com/adybbroe/mesan_compositer"
+
+[tool.hatch.metadata]
+# Include all files in the package directory.
+allow-direct-references = true
+
+[tool.hatch.build.targets.sdist]
+include = ["README.md", "LICENSE"]
+
+[tool.hatch.build.targets.wheel]
+include = ["README.md", "LICENSE"]
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "mesan_compositer/version.py"
+
+[tool.hatch.scripts]
+make_ct_composite = "mesan_compositer.make_ct_composite:main"
+make_ctth_composite = "mesan_compositer.make_ctth_composite:main"
+prt_nwcsaf_cloudamount = "mesan_compositer.prt_nwcsaf_cloudamount:main"
+prt_nwcsaf_cloudheight = "mesan_compositer.prt_nwcsaf_cloudheight:main"
+ct_quicklooks = "mesan_compositer.ct_quicklooks:main"
+ctth_quicklooks = "mesan_compositer.ctth_quicklooks:main"
+mesan_composite_runner = "mesan_compositer.mesan_composite_runner:main"
+load_cloud_products = "mesan_compositer.load_cloud_products:main"
+
+#[project.scripts]
+#pytroll-runner = "mesan_compositer.load_cloud_products:main"
 
 [tool.ruff]
 select = ["E", "W", "F", "I", "D", "S", "B", "A", "PT", "Q", "TID"]
