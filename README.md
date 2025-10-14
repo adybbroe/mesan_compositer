@@ -1,7 +1,7 @@
 mesan_compositer
 ================
 
-[![Build Status](https://github.com/pytroll/satpy/actions?query=workflow%3A%22CI%22)](https://github.com/pytroll/satpy/actions?query=workflow%3A%22CI%22)
+[![Build Status](https://github.com/adybbroe/mesan_compositer/actions?query=workflow%3A%22CI%22)](https://github.com/adybbroe/mesan_compositer/actions?query=workflow%3A%22CI%22)
 [![Coverage Status](https://coveralls.io/repos/adybbroe/mesan_compositer/badge.png?branch=main)](https://coveralls.io/r/adybbroe/mesan_compositer?branch=main)
 
 https://github.com/pytroll/satpy/actions?query=workflow%3A%22CI%22
