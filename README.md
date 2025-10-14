@@ -1,8 +1,8 @@
 mesan_compositer
 ================
 
-[![Build Status](https://travis-ci.org/adybbroe/mesan_compositer.png?branch=develop)](https://travis-ci.org/adybbroe/mesan_compositer)
-[![Coverage Status](https://coveralls.io/repos/adybbroe/mesan_compositer/badge.png?branch=develop)](https://coveralls.io/r/adybbroe/mesan_compositer?branch=develop)
+[![Build Status](https://travis-ci.org/adybbroe/mesan_compositer.png?branch=main)](https://travis-ci.org/adybbroe/mesan_compositer)
+[![Coverage Status](https://coveralls.io/repos/adybbroe/mesan_compositer/badge.png?branch=main)](https://coveralls.io/r/adybbroe/mesan_compositer?branch=main)
 
 
 Generates satellite cloud product composites and super observations for the
@@ -13,5 +13,3 @@ products from NWCSAF/MSG and NWCSAF/PPS.
 
 Adam Dybbroe & Tomas Landelius
 October 2014, Norrkoping, Sweden
-
-
