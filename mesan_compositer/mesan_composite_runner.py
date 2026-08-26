@@ -34,8 +34,10 @@ import socket
 import sys
 import threading
 import time
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import partial
+from itertools import count
 from multiprocessing import Manager, Pool
 from queue import Empty, Queue
 from urllib.parse import urlparse
@@ -50,8 +52,10 @@ from mesan_compositer.ct_quicklooks import ctth_quicklook_from_netcdf
 from mesan_compositer.logger import setup_logging
 from mesan_compositer.make_ct_composite import CloudproductCompositer
 from mesan_compositer.netcdf_io import cloudComposite
-from mesan_compositer.prt_nwcsaf_cloudamount import derive_sobs as derive_sobs_clamount
-from mesan_compositer.prt_nwcsaf_cloudheight import derive_sobs as derive_sobs_clheight
+from mesan_compositer.prt_nwcsaf_cloudamount import \
+    derive_sobs as derive_sobs_clamount
+from mesan_compositer.prt_nwcsaf_cloudheight import \
+    derive_sobs as derive_sobs_clheight
 from mesan_compositer.utils import NoGeoScenesError, check_uri, get_local_ips
 
 LOG = logging.getLogger(__name__)
@@ -113,16 +117,256 @@ def get_arguments():
     return args
 
 
+
+class StuckPoolJob(RuntimeError):
+    """Raised when a submitted pool job exceeds the configured hard timeout."""
+
+
+@dataclass
+class PendingPoolJob:
+    """Parent-side state for one Pool.apply_async submission."""
+
+    key: str
+    token: int
+    product: str
+    submitted_monotonic: float
+    async_result: object
+    last_warning_monotonic: float = 0.0
+
+
+def _notify_pool_success(completion_queue, job_key, token, _worker_result):
+    """Notify the main thread without doing work in Pool's result thread."""
+    completion_queue.put_nowait((job_key, token, "success"))
+
+
+def _notify_pool_failure(completion_queue, job_key, token, exc):
+    """Notify the main thread; AsyncResult.get() will log the traceback."""
+    completion_queue.put_nowait((job_key, token, "failure", repr(exc)))
+
+
+def _pool_worker_snapshot(pool):
+    """Return best-effort worker diagnostics.
+
+    ``Pool._pool`` is private, so this information is diagnostic only.
+    """
+    return [
+        {
+            "pid": process.pid,
+            "alive": process.is_alive(),
+            "exitcode": process.exitcode,
+        }
+        for process in getattr(pool, "_pool", ())
+    ]
+
+
+def submit_pool_job(
+        pool,
+        completion_queue,
+        pending_jobs,
+        token_counter,
+        *,
+        job_key,
+        product,
+        worker,
+        worker_args):
+    """Submit one job and retain its AsyncResult in the parent."""
+    if job_key in pending_jobs:
+        LOG.warning("Job is already pending; duplicate ignored: job=%s", job_key)
+        return False
+
+    token = next(token_counter)
+
+    LOG.info(
+        "Submitting pool job: job=%s token=%s product=%s workers=%s",
+        job_key,
+        token,
+        product,
+        _pool_worker_snapshot(pool),
+    )
+
+    try:
+        async_result = pool.apply_async(
+            worker,
+            args=worker_args,
+            callback=partial(
+                _notify_pool_success,
+                completion_queue,
+                job_key,
+                token,
+            ),
+            error_callback=partial(
+                _notify_pool_failure,
+                completion_queue,
+                job_key,
+                token,
+            ),
+        )
+    except Exception:
+        # This covers synchronous submission failures, for example a pool
+        # that has already stopped accepting work.
+        LOG.exception(
+            "pool.apply_async failed synchronously: "
+            "job=%s token=%s product=%s",
+            job_key,
+            token,
+            product,
+        )
+        return False
+
+    pending_jobs[job_key] = PendingPoolJob(
+        key=job_key,
+        token=token,
+        product=product,
+        submitted_monotonic=time.monotonic(),
+        async_result=async_result,
+    )
+
+    LOG.info(
+        "Submitted pool job: job=%s token=%s product=%s pending=%d",
+        job_key,
+        token,
+        product,
+        len(pending_jobs),
+    )
+    return True
+
+
+def _finish_pool_job(pending_jobs, job_key, token):
+    """Collect one AsyncResult.
+
+    Return ``(finished, succeeded, worker_result)``. ``finished`` is false
+    only for the tiny callback-before-ready race.
+    """
+    pending = pending_jobs.get(job_key)
+    if pending is None or pending.token != token:
+        LOG.debug(
+            "Ignoring stale pool completion: job=%s token=%s",
+            job_key,
+            token,
+        )
+        return True, None, None
+
+    # Pool invokes the callback immediately before marking AsyncResult ready.
+    # If the main thread wins that small race, leave the record pending; the
+    # fallback scan in collect_pool_results() will collect it next time.
+    if not pending.async_result.ready():
+        return False, None, None
+
+    elapsed = time.monotonic() - pending.submitted_monotonic
+
+    try:
+        # This is the important call: worker exceptions are re-raised here,
+        # including the multiprocessing remote traceback.
+        worker_result = pending.async_result.get()
+    except Exception:
+        LOG.exception(
+            "Pool job failed: job=%s token=%s product=%s elapsed=%.1fs",
+            job_key,
+            token,
+            pending.product,
+            elapsed,
+        )
+        succeeded = False
+        worker_result = None
+    else:
+        LOG.info(
+            "Pool job completed: job=%s token=%s product=%s "
+            "elapsed=%.1fs worker_result=%r",
+            job_key,
+            token,
+            pending.product,
+            elapsed,
+            worker_result,
+        )
+        succeeded = True
+    finally:
+        pending_jobs.pop(job_key, None)
+
+    return True, succeeded, worker_result
+
+
+def collect_pool_results(completion_queue, pending_jobs):
+    """Collect completed jobs without blocking the main message loop."""
+    completed = []
+
+    while True:
+        try:
+            event = completion_queue.get_nowait()
+        except Empty:
+            break
+
+        job_key, token, event_type, *details = event
+
+        if event_type == "failure" and details:
+            LOG.error(
+                "Pool error callback: job=%s token=%s exception=%s",
+                job_key,
+                token,
+                details[0],
+            )
+
+        finished, succeeded, worker_result = _finish_pool_job(
+            pending_jobs,
+            job_key,
+            token,
+        )
+        if finished and succeeded is not None:
+            completed.append((job_key, succeeded, worker_result))
+
+    # Fallback: do not depend exclusively on callback delivery.
+    for job_key, pending in list(pending_jobs.items()):
+        if not pending.async_result.ready():
+            continue
+
+        finished, succeeded, worker_result = _finish_pool_job(
+            pending_jobs,
+            job_key,
+            pending.token,
+        )
+        if finished and succeeded is not None:
+            completed.append((job_key, succeeded, worker_result))
+
+    return completed
+
+
+def monitor_pending_pool_jobs(
+        pending_jobs,
+        pool,
+        *,
+        warning_seconds,
+        warning_repeat_seconds,
+        hard_timeout_seconds):
+    """Report jobs that stay unready and optionally fail the service."""
+    now = time.monotonic()
+
+    for pending in pending_jobs.values():
+        elapsed = now - pending.submitted_monotonic
+
+        if (elapsed >= warning_seconds and
+                now - pending.last_warning_monotonic >= warning_repeat_seconds):
+            LOG.error(
+                "Pool job has not completed: job=%s token=%s product=%s "
+                "elapsed=%.1fs ready=%s workers=%s",
+                pending.key,
+                pending.token,
+                pending.product,
+                elapsed,
+                pending.async_result.ready(),
+                _pool_worker_snapshot(pool),
+            )
+            pending.last_warning_monotonic = now
+
+        if hard_timeout_seconds > 0 and elapsed >= hard_timeout_seconds:
+            raise StuckPoolJob(
+                f"Pool job {pending.key!r} has been pending for "
+                f"{elapsed:.1f} seconds"
+            )
+
+
 def reset_job_registry(objdict, key):
     """Remove job key from registry."""
-    LOG.debug("Release/reset job-key " + str(key) + " from job registry")
-    if key in objdict:
-        objdict.pop(key)
-    else:
-        LOG.warning("Nothing to reset/release - " +
-                    "Register didn't contain any entry matching: " +
-                    str(key))
-    return
+    LOG.debug("Release/reset job-key %s from job registry", key)
+    objdict.pop(key, None)
 
 
 class FilePublisher(threading.Thread):
@@ -309,7 +553,7 @@ def ready2run(msg, files4comp, job_register, sceneid, product="CT"):
 
     LOG.debug("Scene identifier = " + str(sceneid))
     LOG.debug("Job register = " + str(job_register))
-    if sceneid in job_register and job_register[sceneid]:
+    if job_register.get(sceneid):
         LOG.debug("Processing of scene " + str(sceneid) +
                   " have already been launched...")
         return False
@@ -327,41 +571,63 @@ def ready2run(msg, files4comp, job_register, sceneid, product="CT"):
 
 
 def ctype_composite_worker(scene, job_id, publish_q, config_options):
-    """Spawn/Start a Mesan composite generation on a new thread if available."""
+    """Create a CT composite and return a small, picklable result record."""
     try:
         LOG.debug("Ctype: Start compositer...")
-        # Get the time of analysis from start and end times:
         time_of_analysis = get_analysis_time(
             scene["starttime"], scene["endtime"])
         twindow = int(config_options.get("absolute_time_threshold_minutes", "30"))
         delta_t = timedelta(minutes=twindow)
-        LOG.debug("Time window = " + str(twindow))
-
+        LOG.debug("Time window = %s", twindow)
         mesan_area_id = config_options.get("mesan_area_id", None)
         if not mesan_area_id:
-            LOG.warning("No area id specified in config file. Using default = " +
-                        str(DEFAULT_AREA))
+            LOG.warning(
+                "No area id specified in config file. Using default = %s",
+                DEFAULT_AREA,
+            )
             mesan_area_id = DEFAULT_AREA
 
+        LOG.info("Make ctype composite for area id = %s", mesan_area_id)
+        result_file = do_cloud_type_composite(
+            time_of_analysis, delta_t, mesan_area_id, config_options)
+
+        if not result_file:
+            return {
+                "status": "no_result",
+                "product": "CT",
+                "worker_pid": os.getpid(),
+                "result_file": None,
+                "super_obs_file": None,
+            }
+
+        pubmsg = create_message(result_file, scene)
+        LOG.info("Sending: %s", pubmsg)
+        publish_q.put(pubmsg)
+
+        if isinstance(job_id, datetime):
+            dt_ = datetime.utcnow() - job_id
+            LOG.info(
+                "Ctype composite scene %s finished. It took: %s",
+                job_id,
+                dt_,
+            )
+        else:
+            LOG.warning("Job entry is not a datetime instance: %s", job_id)
+
+        super_obs_filename = do_cloudamount(
+            result_file, time_of_analysis, mesan_area_id, config_options)
         LOG.info(
-            "Make ctype composite for area id = " + str(mesan_area_id))
+            "Cloud amount super observations generated: %s",
+            super_obs_filename,
+        )
 
-        result_file = do_cloud_type_composite(time_of_analysis, delta_t, mesan_area_id, config_options)
-        if result_file:
-            pubmsg = create_message(result_file, scene)
-            LOG.info("Sending: " + str(pubmsg))
-            publish_q.put(pubmsg)
-
-            if isinstance(job_id, datetime):
-                dt_ = datetime.utcnow() - job_id
-                LOG.info("Ctype composite scene " + str(job_id) +
-                         " finished. It took: " + str(dt_))
-            else:
-                LOG.warning(
-                    "Job entry is not a datetime instance: " + str(job_id))
-
-            super_obs_filename = do_cloudamount(result_file, time_of_analysis, mesan_area_id, config_options)
-            LOG.info("Cloud amount super observations generated: %s", super_obs_filename)
+        return {
+            "status": "success",
+            "product": "CT",
+            "worker_pid": os.getpid(),
+            "result_file": result_file,
+            "super_obs_file": super_obs_filename,
+        }
 
     except Exception:
         LOG.exception("Failed in ctype_composite_worker...")
@@ -369,49 +635,79 @@ def ctype_composite_worker(scene, job_id, publish_q, config_options):
 
 
 def ctth_composite_worker(scene, job_id, publish_q, config_options):
-    """Spawn/Start a cloud height composite generation on a new thread if available."""
+    """Create a CTTH composite and return a small, picklable result record."""
     try:
         LOG.debug("CTTH compositer: Start...")
-        # Get the time of analysis from start and end times:
         time_of_analysis = get_analysis_time(
             scene["starttime"], scene["endtime"])
         twindow = int(config_options.get("absolute_time_threshold_minutes", "30"))
         delta_t = timedelta(minutes=twindow)
-        LOG.debug("Time window = " + str(twindow))
-
+        LOG.debug("Time window = %s", twindow)
         mesan_area_id = config_options.get("mesan_area_id", None)
         if not mesan_area_id:
-            LOG.warning("No area id specified in config file. Using default = " +
-                        str(DEFAULT_AREA))
+            LOG.warning(
+                "No area id specified in config file. Using default = %s",
+                DEFAULT_AREA,
+            )
             mesan_area_id = DEFAULT_AREA
 
-        LOG.info("Make cloud height composite for area id = " + str(mesan_area_id))
+        LOG.info(
+            "Make cloud height composite for area id = %s", mesan_area_id)
+        result_file = do_ctth_composite(
+            time_of_analysis, delta_t, mesan_area_id, config_options)
+        LOG.debug(
+            "After CTTH compositer part. Filename returned = %s",
+            result_file,
+        )
 
-        result_file = do_ctth_composite(time_of_analysis, delta_t, mesan_area_id, config_options)
-        LOG.debug("After CTTH compositer part. Filename returned = %s", str(result_file))
-        if result_file:
-            pubmsg = create_message(result_file, scene)
-            LOG.info("Sending: " + str(pubmsg))
-            publish_q.put(pubmsg)
+        if not result_file:
+            return {
+                "status": "no_result",
+                "product": "CTTH",
+                "worker_pid": os.getpid(),
+                "result_file": None,
+                "super_obs_file": None,
+            }
 
-            if isinstance(job_id, datetime):
-                dt_ = datetime.utcnow() - job_id
-                LOG.info("Cloud Height composite scene " + str(job_id) +
-                         " finished. It took: " + str(dt_))
-            else:
-                LOG.warning(
-                    "Job entry is not a datetime instance: " + str(job_id))
+        pubmsg = create_message(result_file, scene)
+        LOG.info("Sending: %s", pubmsg)
+        publish_q.put(pubmsg)
 
-            super_obs_filename = do_cloudheight(result_file, time_of_analysis, mesan_area_id, config_options)
-            LOG.info("Cloud height super observations generated: %s", super_obs_filename)
+        if isinstance(job_id, datetime):
+            dt_ = datetime.utcnow() - job_id
+            LOG.info(
+                "Cloud Height composite scene %s finished. It took: %s",
+                job_id,
+                dt_,
+            )
+        else:
+            LOG.warning("Job entry is not a datetime instance: %s", job_id)
+
+        super_obs_filename = do_cloudheight(
+            result_file, time_of_analysis, mesan_area_id, config_options)
+        LOG.info(
+            "Cloud height super observations generated: %s",
+            super_obs_filename,
+        )
+
+        return {
+            "status": "success",
+            "product": "CTTH",
+            "worker_pid": os.getpid(),
+            "result_file": result_file,
+            "super_obs_file": super_obs_filename,
+        }
 
     except Exception:
         LOG.exception("Failed in ctth_composite_worker...")
         raise
 
 
+
 def mesan_live_runner(config_options):
     """Start and run the Mesan cloud composite processing in real-time.
+
+    Run the live service while supervising every asynchronous pool job.
 
     Processing is triggered on incoming Meteosat NWCSAF/Geo cloud scene by
     listening to incoming messages. Processing is being triggered and possible
@@ -421,9 +717,17 @@ def mesan_live_runner(config_options):
 
     """
     LOG.info("*** Start the runner for the Mesan composite generator:")
-    LOG.debug("os.environ = " + str(os.environ))
-    npix = int(config_options.get("number_of_pixels", DEFAULT_SUPEROBS_WINDOW_SIZE_NPIX))
-    LOG.debug("Number of pixels = " + str(npix))
+    LOG.debug("os.environ = %s", os.environ)
+    npix = int(config_options.get(
+        "number_of_pixels", DEFAULT_SUPEROBS_WINDOW_SIZE_NPIX))
+    LOG.debug("Number of pixels = %s", npix)
+
+    warning_seconds = float(
+        config_options.get("pool_job_warning_seconds", 20 * 60))
+    warning_repeat_seconds = float(
+        config_options.get("pool_job_warning_repeat_seconds", 5 * 60))
+    hard_timeout_seconds = float(
+        config_options.get("pool_job_hard_timeout_seconds", 0))
 
 
     def worker_succeeded(job_key, result):
@@ -440,6 +744,10 @@ def mesan_live_runner(config_options):
     listener_q = manager.Queue()
     publisher_q = manager.Queue()
 
+    # Pool callbacks execute in the parent, so this can be a normal
+    # thread-safe queue. It is not passed to a child process.
+    completion_q = Queue()
+
     pub_thread = FilePublisher(publisher_q)
     pub_thread.start()
     listen_thread = FileListener(listener_q)
@@ -447,117 +755,188 @@ def mesan_live_runner(config_options):
 
     composite_files = {}
     jobs_dict = {}
-    while True:
-        try:
-            msg = listener_q.get()
-        except Empty:
-            LOG.debug("Empty listener queue...")
-            continue
+    pending_jobs = {}
+    token_counter = count(1)
 
-        LOG.debug(
-            "Number of threads currently alive: " + str(threading.active_count()))
+    try:
+        while True:
+            # Calling AsyncResult.get() inside this function is what surfaces
+            # child-process Python exceptions in the parent log.
+            collect_pool_results(completion_q, pending_jobs)
 
-        if "start_time" in msg.data:
-            start_time = msg.data["start_time"]
-        elif "nominal_time" in msg.data:
-            start_time = msg.data["nominal_time"]
-        else:
-            LOG.warning("Neither start_time nor nominal_time in message!")
-            start_time = None
+            monitor_pending_pool_jobs(
+                pending_jobs,
+                pool,
+                warning_seconds=warning_seconds,
+                warning_repeat_seconds=warning_repeat_seconds,
+                hard_timeout_seconds=hard_timeout_seconds,
+            )
 
-        if "end_time" in msg.data:
-            end_time = msg.data["end_time"]
-        else:
-            LOG.debug("No end_time in message!")
-            end_time = None
-
-        sensor = str(msg.data["sensor"])
-        platform_name = msg.data["platform_name"]
-        if platform_name not in GEO_SATS:
-            orbit_number = int(msg.data["orbit_number"])
-            LOG.info("Polar satellite: " + str(platform_name))
-        else:
-            orbit_number = "00000"
-            LOG.info("Geostationary satellite: " + str(platform_name))
-
-        keyname = (str(platform_name) + "_" +
-                   str(orbit_number) + "_" +
-                   str(start_time.strftime("%Y%m%d%H%M")))
-
-        product = "UNKNOWN"
-        if "pge" in msg.data:
-            product = msg.data["pge"]
-        elif "uid" in msg.data:
-            uid = msg.data["uid"]
-            for pge in PRODUCT_NAMES:
-                match = "_" + pge + "_"
-                if match in uid:
-                    product = pge
-                    break
-
-        keyname = str(product) + "_" + keyname
-        status = ready2run(msg, composite_files,
-                           jobs_dict, keyname, product)
-
-        if status:
-            # Start composite generation:
-
-            urlobj = urlparse(msg.data["uri"])
-            path, fname = os.path.split(urlobj.path)
-            LOG.debug("path " + str(path) + " filename = " + str(fname))
-
-            scene = {"platform_name": platform_name,
-                     "orbit_number": orbit_number,
-                     "starttime": start_time, "endtime": end_time,
-                     "sensor": sensor,
-                     "filename": urlobj.path,
-                     "product": product}
-
-            if keyname not in jobs_dict:
-                LOG.warning("Scene-run seems unregistered! Forget it...")
+            try:
+                msg = listener_q.get(timeout=1.0)
+            except Empty:
                 continue
 
-            if product == "CT":
-                LOG.debug("Product is CT")
-                result = pool.apply_async(ctype_composite_worker,
-                                          args=(
-                                              scene,
-                                              jobs_dict[keyname],
-                                              publisher_q,
-                                              config_options,
-                                          ),
-                                          callback=partial(worker_succeeded, keyname),
-                                          error_callback=partial(worker_failed, keyname),
-                                          )
+            if msg is None:
+                LOG.info("Listener requested shutdown")
+                break
 
-            elif product == "CTTH":
-                LOG.debug("Product is CTTH")
-                pool.apply_async(ctth_composite_worker,
-                                 (scene,
-                                  jobs_dict[
-                                      keyname],
-                                  publisher_q,
-                                  config_options))
+            registered_key = None
+            try:
+                LOG.debug(
+                    "Number of threads currently alive: %s",
+                    threading.active_count(),
+                )
 
-            else:
-                LOG.warning("Product %s not supported!", str(product))
+                if "start_time" in msg.data:
+                    start_time = msg.data["start_time"]
+                elif "nominal_time" in msg.data:
+                    start_time = msg.data["nominal_time"]
+                else:
+                    LOG.warning(
+                        "Neither start_time nor nominal_time in message!")
+                    continue
 
-            pending[keyname] = {
-                "result": result,
-                "started": time.monotonic(),
-            }
+                if "end_time" in msg.data:
+                    end_time = msg.data["end_time"]
+                else:
+                    LOG.debug("No end_time in message!")
+                    end_time = None
 
-            # Block any future run on this scene for x minutes from now
-            # x = 5
-            thread_job_registry = threading.Timer(
-                5 * 60.0, reset_job_registry, args=(jobs_dict, keyname))
-            thread_job_registry.start()
+                sensor = str(msg.data["sensor"])
+                platform_name = msg.data["platform_name"]
 
-    pool.close()
-    pool.join()
+                if platform_name not in GEO_SATS:
+                    orbit_number = int(msg.data["orbit_number"])
+                    LOG.info("Polar satellite: %s", platform_name)
+                else:
+                    orbit_number = "00000"
+                    LOG.info("Geostationary satellite: %s", platform_name)
 
-    pub_thread.stop()
-    listen_thread.stop()
+                keyname = (
+                    f"{platform_name}_{orbit_number}_"
+                    f"{start_time.strftime('%Y%m%d%H%M')}"
+                )
+
+                product = "UNKNOWN"
+                if "pge" in msg.data:
+                    product = msg.data["pge"]
+                elif "uid" in msg.data:
+                    uid = msg.data["uid"]
+                    for pge in PRODUCT_NAMES:
+                        if f"_{pge}_" in uid:
+                            product = pge
+                            break
+
+                keyname = f"{product}_{keyname}"
+
+                # Unlike the old five-minute registry timer, this entry remains
+                # present for the actual lifetime of the asynchronous job.
+                if keyname in pending_jobs:
+                    pending = pending_jobs[keyname]
+                    LOG.warning(
+                        "Duplicate message ignored because pool job is still "
+                        "pending: job=%s token=%s elapsed=%.1fs",
+                        keyname,
+                        pending.token,
+                        time.monotonic() - pending.submitted_monotonic,
+                    )
+                    continue
+
+                status = ready2run(
+                    msg, composite_files, jobs_dict, keyname, product)
+                if not status:
+                    continue
+
+                # If an exception occurs before successful submission, release
+                # the registry entry in the per-message exception handler.
+                registered_key = keyname
+
+                urlobj = urlparse(msg.data["uri"])
+                path, fname = os.path.split(urlobj.path)
+                LOG.debug("path %s filename = %s", path, fname)
+                scene = {
+                    "platform_name": platform_name,
+                    "orbit_number": orbit_number,
+                    "starttime": start_time,
+                    "endtime": end_time,
+                    "sensor": sensor,
+                    "filename": urlobj.path,
+                    "product": product,
+                }
+
+                if keyname not in jobs_dict:
+                    LOG.warning("Scene-run seems unregistered! Forget it...")
+                    registered_key = None
+                    continue
+
+                worker = {
+                    "CT": ctype_composite_worker,
+                    "CTTH": ctth_composite_worker,
+                }.get(product)
+
+                if worker is None:
+                    LOG.warning("Product %s not supported!", product)
+                    jobs_dict.pop(keyname, None)
+                    registered_key = None
+                    continue
+
+                submitted = submit_pool_job(
+                    pool,
+                    completion_q,
+                    pending_jobs,
+                    token_counter,
+                    job_key=keyname,
+                    product=product,
+                    worker=worker,
+                    worker_args=(
+                        scene,
+                        jobs_dict[keyname],
+                        publisher_q,
+                        config_options,
+                    ),
+                )
+
+                if not submitted:
+                    jobs_dict.pop(keyname, None)
+                    registered_key = None
+                    continue
+
+                # Preserve the old five-minute duplicate-message hold. The
+                # pending_jobs check above continues blocking duplicates if the
+                # actual worker runs for more than five minutes.
+                registry_timer = threading.Timer(
+                    5 * 60.0,
+                    reset_job_registry,
+                    args=(jobs_dict, keyname),
+                )
+                registry_timer.daemon = True
+                registry_timer.start()
+                registered_key = None
+
+            except Exception:
+                if registered_key is not None:
+                    jobs_dict.pop(registered_key, None)
+                LOG.exception(
+                    "Unhandled exception while processing message: %r", msg)
+
+    except StuckPoolJob:
+        LOG.critical(
+            "A pool job exceeded the hard timeout; terminating the service "
+            "so the process supervisor can restart it."
+        )
+        raise
+    finally:
+        # close()/join() may wait forever when the worker itself is hung.
+        pool.terminate()
+        pool.join()
+
+        pub_thread.stop()
+        listen_thread.stop()
+        pub_thread.join(timeout=10)
+        listen_thread.join(timeout=10)
+        manager.shutdown()
+
 
 
 def do_cloud_type_composite(time_of_analysis, delta_t, area_id, config_options):
