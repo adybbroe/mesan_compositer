@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2023 Adam.Dybbroe
+# Copyright (c) 2023, 2026 Adam.Dybbroe
 
 # Author(s):
 

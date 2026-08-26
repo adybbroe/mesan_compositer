@@ -23,8 +23,8 @@
 """Testing the color legends for the cloudtype and ctth imagery."""
 
 import unittest
-from mesan_compositer import ctth_height
-from mesan_compositer import nwcsaf_cloudtype
+
+from mesan_compositer import ctth_height, nwcsaf_cloudtype
 
 CTYPE_PALETTE = [(100.0, 100.0, 100.0), (0.0, 120.0, 0.0), (0.0, 0.0, 0.0),
                  (250.0, 190.0, 250.0), (220.0, 160.0, 220.0), (255.0, 150.0, 0.0),

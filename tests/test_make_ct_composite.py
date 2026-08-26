@@ -36,7 +36,7 @@ from mesan_compositer.make_ct_composite import CloudproductCompositer
 from mesan_compositer.utils import NoGeoScenesError
 
 
-@pytest.fixture()
+@pytest.fixture
 def nwcsaf_geo_ct_filename(tmp_path_factory):
     """Create a CT file and return the filename."""
     return create_nwcsaf_geo_ct_file(tmp_path_factory.mktemp("data"))
@@ -69,7 +69,7 @@ CT_ARRAY = np.random.randint(0, 16, size=(928, 1530), dtype=np.uint8)
 PAL_ARRAY = np.random.randint(0, 255, size=(250, 3), dtype=np.uint8)
 
 
-@pytest.fixture()
+@pytest.fixture
 def nwcsaf_pps_ct_filename(tmp_path_factory):
     """Create a NWCSAF/PPS Cloud Type file."""
     attrs = GLOBAL_ATTRIBUTES.copy()
@@ -134,7 +134,7 @@ CONFIG_OPTIONS = {"ct_composite_filename": "mesan_composite_%(area)s_%Y%m%d_%H%M
                   "msg_areaname": "MSG-N"}
 
 
-@pytest.fixture()
+@pytest.fixture
 def fake_pps_filenames(tmp_path):
     """Create a NWCSAF/PPS fake file names."""
     filenames = []

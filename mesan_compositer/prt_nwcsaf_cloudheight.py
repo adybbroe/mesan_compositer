@@ -122,7 +122,7 @@ def derive_sobs(ctth_comp, npix, filepath):
     height = da.nan_to_num(height, nan=-1.0).astype("int32")
     with  tempfile.NamedTemporaryFile(suffix=("_" + os.path.basename(filepath)),
                                       dir=os.path.dirname(filepath),
-                                      mode='w', delete=False) as file_obj:
+                                      mode="w", delete=False) as file_obj:
         write_data(file_obj, so_lon, so_lat, height)
 
     now = datetime.utcnow()

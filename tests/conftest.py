@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2023 Adam.Dybbroe
+# Copyright (c) 2023 - 2026 Adam.Dybbroe
 
 # Author(s):
 
-#   Adam.Dybbroe <a000680@c21856.ad.smhi.se>
+#   Adam Dybbroe <Firstname.Lastname at smhi.se>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -77,14 +77,14 @@ msg_ctth_filename: "SAFNWC_{satellite:s}_CTTH_{nominal_time:%Y%m%d%H%M}_{area:s}
 """  # noqa
 
 
-@pytest.fixture()
+@pytest.fixture
 def fake_msg_dir_path(tmp_path):
     """Write fake msg_dir path directive."""
     file_path = tmp_path / "{product:s}"
     return file_path
 
 
-@pytest.fixture()
+@pytest.fixture
 def fake_yamlconfig_file(tmp_path):
     """Write fake yaml config file."""
     file_path = tmp_path / "test_mesan_sat_config.yaml"
@@ -94,7 +94,7 @@ def fake_yamlconfig_file(tmp_path):
     os.remove(file_path)
 
 
-@pytest.fixture()
+@pytest.fixture
 def fake_yamlconfig_file_with_msg_dir(tmp_path, fake_msg_dir_path):
     """Write fake yaml config file - with a realistic msg_dir directive."""
     file_path = tmp_path / "test_mesan_sat_config_with_msg_dir.yaml"
@@ -133,7 +133,7 @@ MSG_CTYPES = ["S_NWC_CT_MSG4_MSG-N-VISIR_20230116T101500Z.nc",
               "S_NWC_CT_MSG4_MSG-N-VISIR_20230116T114500Z_PLAX.nc"]
 
 
-@pytest.fixture()
+@pytest.fixture
 def fake_empty_nwcsaf_pps_files(tmp_path):
     """Create a list of empty fake nwcsaf/pps files."""
     files = _create_empty_nwcsaf_files_fromlist(tmp_path, PPS_CTYPES)
@@ -142,7 +142,7 @@ def fake_empty_nwcsaf_pps_files(tmp_path):
         os.remove(pps_file)
 
 
-@pytest.fixture()
+@pytest.fixture
 def fake_empty_old_nwcsaf_geo_files(tmp_path):
     """Create a list of empty fake nwcsaf/geo files."""
     files = _create_empty_nwcsaf_files_fromlist(tmp_path, MSG_CTYPES_OLD)
@@ -151,7 +151,7 @@ def fake_empty_old_nwcsaf_geo_files(tmp_path):
         os.remove(filename)
 
 
-@pytest.fixture()
+@pytest.fixture
 def fake_empty_nwcsaf_geo_files(tmp_path):
     """Create a list of empty fake nwcsaf/geo files."""
     files = _create_empty_nwcsaf_files_fromlist(tmp_path, MSG_CTYPES, product="CT")

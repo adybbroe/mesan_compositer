@@ -23,26 +23,28 @@
 """Make quick look images of the ctth composite."""
 
 import argparse
+import logging
+import os
+import sys
 from datetime import datetime
+from logging import handlers
+
 import numpy as np
 import xarray as xr
-from trollimage.xrimage import XRImage
-from mesan_compositer import ctth_height
-from mesan_compositer.netcdf_io import ncCTTHComposite
-from mesan_compositer.config import get_config
 from satpy.composites import ColormapCompositor
-import sys
-import os
-from logging import handlers
-import logging
+from trollimage.xrimage import XRImage
+
+from mesan_compositer import ctth_height
+from mesan_compositer.config import get_config
+from mesan_compositer.netcdf_io import ncCTTHComposite
 
 LOG = logging.getLogger(__name__)
 
 #: Default time format
-_DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
+_DEFAULT_TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 #: Default log format
-_DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
+_DEFAULT_LOG_FORMAT = "[%(levelname)s: %(asctime)s : %(name)s] %(message)s"
 
 
 def get_arguments():
@@ -50,7 +52,7 @@ def get_arguments():
 
     args.logging_conf_file, args.config_file, obs_time, area_id, wsize
 
-    Return
+    Return:
       File path of the logging.ini file
       File path of the application configuration file
       Observation/Analysis time
@@ -58,13 +60,13 @@ def get_arguments():
       Window size
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument('--datetime', '-d', help='Date and time of observation - yyyymmddhh',
+    parser.add_argument("--datetime", "-d", help="Date and time of observation - yyyymmddhh",
                         required=True)
-    parser.add_argument('--area_id', '-a', help='Area id',
+    parser.add_argument("--area_id", "-a", help="Area id",
                         required=True)
-    parser.add_argument('-c', '--config_file',
+    parser.add_argument("-c", "--config_file",
                         type=str,
-                        dest='config_file',
+                        dest="config_file",
                         required=True,
                         help="The file containing configuration parameters e.g. mesan_sat_config.yaml")
     parser.add_argument("-l", "--logging",
@@ -78,9 +80,9 @@ def get_arguments():
 
     args = parser.parse_args()
 
-    tanalysis = datetime.strptime(args.datetime, '%Y%m%d%H')
+    tanalysis = datetime.strptime(args.datetime, "%Y%m%d%H")
     area_id = args.area_id
-    if 'template' in args.config_file:
+    if "template" in args.config_file:
         print("Template file given as master config, aborting!")
         sys.exit()
 
@@ -100,13 +102,13 @@ if __name__ == "__main__":
     handler.setFormatter(formatter)
     handler.setLevel(logging.DEBUG)
 
-    logging.getLogger('').addHandler(handler)
-    logging.getLogger('').setLevel(logging.DEBUG)
-    logging.getLogger('satpy').setLevel(logging.INFO)
+    logging.getLogger("").addHandler(handler)
+    logging.getLogger("").setLevel(logging.DEBUG)
+    logging.getLogger("satpy").setLevel(logging.INFO)
 
-    LOG = logging.getLogger('ctth_quicklooks')
+    LOG = logging.getLogger("ctth_quicklooks")
 
-    log_handlers = logging.getLogger('').handlers
+    log_handlers = logging.getLogger("").handlers
     for log_handle in log_handlers:
         if type(log_handle) is handlers.SMTPHandler:
             LOG.debug("Mail notifications to: %s", str(log_handle.toaddrs))
@@ -114,9 +116,9 @@ if __name__ == "__main__":
     OPTIONS = get_config(config_filename)
 
     values = {"area": areaid, }
-    bname = time_of_analysis.strftime(OPTIONS['ctth_composite_filename']) % values
-    path = OPTIONS['composite_output_dir']
-    filename = os.path.join(path, bname) + '.nc'
+    bname = time_of_analysis.strftime(OPTIONS["ctth_composite_filename"]) % values
+    path = OPTIONS["composite_output_dir"]
+    filename = os.path.join(path, bname) + ".nc"
     if not os.path.exists(filename):
         LOG.error("File " + str(filename) + " does not exist!")
         sys.exit(-1)
@@ -130,11 +132,11 @@ if __name__ == "__main__":
     ctth_data = ctth_data / 500.0 + 1
     ctth_data = ctth_data.astype(np.uint8)
 
-    cmap = ColormapCompositor('mesan_cloudheight_composite')
+    cmap = ColormapCompositor("mesan_cloudheight_composite")
     colors, sqpal = cmap.build_colormap(palette, np.uint8, {})
 
-    attrs = {'_FillValue': 0}
-    xdata = xr.DataArray(ctth_data, dims=['y', 'x'], attrs=attrs).astype('uint8')
+    attrs = {"_FillValue": 0}
+    xdata = xr.DataArray(ctth_data, dims=["y", "x"], attrs=attrs).astype("uint8")
     pimage = XRImage(xdata)
     pimage.palettize(colors)
-    pimage.save(filename.strip('.nc') + '_height.png')
+    pimage.save(filename.strip(".nc") + "_height.png")

@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014-2025 Adam.Dybbroe
+# Copyright (c) 2014-2026 Adam.Dybbroe
 
 # Author(s):
 
-#   Adam.Dybbroe <a000680@c14526.ad.smhi.se>
+#   Adam Dybbroe <Firstname.Lastname at smhi.se>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,16 +22,16 @@
 
 """Package file for the mesan_compositer."""
 
-import logging
-
-from pkg_resources import DistributionNotFound, get_distribution
-
 try:
-    __version__ = get_distribution(__name__).version
-except DistributionNotFound:
-    # package is not installed
-    pass
+    from mesan_compositer.version import version as __version__  # noqa
+except ModuleNotFoundError:
+    raise ModuleNotFoundError(
+        "No module named mesan_compositer.version. This could mean "
+        "you didn't install 'mesan_compositer' properly. Try reinstalling ('pip "
+        "install').")
 
+
+import logging
 
 LOG = logging.getLogger(__name__)
 

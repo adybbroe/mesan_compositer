@@ -23,19 +23,19 @@
 """Unit testing the pps-msg format conversion tools
 """
 
-from mesan_compositer.pps_msg_conversions import (ctype_procflags2pps,
-                                                  ctth_procflags2pps,
-                                                  get_bit_from_flags)
-
 import unittest
+
 import numpy as np
+
+from mesan_compositer.pps_msg_conversions import (ctth_procflags2pps,
+                                                  ctype_procflags2pps,
+                                                  get_bit_from_flags)
 
 PFLAGS = [10, 156]
 CTYPE_MSG_PROCFLAGS = np.array(PFLAGS)
 
 
 class TestFlagConversions(unittest.TestCase):
-
     """Unit testing the functions to convert msg flags to pps (old) flags"""
 
     def setUp(self):
@@ -44,8 +44,8 @@ class TestFlagConversions(unittest.TestCase):
 
     def test_ctype_procflags2pps(self):
         """Test convert msg cloudtype quality flags to pps (<v2014) processing
-        flags"""
-
+        flags
+        """
         # msg illumination bit 0,1,2 (undefined,night,twilight,day,sunglint) maps
         # to pps bits 2, 3 and 4:
         # msgbits = [1, 1, 1]
@@ -53,20 +53,20 @@ class TestFlagConversions(unittest.TestCase):
 
         # Example: Day and no Sunglint - 3-bit value = 3
         res = 3  # [1, 1]
-        res = ctype_procflags2pps(np.array([res], 'int32'))
+        res = ctype_procflags2pps(np.array([res], "int32"))
         get_bit_from_flags(res, range(4))
         self.assertEqual(res[0], 0)
 
         res = 4  # [0, 0, 1]         # Example: Day and Sunglint - 3-bit value = 4
-        res = ctype_procflags2pps(np.array([4], 'int32'))
+        res = ctype_procflags2pps(np.array([4], "int32"))
         self.assertEqual(res[0], 16)
 
         # Example: Night - 3-bit value = 1
-        res = ctype_procflags2pps(np.array([1], 'int32'))
+        res = ctype_procflags2pps(np.array([1], "int32"))
         self.assertEqual(res[0], 4)
 
         # Example: Twilight - 3-bit value = 2
-        res = ctype_procflags2pps(np.array([2], 'int32'))
+        res = ctype_procflags2pps(np.array([2], "int32"))
         self.assertEqual(res[0], 8)
 
         # msg nwp-input bit 3 (nwp present?) maps to pps bit 7:
@@ -77,7 +77,7 @@ class TestFlagConversions(unittest.TestCase):
         # msgbits = [0, 0, 0, 1]
         # res = 8
         # PPS bit 7 should be set
-        res = ctype_procflags2pps(np.array([8], 'int32'))
+        res = ctype_procflags2pps(np.array([8], "int32"))
         self.assertEqual(res[0], 128)
 
         # Example: All NWP parameters available (low level inversion) -
@@ -85,13 +85,13 @@ class TestFlagConversions(unittest.TestCase):
         # msgbits = [0, 0, 0, 0, 1]
         # res = 16
         # PPS bits 6 and 7 should be set
-        res = ctype_procflags2pps(np.array([16], 'int32'))
+        res = ctype_procflags2pps(np.array([16], "int32"))
         self.assertEqual(res[0], 192)
 
         # Example: At least one NWP parameter missing - 2-bit value = 3
         #msgbits = [0, 0, 0, 1, 1]
         res = 24
-        res = ctype_procflags2pps(np.array([24], 'int32'))
+        res = ctype_procflags2pps(np.array([24], "int32"))
         self.assertEqual(res[0], 0)
 
         # msg seviri-input bits 5&6 maps to pps bit 8:
@@ -100,14 +100,14 @@ class TestFlagConversions(unittest.TestCase):
         msgbits = [0, 0, 0, 0, 0, 1]
         # res = 32
         # PPS bit 8 should not be set!
-        res = ctype_procflags2pps(np.array([32], 'int32'))
+        res = ctype_procflags2pps(np.array([32], "int32"))
         self.assertEqual(res[0], 0)
 
         # Example: At least one useful SEVIRI channel missing - 2-bit value = 2
         #msgbits = [0, 0, 0, 0, 0, 0, 1]
         res = 64
         # PPS bit 8 should be set
-        res = ctype_procflags2pps(np.array([64], 'int32'))
+        res = ctype_procflags2pps(np.array([64], "int32"))
         self.assertEqual(res[0], 256)
 
         # Example: At least one mandatory SEVIRI channel missing - 2-bit value
@@ -115,7 +115,7 @@ class TestFlagConversions(unittest.TestCase):
         # msgbits = [0, 0, 0, 0, 0, 1, 1]
         res = 96
         # PPS bit 8 should be set
-        res = ctype_procflags2pps(np.array([96], 'int32'))
+        res = ctype_procflags2pps(np.array([96], "int32"))
         self.assertEqual(res[0], 256)
 
         #
@@ -125,14 +125,14 @@ class TestFlagConversions(unittest.TestCase):
         # msgbits = [0, 0, 0, 0, 0, 0, 0, 1]
         # res = 128
         # PPS bit 9 should not be set!
-        res = ctype_procflags2pps(np.array([128], 'int32'))
+        res = ctype_procflags2pps(np.array([128], "int32"))
         self.assertEqual(res[0], 0)
 
         # Example: Poor quality (low confidence) - 2-bit value = 2
         # msgbits = [0, 0, 0, 0, 0, 0, 0, 0, 1]
         # res = 256
         # PPS bit 9 should be set
-        res = ctype_procflags2pps(np.array([256], 'int32'))
+        res = ctype_procflags2pps(np.array([256], "int32"))
         self.assertEqual(res[0], 512)
 
         # Example: Reclassified after spatial smoothing (very low confidence) -
@@ -140,7 +140,7 @@ class TestFlagConversions(unittest.TestCase):
         # msgbits = [0, 0, 0, 0, 0, 0, 0, 1, 1]
         #res = 384
         # PPS bit 9 should be set
-        res = ctype_procflags2pps(np.array([384], 'int32'))
+        res = ctype_procflags2pps(np.array([384], "int32"))
         self.assertEqual(res[0], 1024)
 
         #
@@ -150,7 +150,7 @@ class TestFlagConversions(unittest.TestCase):
         # performed
         # msgbits = [0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
         # PPS bit 11 should be set
-        res = ctype_procflags2pps(np.array([512], 'int32'))
+        res = ctype_procflags2pps(np.array([512], "int32"))
         self.assertEqual(res[0], 2048)
 
         # Example: Some combinations of the above
@@ -164,14 +164,14 @@ class TestFlagConversions(unittest.TestCase):
         # PPS bit 11 should be set
         ppsbits = [0, 0, 0, 1, 0, 0, 0, 1,
                    0, 0, 0, 1, 0, 0, 0, 0]
-        res = ctype_procflags2pps(np.array([682], 'int32'))
+        res = ctype_procflags2pps(np.array([682], "int32"))
         bits = get_bit_from_flags(res[0], range(16))
         np.testing.assert_allclose(bits, ppsbits)
 
     def test_ctth_procflags2pps(self):
         """Test convert msg ctth quality flags (14 bits) to pps (<v2014)
-        processing flags"""
-
+        processing flags
+        """
         # 2 bits to define processing status (maps to pps bits 0 and 1:)
         # Non-processed?
         # If non-processed in msg (0) then set pps bit 0 and nothing else.
@@ -183,7 +183,7 @@ class TestFlagConversions(unittest.TestCase):
         # pps bit 0 (non-processed) and pps bit 1.
 
         # Example: non-processed - 2-bit value = 0
-        res = ctth_procflags2pps(np.array([0], 'int32'))
+        res = ctth_procflags2pps(np.array([0], "int32"))
         bits = get_bit_from_flags(res[0], range(2))
         ppsbits = [1, 0]
         np.testing.assert_allclose(bits, ppsbits)
@@ -191,21 +191,21 @@ class TestFlagConversions(unittest.TestCase):
         # Example: non-processed because FOV is cloud free - 2-bit value = 1
         msgbits = [1, ]
         # res = 1
-        res = ctth_procflags2pps(np.array([1], 'int32'))
+        res = ctth_procflags2pps(np.array([1], "int32"))
         bits = get_bit_from_flags(res[0], range(2))
         ppsbits = [1, 0]
         np.testing.assert_allclose(bits, ppsbits)
 
         # Example: processed because cloudy, but without result - 2-bit value =
         # 2
-        res = ctth_procflags2pps(np.array([2], 'int32'))
+        res = ctth_procflags2pps(np.array([2], "int32"))
         bits = get_bit_from_flags(res[0], range(2))
         ppsbits = [1, 1]
         np.testing.assert_allclose(bits, ppsbits)
 
         # Example: processed because cloudy, with result - 2-bit value =
         # 3
-        res = ctth_procflags2pps(np.array([3], 'int32'))
+        res = ctth_procflags2pps(np.array([3], "int32"))
         bits = get_bit_from_flags(res[0], range(2))
         ppsbits = [0, 1]
         np.testing.assert_allclose(bits, ppsbits)
@@ -216,7 +216,7 @@ class TestFlagConversions(unittest.TestCase):
         msgbits = [0, 0, 1]
         # res = 4
         # PPS bit 3 should be set (and pps bit 0 for non-processed)
-        res = ctth_procflags2pps(np.array([4], 'int32'))
+        res = ctth_procflags2pps(np.array([4], "int32"))
         bits = get_bit_from_flags(res[0], range(4))
         ppsbits = [1, 0, 0, 1]
         np.testing.assert_allclose(bits, ppsbits)
@@ -229,7 +229,7 @@ class TestFlagConversions(unittest.TestCase):
         msgbits = [0, 0, 0, 1]
         # res = 8
         # No PPS bits should be set (only pps bit 0 for non-processed)
-        res = ctth_procflags2pps(np.array([8], 'int32'))
+        res = ctth_procflags2pps(np.array([8], "int32"))
         bits = get_bit_from_flags(res[0], range(2))
         ppsbits = [1, 0]
         np.testing.assert_allclose(bits, ppsbits)
@@ -239,7 +239,7 @@ class TestFlagConversions(unittest.TestCase):
         msgbits = [0, 0, 0, 0, 1]
         # res = 16
         # PPS bit 5 should be set (and pps bit 0 for non-processed)
-        res = ctth_procflags2pps(np.array([16], 'int32'))
+        res = ctth_procflags2pps(np.array([16], "int32"))
         bits = get_bit_from_flags(res[0], range(6))
         ppsbits = [1, 0, 0, 0, 0, 1]
         np.testing.assert_allclose(bits, ppsbits)
@@ -249,7 +249,7 @@ class TestFlagConversions(unittest.TestCase):
         msgbits = [0, 0, 0, 1, 1]
         # res = 24
         # No PPS bits should be set (only pps bit 0 for non-processed)
-        res = ctth_procflags2pps(np.array([24], 'int32'))
+        res = ctth_procflags2pps(np.array([24], "int32"))
         # ppsbits = [1, 0, 0, 0, 1] # This is how it has been up to now
         # (2014-10-24)
         bits = get_bit_from_flags(res[0], range(2))
@@ -261,7 +261,7 @@ class TestFlagConversions(unittest.TestCase):
         msgbits = [0, 0, 0, 0, 0, 1]
         res = 32
         # PPS bit 5 should be set (and pps bit 0 for non-processed)
-        res = ctth_procflags2pps(np.array([32], 'int32'))
+        res = ctth_procflags2pps(np.array([32], "int32"))
         # This is how it has been up to now (2014-10-24):
         # ppsbits = [1, 0, 0, 0, 1, 1]
         bits = get_bit_from_flags(res[0], range(6))
@@ -273,7 +273,7 @@ class TestFlagConversions(unittest.TestCase):
         msgbits = [0, 0, 0, 1, 0, 1]
         # res = 40
         # PPS bit 4 should be set (and pps bit 0 for non-processed)
-        res = ctth_procflags2pps(np.array([40], 'int32'))
+        res = ctth_procflags2pps(np.array([40], "int32"))
         bits = get_bit_from_flags(res[0], range(6))
         ppsbits = [1, 0, 0, 0, 1, 0]
         np.testing.assert_allclose(bits, ppsbits)
@@ -287,7 +287,7 @@ class TestFlagConversions(unittest.TestCase):
         # msgbits = [0, 0, 0, 0, 0, 0, 1, 1]  # value=3
         # res = 192
         # PPS bit 6 should be set (and pps bit 0 for non-processed)
-        res = ctth_procflags2pps(np.array([192], 'int32'))
+        res = ctth_procflags2pps(np.array([192], "int32"))
         bits = get_bit_from_flags(res[0], range(8))
         ppsbits = [1, 0, 0, 0, 0, 0, 1, 0]
         np.testing.assert_allclose(bits, ppsbits)
@@ -295,7 +295,7 @@ class TestFlagConversions(unittest.TestCase):
         # msgbits = [0, 0, 0, 0, 0, 0, 0, 1]  # value=2
         # res = 128
         # PPS bit 6 should be set (and pps bit 0 for non-processed)
-        res = ctth_procflags2pps(np.array([128], 'int32'))
+        res = ctth_procflags2pps(np.array([128], "int32"))
         bits = get_bit_from_flags(res[0], range(8))
         ppsbits = [1, 0, 0, 0, 0, 0, 1, 0]
         np.testing.assert_allclose(bits, ppsbits)
@@ -307,7 +307,7 @@ class TestFlagConversions(unittest.TestCase):
         # msgbits = [0, 0, 0, 0, 0, 0, 0, 0, 1]  # value=1
         # res = 256
         # PPS bits 0, 2, 7 and 9 (spare) should be set:
-        res = ctth_procflags2pps(np.array([256], 'int32'))
+        res = ctth_procflags2pps(np.array([256], "int32"))
         bits = get_bit_from_flags(res[0], range(16))
         ppsbits = [1, 0, 1, 1, 0, 0, 0, 1,
                    0, 1, 0, 0, 0, 0, 0, 0]
@@ -320,7 +320,7 @@ class TestFlagConversions(unittest.TestCase):
         # PPS bits 9, 11 and 12 (direct mapping) + PPS bits 2 (opaque cloud)
         # and 3 (rttov available) and 5 (thermal inversion) and 7 (rttov
         # simulations applied):
-        res = ctth_procflags2pps(np.array([3328], 'int32'))
+        res = ctth_procflags2pps(np.array([3328], "int32"))
         bits = get_bit_from_flags(res[0], range(16))
         ppsbits = [1, 0, 1, 1, 0, 1, 0, 1,
                    0, 1, 0, 1, 1, 0, 0, 0]
@@ -332,7 +332,7 @@ class TestFlagConversions(unittest.TestCase):
         # msgbits = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
         # res = 4096
         # PPS bit 14 is set (and bit 0 for non-processed)
-        res = ctth_procflags2pps(np.array([4096], 'int32'))
+        res = ctth_procflags2pps(np.array([4096], "int32"))
         bits = get_bit_from_flags(res[0], range(16))
         ppsbits = [1, 0, 0, 0, 0, 0, 0, 0,
                    0, 0, 0, 0, 0, 0, 1, 0]
@@ -342,7 +342,7 @@ class TestFlagConversions(unittest.TestCase):
         # msgbits = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
         # res = 8192
         # PPS bit 14 is set (and bit 0 for non-processed)
-        res = ctth_procflags2pps(np.array([8192], 'int32'))
+        res = ctth_procflags2pps(np.array([8192], "int32"))
         bits = get_bit_from_flags(res[0], range(16))
         ppsbits = [1, 0, 0, 0, 0, 0, 0, 0,
                    0, 0, 0, 0, 0, 0, 1, 1]
