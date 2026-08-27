@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014-2024 Adam.Dybbroe
+# Copyright (c) 2014-2024, 2026 Adam.Dybbroe
 
 # Author(s):
 
@@ -28,6 +28,7 @@ amount/cover and print to stdout.
 
 import argparse
 import logging
+import logging.config
 import os
 import sys
 from datetime import datetime
@@ -229,7 +230,7 @@ def derive_sobs(ct_comp, ipar, npix, resultfile):
 
     with tempfile.NamedTemporaryFile(suffix=("_" + os.path.basename(resultfile)),
                                      dir=os.path.dirname(resultfile),
-                                     mode='w', delete=False) as file_obj:
+                                     mode="w", delete=False) as file_obj:
         write_data(file_obj, so_lon, so_lat, clamount)
 
     now = datetime.utcnow()

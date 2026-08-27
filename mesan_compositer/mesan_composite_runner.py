@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2015-2023 Adam.Dybbroe
+# Copyright (c) 2015-2023, 2026 Adam.Dybbroe
 
 # Author(s):
 
@@ -33,9 +33,11 @@ import os
 import socket
 import sys
 import threading
+import time
 from datetime import datetime, timedelta
+from functools import partial
 from multiprocessing import Manager, Pool
-from queue import Empty
+from queue import Empty, Queue
 from urllib.parse import urlparse
 
 import posttroll.subscriber
@@ -48,10 +50,8 @@ from mesan_compositer.ct_quicklooks import ctth_quicklook_from_netcdf
 from mesan_compositer.logger import setup_logging
 from mesan_compositer.make_ct_composite import CloudproductCompositer
 from mesan_compositer.netcdf_io import cloudComposite
-from mesan_compositer.prt_nwcsaf_cloudamount import \
-    derive_sobs as derive_sobs_clamount
-from mesan_compositer.prt_nwcsaf_cloudheight import \
-    derive_sobs as derive_sobs_clheight
+from mesan_compositer.prt_nwcsaf_cloudamount import derive_sobs as derive_sobs_clamount
+from mesan_compositer.prt_nwcsaf_cloudheight import derive_sobs as derive_sobs_clheight
 from mesan_compositer.utils import NoGeoScenesError, check_uri, get_local_ips
 
 LOG = logging.getLogger(__name__)
@@ -425,6 +425,16 @@ def mesan_live_runner(config_options):
     npix = int(config_options.get("number_of_pixels", DEFAULT_SUPEROBS_WINDOW_SIZE_NPIX))
     LOG.debug("Number of pixels = " + str(npix))
 
+
+    def worker_succeeded(job_key, result):
+        completion_q.put(("success", job_key, result))
+
+    def worker_failed(job_key, exc):
+        completion_q.put(("failed", job_key, exc))
+
+    completion_q = Queue()
+    pending = {}
+
     pool = Pool(processes=1, maxtasksperchild=1)
     manager = Manager()
     listener_q = manager.Queue()
@@ -509,12 +519,16 @@ def mesan_live_runner(config_options):
 
             if product == "CT":
                 LOG.debug("Product is CT")
-                pool.apply_async(ctype_composite_worker,
-                                 (scene,
-                                  jobs_dict[
-                                      keyname],
-                                  publisher_q,
-                                  config_options))
+                result = pool.apply_async(ctype_composite_worker,
+                                          args=(
+                                              scene,
+                                              jobs_dict[keyname],
+                                              publisher_q,
+                                              config_options,
+                                          ),
+                                          callback=partial(worker_succeeded, keyname),
+                                          error_callback=partial(worker_failed, keyname),
+                                          )
 
             elif product == "CTTH":
                 LOG.debug("Product is CTTH")
@@ -527,6 +541,11 @@ def mesan_live_runner(config_options):
 
             else:
                 LOG.warning("Product %s not supported!", str(product))
+
+            pending[keyname] = {
+                "result": result,
+                "started": time.monotonic(),
+            }
 
             # Block any future run on this scene for x minutes from now
             # x = 5

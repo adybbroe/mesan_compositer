@@ -23,10 +23,9 @@
 """Functions for converting from new to old PPS product outputs
 """
 
-from mesan_compositer.pps_msg_conversions import get_bit_from_flags
-
 import numpy as np
 
+from mesan_compositer.pps_msg_conversions import get_bit_from_flags
 
 OLD_CTYPE_NAMES = ["Not processed",
                    "Cloud free land",
@@ -88,7 +87,6 @@ OLD_CTYPE_QFLAG_NAMES = ["Land",
 
 def ctth_convert_flags(status_flag, conditions_flag, quality_flag):
     """Convert from new v2014 ctth flags to the old ones"""
-
     shape = status_flag.shape
     ones = np.ones(shape, "int32")
 
@@ -249,8 +247,8 @@ def ctype_convert_flags(status_flag, conditions_flag, quality_flag):
 
 def map_cloudtypes(newctype):
     """Map the v2014 cloudtype classes to the old (v2012 and before) cloud type
-    categories"""
-
+    categories
+    """
     print("Map new cloud type to old one...")
     retv = newctype.copy()
 
@@ -274,18 +272,17 @@ def map_cloudtypes(newctype):
 
 def old_processing_flag_palette(product):
     """Make the old name list with cloudtype or ctth processing flag descriptions"""
-
-    if product == 'ctth':
+    if product == "ctth":
         names = OLD_CTTH_PFLAG_NAMES
-    elif product == 'cloudtype':
+    elif product == "cloudtype":
         names = OLD_CTYPE_QFLAG_NAMES
     else:
-        raise NotImplementedError('Processing flag conversion for ' +
-                                  'product name ' + str(product) +
-                                  ' not supported!')
+        raise NotImplementedError("Processing flag conversion for " +
+                                  "product name " + str(product) +
+                                  " not supported!")
 
     # Outputvaluenamelist:
-    comp_type = np.dtype([('outval_name', str, 128), ])
+    comp_type = np.dtype([("outval_name", str, 128), ])
     vnamelist = []
     for i, item in enumerate(names):
         bitvalue = 2 ** i
@@ -296,9 +293,8 @@ def old_processing_flag_palette(product):
 
 def old_ctype_palette():
     """Make the old cloudtype output_value_namelist for hdf5 file"""
-
     # Outputvaluenamelist:
-    comp_type = np.dtype([('outval_name', str, 128), ])
+    comp_type = np.dtype([("outval_name", str, 128), ])
     vnamelist = []
     for i, item in enumerate(OLD_CTYPE_NAMES):
         vnamelist.append(str(i) + ": " + item)
@@ -308,7 +304,6 @@ def old_ctype_palette():
 
 def old_ctype_palette_data():
     """Make the old cloudtype PALETTE data array for hdf5 file"""
-
     # PALETTE:
     pal = []
     for i in range(256):
@@ -336,7 +331,7 @@ def old_ctype_palette_data():
     pal[19] = [200, 0, 200]
     pal[20] = [95, 60, 30]
 
-    return np.array(pal, dtype='u1')
+    return np.array(pal, dtype="u1")
 
 
 def old_ctth_height_palette_data():

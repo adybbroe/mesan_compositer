@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2023 Adam.Dybbroe
+# Copyright (c) 2023-2026 Adam.Dybbroe
 
 # Author(s):
 
-#   Adam.Dybbroe <a000680@c21856.ad.smhi.se>
+#   Adam.Dybbroe <Firstname.Lastname at smhi.se>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -28,7 +28,7 @@ import os
 import dask.array as da
 import numpy as np
 import xarray as xr
-from satpy.composites import PaletteCompositor
+from satpy.composites.lookup import PaletteCompositor
 from trollimage.xrimage import XRImage
 
 from mesan_compositer import ctth_height, nwcsaf_cloudtype_2021
@@ -124,7 +124,7 @@ if __name__ == "__main__":
     # FILEPATH = "./blended_stack_weighted_geo_n18_{area}.nc".format(area=areaid)
 
     netcdfpath = get_arguments()
-    group_name = 'CTTH_ALTI_group'
+    group_name = "CTTH_ALTI_group"
     # group_name = 'ctth_alti'
     # ctype_quicklook_from_netcdf("CT_group", netcdfpath)
     ctth_quicklook_from_netcdf(group_name, netcdfpath, destpath="./")

@@ -24,9 +24,10 @@
 old format
 """
 
+import logging
+
 import numpy as np
 
-import logging
 LOG = logging.getLogger(__name__)
 
 
@@ -57,13 +58,12 @@ def get_bit_from_flags(arr, nbit):
     and 0 if it is not set
     """
     res = np.bitwise_and(np.right_shift(arr, nbit), 1)
-    return res.astype('b')
+    return res.astype("b")
 
 
 def ctth_procflags2pps_old(data):
     """Convert ctth processing flags from MSG to PPS format.
     """
-
     ones = np.ones(data.shape, "h")
 
     # 2 bits to define processing status
@@ -200,13 +200,12 @@ def ctth_procflags2pps_old(data):
     del is_bit12_set
     del is_bit13_set
 
-    return retv.astype('h')
+    return retv.astype("h")
 
 
 def ctth_procflags2pps(data):
     """Convert ctth processing flags from MSG to PPS format.
     """
-
     ones = np.ones(data.shape, "int32")
 
     # 2 bits to define processing status
@@ -352,14 +351,13 @@ def ctth_procflags2pps(data):
     del is_bit12_set
     del is_bit13_set
 
-    return retv.astype('int32')
+    return retv.astype("int32")
 
 
 def ctype_procflags2pps(data):
     """Converting cloud type processing flags to the PPS format, in order to
     have consistency between PPS and MSG cloud type contents.
     """
-
     ones = np.ones(data.shape, "h")
 
     # msg illumination bit 0,1,2 (undefined,night,twilight,day,sunglint) maps
@@ -437,4 +435,4 @@ def ctype_procflags2pps(data):
                            0))
     del is_bit9_set
 
-    return retv.astype('h')
+    return retv.astype("h")

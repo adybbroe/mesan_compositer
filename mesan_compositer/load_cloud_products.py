@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2023 Adam.Dybbroe
+# Copyright (c) 2023-2026 Adam.Dybbroe
 
 # Author(s):
 
-#   Adam.Dybbroe <Firstname.Lastname @ smhi.se>
+#   Adam.Dybbroe <Firstname.Lastname at smhi.se>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -35,7 +35,7 @@ from pyorbital.orbital import Orbital
 from satpy import DataQuery, MultiScene, Scene
 from satpy import config as satpy_config
 from satpy.modifiers.angles import get_satellite_zenith_angle
-from satpy.multiscene import stack
+from satpy.multiscene.blend_funcs import stack
 from satpy.utils import debug_on
 from trollsift import Parser, globify
 
@@ -51,10 +51,9 @@ class CloudProductsLoader:
         """Set up the instance."""
         self._cloud_files = cloud_files
         self.scene = None
-        if "MSG" in str(self._cloud_files[0].name):
+        self._reader = "nwcsaf-pps_nc"
+        if len(self._cloud_files) > 0 and "MSG" in str(self._cloud_files[0].name):
             self._reader = "nwcsaf-geo"
-        else:
-            self._reader = "nwcsaf-pps_nc"
 
     def load(self, to_load):
         """Load the cloud products."""
@@ -172,6 +171,7 @@ def blend_cloud_products(product, areaid, *scenes, cache_dir=None):
         loader = CloudProductsLoader(files)
         loader.load([product])
         # Special handling of no-data/fill value for the CTTH:
+        breakpoint()
         try:
             loader.scene["ctth_alti"] = loader.scene["ctth_alti"].fillna(
                 loader.scene["ctth_alti"].scaled_FillValue)
@@ -189,7 +189,7 @@ def blend_cloud_products(product, areaid, *scenes, cache_dir=None):
 
     group_name = product.upper() + "_group"
     if len(loaded_scenes) == 1:
-        local = loaded_scenes[0].resample(areaid, radius_of_influence=10000,
+        local = loaded_scenes[0].resample(areaid, radius_of_influence=25000, #radius_of_influence=10000,
                                           reduce_data=False, cache_dir=cache_dir,
                                           mask_area=False)
         return local, product
@@ -199,7 +199,7 @@ def blend_cloud_products(product, areaid, *scenes, cache_dir=None):
     mscn.group(groups)
 
     LOG.debug("Before call to resample on Multiscene...")
-    resampled = mscn.resample(areaid, radius_of_influence=10000,
+    resampled = mscn.resample(areaid, radius_of_influence=25000, #radius_of_influence=10000,
                               reduce_data=False, cache_dir=cache_dir, mask_area=False)
 
     LOG.debug("Getting the weights...")
@@ -213,7 +213,7 @@ def blend_cloud_products(product, areaid, *scenes, cache_dir=None):
     LOG.debug("Before resampling...")
     blended = resampled.blend(blend_function=stack_with_weights)
     try:
-        blended['CTTH_ALTI_group'].attrs['_FillValue'] = 63535.
+        blended["CTTH_ALTI_group"].attrs["_FillValue"] = 63535.
     except KeyError:
         pass
 
@@ -237,8 +237,9 @@ if __name__ == "__main__":
     # POES_FILES = [*POLAR_DIR.glob("S_NWC_*noaa19_72055_20230201T1651106Z*nc")]
     POES_FILES = [*POLAR_DIR.glob("S_NWC_*_noaa18_00000_20231006T0756*Z*.nc")]
     # NPP_FILES = [*POLAR_DIR.glob("S_NWC_*npp_00000_20230116T11*nc")]
-    # METOP_FILES = [*POLAR_DIR.glob("S_NWC_*metopc_21988_20230201T1657001Z*nc")]
-    METOP_FILES = [*POLAR_DIR.glob("S_NWC_*metopc_00000_20231006T0650001Z*nc")]
+    #METOP_FILES = [*POLAR_DIR.glob("S_NWC_*metopc_21988_20230201T1657001Z*nc")]
+    #METOP_FILES = [*POLAR_DIR.glob("S_NWC_*metopc_00000_20231006T0650001Z*nc")]
+    METOP_FILES = [*POLAR_DIR.glob("S_NWC_*metopb_00000_20231006T0737000Z*nc")]
 
     POLAR_FILES = [POES_FILES, METOP_FILES]
     # blended, group_name = blend_ct_products("ct", areaid, GEO_FILES, POES_FILES,  # NPP_FILES,
@@ -249,7 +250,8 @@ if __name__ == "__main__":
     # blended.save_dataset(group_name,
     #                      filename="./blended_stack_weighted_geo_polar_{area}_ct.nc".format(area=areaid))
 
-    blended, group_name = blend_cloud_products("ctth_alti", areaid, GEO_FILES, METOP_FILES,
+    #blended, group_name = blend_cloud_products("ctth_alti", areaid, GEO_FILES, METOP_FILES,
+    blended, group_name = blend_cloud_products("ctth_alti", areaid, METOP_FILES,
                                                cache_dir=gettempdir())
     blended.save_dataset(group_name,
                          filename="./blended_stack_weighted_geo_polar_{area}_ctth.nc".format(area=areaid))

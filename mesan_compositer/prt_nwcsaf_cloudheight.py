@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2015-2024 Adam.Dybbroe
+# Copyright (c) 2015-2024, 2026 Adam.Dybbroe
 
 # Author(s):
 
@@ -28,6 +28,7 @@ observations of cloud height and print to stdout
 
 import argparse
 import logging
+import logging.config
 import os
 import shutil
 import sys
@@ -122,7 +123,7 @@ def derive_sobs(ctth_comp, npix, filepath):
     height = da.nan_to_num(height, nan=-1.0).astype("int32")
     with  tempfile.NamedTemporaryFile(suffix=("_" + os.path.basename(filepath)),
                                       dir=os.path.dirname(filepath),
-                                      mode='w', delete=False) as file_obj:
+                                      mode="w", delete=False) as file_obj:
         write_data(file_obj, so_lon, so_lat, height)
 
     now = datetime.utcnow()
