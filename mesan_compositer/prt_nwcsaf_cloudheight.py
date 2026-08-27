@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2015-2024 Adam.Dybbroe
+# Copyright (c) 2015-2024, 2026 Adam.Dybbroe
 
 # Author(s):
 
@@ -28,6 +28,7 @@ observations of cloud height and print to stdout
 
 import argparse
 import logging
+import logging.config
 import os
 import shutil
 import sys

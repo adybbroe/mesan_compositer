@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014-2024 Adam.Dybbroe
+# Copyright (c) 2014-2024, 2026 Adam.Dybbroe
 
 # Author(s):
 
@@ -28,6 +28,7 @@ amount/cover and print to stdout.
 
 import argparse
 import logging
+import logging.config
 import os
 import sys
 from datetime import datetime

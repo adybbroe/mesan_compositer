@@ -33,9 +33,11 @@ import os
 import socket
 import sys
 import threading
+import time
 from datetime import datetime, timedelta
+from functools import partial
 from multiprocessing import Manager, Pool
-from queue import Empty
+from queue import Empty, Queue
 from urllib.parse import urlparse
 
 import posttroll.subscriber
