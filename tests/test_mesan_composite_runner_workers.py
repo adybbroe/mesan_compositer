@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime as dt
 import logging
 import pickle
+import socket
 from unittest.mock import Mock
 
 import pytest
@@ -48,6 +49,7 @@ def test_ctype_worker_publishes_and_returns_picklable_success_record(
     superobs = Mock(return_value="/output/cloud_amount.dat")
     create_message = Mock(return_value=b"encoded-posttroll-message")
     publish_queue = ScriptedQueue()
+    servername = socket.gethostname() # 'myfake.server.se'
 
     monkeypatch.setattr(runner, "get_analysis_time", Mock(return_value=analysis_time))
     monkeypatch.setattr(runner, "do_cloud_type_composite", composite)
@@ -68,7 +70,7 @@ def test_ctype_worker_publishes_and_returns_picklable_success_record(
         "mesanEx",
         config,
     )
-    create_message.assert_called_once_with("/output/ct.nc", scene)
+    create_message.assert_called_once_with("/output/ct.nc", scene, servername)
     superobs.assert_called_once_with(
         "/output/ct.nc",
         analysis_time,
@@ -189,6 +191,7 @@ def test_ctth_worker_publishes_and_returns_success_record(monkeypatch, scene, co
     superobs = Mock(return_value="/output/cloud_height.dat")
     create_message = Mock(return_value=b"ctth-message")
     publish_queue = ScriptedQueue()
+    servername = socket.gethostname() # 'myfake.server.se'
 
     monkeypatch.setattr(runner, "get_analysis_time", Mock(return_value=analysis_time))
     monkeypatch.setattr(runner, "do_ctth_composite", composite)
@@ -209,7 +212,7 @@ def test_ctth_worker_publishes_and_returns_success_record(monkeypatch, scene, co
         "mesanEx",
         config,
     )
-    create_message.assert_called_once_with("/output/ctth.nc", scene)
+    create_message.assert_called_once_with("/output/ctth.nc", scene, servername)
     superobs.assert_called_once_with(
         "/output/ctth.nc",
         analysis_time,
