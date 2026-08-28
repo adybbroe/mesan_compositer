@@ -24,10 +24,10 @@
 
 Listens to incoming satellite data products (lvl2 cloud products) and generates
 a mesan composite valid for the closest (whole) hour.
-
 """
 
 import argparse
+import datetime as dt
 import logging.config
 import os
 import socket
@@ -35,7 +35,6 @@ import sys
 import threading
 import time
 from dataclasses import dataclass
-from datetime import datetime, timedelta
 from functools import partial
 from itertools import count
 from multiprocessing import Manager, Pool
@@ -52,15 +51,13 @@ from mesan_compositer.ct_quicklooks import ctth_quicklook_from_netcdf
 from mesan_compositer.logger import setup_logging
 from mesan_compositer.make_ct_composite import CloudproductCompositer
 from mesan_compositer.netcdf_io import cloudComposite
-from mesan_compositer.prt_nwcsaf_cloudamount import \
-    derive_sobs as derive_sobs_clamount
-from mesan_compositer.prt_nwcsaf_cloudheight import \
-    derive_sobs as derive_sobs_clheight
+from mesan_compositer.prt_nwcsaf_cloudamount import derive_sobs as derive_sobs_clamount
+from mesan_compositer.prt_nwcsaf_cloudheight import derive_sobs as derive_sobs_clheight
 from mesan_compositer.utils import NoGeoScenesError, check_uri, get_local_ips
 
 LOG = logging.getLogger(__name__)
 
-DEFAULT_AREA = "mesanX"
+DEFAULT_AREA = "mesanEx"
 DEFAULT_SUPEROBS_WINDOW_SIZE_NPIX = 32
 
 
@@ -74,6 +71,9 @@ SENSOR = {"NOAA-19": "avhrr/3",
           "EOS-Aqua": "modis",
           "Suomi-NPP": "viirs",
           "NOAA-20": "viirs"}
+
+
+POLAR_SATELLITES: list[str] = []
 
 
 GEO_SATS = ["Meteosat-10", "Meteosat-9", "Meteosat-8", "Meteosat-11", ]
@@ -461,10 +461,10 @@ class FileListener(threading.Thread):
         return True
 
 
-def create_message(resultfile, scene):
+def create_message(resultfile, scene, servername):
     """Create the posttroll message."""
     to_send = {}
-    to_send["uri"] = ("ssh://%s/%s" % (SERVERNAME, resultfile))
+    to_send["uri"] = ("ssh://%s/%s" % (servername, resultfile))
     to_send["uid"] = resultfile
     to_send["sensor"] = scene.get("instrument")
     if not to_send["sensor"]:
@@ -566,18 +566,19 @@ def ready2run(msg, files4comp, job_register, sceneid, product="CT"):
     LOG.info("Files ready for Mesan composite: " +
              str(files4comp[sceneid]))
 
-    job_register[sceneid] = datetime.utcnow()
+    job_register[sceneid] = dt.datetime.utcnow(dt.timezone.utc)
     return True
 
 
 def ctype_composite_worker(scene, job_id, publish_q, config_options):
     """Create a CT composite and return a small, picklable result record."""
+    servername = config_options.get("servername", socket.gethostname())
     try:
         LOG.debug("Ctype: Start compositer...")
         time_of_analysis = get_analysis_time(
             scene["starttime"], scene["endtime"])
         twindow = int(config_options.get("absolute_time_threshold_minutes", "30"))
-        delta_t = timedelta(minutes=twindow)
+        delta_t = dt.timedelta(minutes=twindow)
         LOG.debug("Time window = %s", twindow)
         mesan_area_id = config_options.get("mesan_area_id", None)
         if not mesan_area_id:
@@ -600,12 +601,12 @@ def ctype_composite_worker(scene, job_id, publish_q, config_options):
                 "super_obs_file": None,
             }
 
-        pubmsg = create_message(result_file, scene)
+        pubmsg = create_message(result_file, scene, servername)
         LOG.info("Sending: %s", pubmsg)
         publish_q.put(pubmsg)
 
-        if isinstance(job_id, datetime):
-            dt_ = datetime.utcnow() - job_id
+        if isinstance(job_id, dt.datetime):
+            dt_ = dt.datetime.now(dt.timezone.utc) - job_id
             LOG.info(
                 "Ctype composite scene %s finished. It took: %s",
                 job_id,
@@ -636,12 +637,13 @@ def ctype_composite_worker(scene, job_id, publish_q, config_options):
 
 def ctth_composite_worker(scene, job_id, publish_q, config_options):
     """Create a CTTH composite and return a small, picklable result record."""
+    servername = config_options.get("servername", socket.gethostname())
     try:
         LOG.debug("CTTH compositer: Start...")
         time_of_analysis = get_analysis_time(
             scene["starttime"], scene["endtime"])
         twindow = int(config_options.get("absolute_time_threshold_minutes", "30"))
-        delta_t = timedelta(minutes=twindow)
+        delta_t = dt.timedelta(minutes=twindow)
         LOG.debug("Time window = %s", twindow)
         mesan_area_id = config_options.get("mesan_area_id", None)
         if not mesan_area_id:
@@ -669,12 +671,12 @@ def ctth_composite_worker(scene, job_id, publish_q, config_options):
                 "super_obs_file": None,
             }
 
-        pubmsg = create_message(result_file, scene)
+        pubmsg = create_message(result_file, scene, servername)
         LOG.info("Sending: %s", pubmsg)
         publish_q.put(pubmsg)
 
-        if isinstance(job_id, datetime):
-            dt_ = datetime.utcnow() - job_id
+        if isinstance(job_id, dt.datetime):
+            dt_ = dt.datetime.now(dt.timezone.utc) - job_id
             LOG.info(
                 "Cloud Height composite scene %s finished. It took: %s",
                 job_id,
@@ -1014,7 +1016,7 @@ def do_cloudheight(filename, time_of_analysis, area_id, config_options):
 
     values = {"area": area_id, }
 
-    bname = time_of_analysis.strftime(OPTIONS["cloudheight_filename"]) % values
+    bname = time_of_analysis.strftime(config_options["cloudheight_filename"]) % values
     path = config_options["composite_output_dir"]
     filename = os.path.join(path, bname + ".dat")
     LOG.info("Make Cloud Height super observations. Output file = %s", str(filename))
@@ -1022,18 +1024,16 @@ def do_cloudheight(filename, time_of_analysis, area_id, config_options):
     return filename
 
 
-if __name__ == "__main__":
-
+def main():
+    """Start the live runner using command line arguments."""
+    global POLAR_SATELLITES
     cmd_args = get_arguments()
-
     setup_logging(cmd_args)
 
-    OPTIONS = get_config(cmd_args.config_file)
+    configuration = get_config(cmd_args.config_file)
+    POLAR_SATELLITES = configuration.get("polar_satellites")
+    mesan_live_runner(configuration)
 
-    POLAR_SATELLITES = OPTIONS.get("polar_satellites")
 
-    servername = None
-    servername = socket.gethostname()
-    SERVERNAME = OPTIONS.get("servername", servername)
-
-    mesan_live_runner(OPTIONS)
+if __name__ == "__main__":
+    main()

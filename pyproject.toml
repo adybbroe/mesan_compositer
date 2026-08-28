@@ -46,6 +46,18 @@ load_cloud_products = "mesan_compositer.load_cloud_products:main"
 allow-direct-references = true
 
 
+[tool.isort]
+line_length = 120
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+
+#[tool.isort]
+#profile = "black"
+#line_length = 120
+
+
 [tool.hatch.version]
 source = "vcs"
 
@@ -61,6 +73,10 @@ packages = ["mesan_compositer"]
 lint.select = ["E", "W", "F", "I", "D", "S", "B", "A", "PT", "Q", "TID"]
 lint.ignore = ["B905"]  # only available from python 3.10
 line-length = 120
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*.py" = ["S101"]
+
 
 [tool.hatch.build.targets.sdist]
 include = [

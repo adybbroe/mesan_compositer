@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import logging
 import pickle
-from datetime import datetime, timedelta
 from unittest.mock import Mock
 
 import pytest
@@ -13,12 +13,13 @@ from _mesan_runner_fakes import ScriptedQueue
 from mesan_compositer import mesan_composite_runner as runner
 
 
-@pytest.fixture()
+@pytest.fixture
 def scene():
+    """Fixture to create a Mesan-compositer input scene."""
     return {
         "platform_name": "Meteosat-10",
         "orbit_number": "00000",
-        "starttime": datetime(2026, 8, 3, 22, 0),
+        "starttime": dt.datetime(2026, 8, 3, 22, 0, tzinfo=dt.timezone.utc),
         "endtime": None,
         "sensor": "['seviri']",
         "filename": "/CT/S_NWC_CT_MSG3_MSG-N-VISIR_20260803T220000Z_PLAX.nc",
@@ -26,8 +27,9 @@ def scene():
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 def config():
+    """Fixture to create a default Mesan-runner configuration."""
     return {
         "absolute_time_threshold_minutes": "35",
         "mesan_area_id": "mesanEx",
@@ -40,7 +42,8 @@ def test_ctype_worker_publishes_and_returns_picklable_success_record(
     scene,
     config,
 ):
-    analysis_time = datetime(2026, 8, 3, 22, 0)
+    """Test that the the Ctype worker publishes and returns picklable success-record."""
+    analysis_time = dt.datetime(2026, 8, 3, 22, 0, tzinfo=dt.timezone.utc),
     composite = Mock(return_value="/output/ct.nc")
     superobs = Mock(return_value="/output/cloud_amount.dat")
     create_message = Mock(return_value=b"encoded-posttroll-message")
@@ -54,14 +57,14 @@ def test_ctype_worker_publishes_and_returns_picklable_success_record(
 
     result = runner.ctype_composite_worker(
         scene,
-        datetime.utcnow(),
+        dt.datetime.now(dt.timezone.utc),
         publish_queue,
         config,
     )
 
     composite.assert_called_once_with(
         analysis_time,
-        timedelta(minutes=35),
+        dt.timedelta(minutes=35),
         "mesanEx",
         config,
     )
@@ -80,14 +83,12 @@ def test_ctype_worker_publishes_and_returns_picklable_success_record(
         "result_file": "/output/ct.nc",
         "super_obs_file": "/output/cloud_amount.dat",
     }
-    assert pickle.loads(pickle.dumps(result)) == result
+    assert pickle.loads(pickle.dumps(result)) == result  # noqa: S301
 
 
-def test_ctype_worker_uses_default_area_when_configuration_omits_it(
-    monkeypatch,
-    scene,
-):
-    analysis_time = datetime(2026, 8, 3, 22, 0)
+def test_ctype_worker_uses_default_area_when_configuration_omits_it(monkeypatch, scene):
+    """Test that the Ctype worker uses default area when not configured."""
+    analysis_time = dt.datetime(2026, 8, 3, 22, 0, tzinfo=dt.timezone.utc)
     composite = Mock(return_value=None)
 
     monkeypatch.setattr(runner, "get_analysis_time", Mock(return_value=analysis_time))
@@ -103,7 +104,7 @@ def test_ctype_worker_uses_default_area_when_configuration_omits_it(
 
     composite.assert_called_once_with(
         analysis_time,
-        timedelta(minutes=30),
+        dt.timedelta(minutes=30),
         runner.DEFAULT_AREA,
         {},
     )
@@ -116,6 +117,7 @@ def test_ctype_worker_does_not_publish_or_generate_superobs_without_result(
     scene,
     config,
 ):
+    """Test that the Ctype worker does not publish or try generate superobs without a result."""
     create_message = Mock()
     superobs = Mock()
     publish_queue = ScriptedQueue()
@@ -123,7 +125,7 @@ def test_ctype_worker_does_not_publish_or_generate_superobs_without_result(
     monkeypatch.setattr(
         runner,
         "get_analysis_time",
-        Mock(return_value=datetime(2026, 8, 3, 22, 0)),
+        Mock(return_value=dt.datetime(2026, 8, 3, 22, 0, tzinfo=dt.timezone.utc))
     )
     monkeypatch.setattr(runner, "do_cloud_type_composite", Mock(return_value=None))
     monkeypatch.setattr(runner, "create_message", create_message)
@@ -132,7 +134,7 @@ def test_ctype_worker_does_not_publish_or_generate_superobs_without_result(
 
     result = runner.ctype_composite_worker(
         scene,
-        datetime.utcnow(),
+        dt.datetime.now(dt.timezone.utc),
         publish_queue,
         config,
     )
@@ -155,10 +157,11 @@ def test_ctype_worker_reraises_processing_exception_for_asyncresult(
     scene,
     config,
 ):
+    """Test that the Ctype worker re-raises processing exception for async-result."""
     monkeypatch.setattr(
         runner,
         "get_analysis_time",
-        Mock(return_value=datetime(2026, 8, 3, 22, 0)),
+        Mock(return_value=dt.datetime(2026, 8, 3, 22, 0, tzinfo=dt.timezone.utc))
     )
     monkeypatch.setattr(
         runner,
@@ -170,7 +173,7 @@ def test_ctype_worker_reraises_processing_exception_for_asyncresult(
         with pytest.raises(RuntimeError, match="composite failed"):
             runner.ctype_composite_worker(
                 scene,
-                datetime.utcnow(),
+                dt.datetime.now(dt.timezone.utc),
                 ScriptedQueue(),
                 config,
             )
@@ -178,13 +181,10 @@ def test_ctype_worker_reraises_processing_exception_for_asyncresult(
     assert "Failed in ctype_composite_worker" in caplog.text
 
 
-def test_ctth_worker_publishes_and_returns_success_record(
-    monkeypatch,
-    scene,
-    config,
-):
+def test_ctth_worker_publishes_and_returns_success_record(monkeypatch, scene, config):
+    """Test that the CTTH worker publishes and returns a success record."""
     scene = dict(scene, product="CTTH")
-    analysis_time = datetime(2026, 8, 3, 22, 0)
+    analysis_time = dt.datetime(2026, 8, 3, 22, 0, tzinfo=dt.timezone.utc)
     composite = Mock(return_value="/output/ctth.nc")
     superobs = Mock(return_value="/output/cloud_height.dat")
     create_message = Mock(return_value=b"ctth-message")
@@ -198,14 +198,14 @@ def test_ctth_worker_publishes_and_returns_success_record(
 
     result = runner.ctth_composite_worker(
         scene,
-        datetime.utcnow(),
+        dt.datetime.now(dt.timezone.utc),
         publish_queue,
         config,
     )
 
     composite.assert_called_once_with(
         analysis_time,
-        timedelta(minutes=35),
+        dt.timedelta(minutes=35),
         "mesanEx",
         config,
     )
@@ -227,6 +227,7 @@ def test_ctth_worker_publishes_and_returns_success_record(
 
 
 def test_ctth_worker_does_not_publish_without_result(monkeypatch, scene, config):
+    """Test that the CTTH worker dows not publish without a result."""
     scene = dict(scene, product="CTTH")
     create_message = Mock()
     superobs = Mock()
@@ -235,7 +236,7 @@ def test_ctth_worker_does_not_publish_without_result(monkeypatch, scene, config)
     monkeypatch.setattr(
         runner,
         "get_analysis_time",
-        Mock(return_value=datetime(2026, 8, 3, 22, 0)),
+        Mock(return_value=dt.datetime(2026, 8, 3, 22, 0), tzinfo=dt.timezone.utc)
     )
     monkeypatch.setattr(runner, "do_ctth_composite", Mock(return_value=None))
     monkeypatch.setattr(runner, "create_message", create_message)
@@ -244,7 +245,7 @@ def test_ctth_worker_does_not_publish_without_result(monkeypatch, scene, config)
 
     result = runner.ctth_composite_worker(
         scene,
-        datetime.utcnow(),
+        dt.datetime.now(dt.timezone.utc),
         publish_queue,
         config,
     )
@@ -262,11 +263,12 @@ def test_ctth_worker_reraises_processing_exception_for_asyncresult(
     scene,
     config,
 ):
+    """Test the CTTH worker: That it re-raises processing exception for async-result."""
     scene = dict(scene, product="CTTH")
     monkeypatch.setattr(
         runner,
         "get_analysis_time",
-        Mock(return_value=datetime(2026, 8, 3, 22, 0)),
+        Mock(return_value=dt.datetime(2026, 8, 3, 22, 0, tzinfo=dt.timezone.utc))
     )
     monkeypatch.setattr(
         runner,
@@ -278,7 +280,7 @@ def test_ctth_worker_reraises_processing_exception_for_asyncresult(
         with pytest.raises(OSError, match="filesystem unavailable"):
             runner.ctth_composite_worker(
                 scene,
-                datetime.utcnow(),
+                dt.datetime.now(dt.timezone.utc),
                 ScriptedQueue(),
                 config,
             )
@@ -292,7 +294,8 @@ def test_ctype_worker_success_tolerates_non_datetime_registry_value(
     scene,
     config,
 ):
-    analysis_time = datetime(2026, 8, 3, 22, 0)
+    """Test the Ctype worker: That it tolerates non-datetime registry value."""
+    analysis_time = dt.datetime(2026, 8, 3, 22, 0, tzinfo=dt.timezone.utc)
     monkeypatch.setattr(runner, "get_analysis_time", Mock(return_value=analysis_time))
     monkeypatch.setattr(
         runner,
@@ -324,8 +327,9 @@ def test_ctth_worker_uses_default_area_and_tolerates_non_datetime_job_id(
     caplog,
     scene,
 ):
+    """Test the CTTH worker: That is uses default area and tolerates non-datetime-job-id."""
     scene = dict(scene, product="CTTH")
-    analysis_time = datetime(2026, 8, 3, 22, 0)
+    analysis_time = dt.datetime(2026, 8, 3, 22, 0, tzinfo=dt.timezone.utc)
     composite = Mock(return_value="/output/ctth.nc")
 
     monkeypatch.setattr(runner, "get_analysis_time", Mock(return_value=analysis_time))
@@ -348,7 +352,7 @@ def test_ctth_worker_uses_default_area_and_tolerates_non_datetime_job_id(
 
     composite.assert_called_once_with(
         analysis_time,
-        timedelta(minutes=30),
+        dt.timedelta(minutes=30),
         runner.DEFAULT_AREA,
         {},
     )
