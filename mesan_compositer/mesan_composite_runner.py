@@ -566,7 +566,7 @@ def ready2run(msg, files4comp, job_register, sceneid, product="CT"):
     LOG.info("Files ready for Mesan composite: " +
              str(files4comp[sceneid]))
 
-    job_register[sceneid] = dt.datetime.utcnow(dt.timezone.utc)
+    job_register[sceneid] = dt.datetime.now(dt.timezone.utc)
     return True
 
 
