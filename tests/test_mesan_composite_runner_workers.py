@@ -180,7 +180,7 @@ def test_ctype_worker_reraises_processing_exception_for_asyncresult(
                 config,
             )
 
-    assert "Failed in ctype_composite_worker" in caplog.text
+    assert "Failed in CT composite worker" in caplog.text
 
 
 def test_ctth_worker_publishes_and_returns_success_record(monkeypatch, scene, config):
@@ -288,7 +288,7 @@ def test_ctth_worker_reraises_processing_exception_for_asyncresult(
                 config,
             )
 
-    assert "Failed in ctth_composite_worker" in caplog.text
+    assert "Failed in CTTH composite worker" in caplog.text
 
 
 def test_ctype_worker_success_tolerates_non_datetime_registry_value(

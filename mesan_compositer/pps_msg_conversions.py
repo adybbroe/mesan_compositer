@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 Adam.Dybbroe
+# Copyright (c) 2014-2026 Adam.Dybbroe
 
 # Author(s):
 
-#   Adam.Dybbroe <a000680@c14526.ad.smhi.se>
+#   Adam Dybbroe <Firstname.Lastname @ smhi.se>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,9 +20,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Utilities to go from new pps format to old and from msg (old) format to pps
-old format
-"""
+"""Utilities to go from new pps format to old and from msg (old) format to pps old format."""
 
 import logging
 
@@ -32,7 +30,7 @@ LOG = logging.getLogger(__name__)
 
 
 def bits2value(bitlist):
-    """Enter a list of zeros and ones as a bit list and calculate the value"""
+    """Enter a list of zeros and ones as a bit list and calculate the value."""
     val = 0
     for i, bit in enumerate(bitlist):
         val = val + bit * 2 ** i
@@ -41,7 +39,7 @@ def bits2value(bitlist):
 
 
 def value2bits(val):
-    """Converting decimal to binary: Take an integer and calculate the bits"""
+    """Convert decimal to binary - Take an integer and calculate the bits."""
     bits = []
     tmp = 1 * val
     while tmp != 0:
@@ -54,16 +52,17 @@ def value2bits(val):
 
 
 def get_bit_from_flags(arr, nbit):
-    """Check an array if a given bit is set. It outputs 1 when the bit is set
-    and 0 if it is not set
+    """Check an array if a given bit is set.
+
+    It outputs 1 when the bit is set and 0 if it is not set
+
     """
     res = np.bitwise_and(np.right_shift(arr, nbit), 1)
     return res.astype("b")
 
 
 def ctth_procflags2pps_old(data):
-    """Convert ctth processing flags from MSG to PPS format.
-    """
+    """Convert ctth processing flags from MSG to PPS format."""
     ones = np.ones(data.shape, "h")
 
     # 2 bits to define processing status
@@ -204,8 +203,7 @@ def ctth_procflags2pps_old(data):
 
 
 def ctth_procflags2pps(data):
-    """Convert ctth processing flags from MSG to PPS format.
-    """
+    """Convert ctth processing flags from MSG to PPS format."""
     ones = np.ones(data.shape, "int32")
 
     # 2 bits to define processing status
@@ -355,8 +353,11 @@ def ctth_procflags2pps(data):
 
 
 def ctype_procflags2pps(data):
-    """Converting cloud type processing flags to the PPS format, in order to
-    have consistency between PPS and MSG cloud type contents.
+    """Convert cloud type processing flags to the PPS format.
+
+    This is in order to have consistency between PPS and MSG cloud type
+    contents.
+
     """
     ones = np.ones(data.shape, "h")
 

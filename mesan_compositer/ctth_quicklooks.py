@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014-2023 Adam.Dybbroe
+# Copyright (c) 2014-2023, 2026 Adam.Dybbroe
 
 # Author(s):
 
@@ -23,20 +23,22 @@
 """Make quick look images of the ctth composite."""
 
 import argparse
+import datetime as dt
 import logging
+import logging.config
 import os
 import sys
-from datetime import datetime
 from logging import handlers
 
-import numpy as np
-import xarray as xr
-from satpy.composites import ColormapCompositor
-from trollimage.xrimage import XRImage
-
-from mesan_compositer import ctth_height
 from mesan_compositer.config import get_config
-from mesan_compositer.netcdf_io import ncCTTHComposite
+from mesan_compositer.make_ct_composite import CloudproductCompositer
+
+# from satpy.composites import ColormapCompositor
+# import numpy as np
+# import xarray as xr
+# from mesan_compositer import ctth_height
+# from trollimage.xrimage import XRImage
+
 
 LOG = logging.getLogger(__name__)
 
@@ -58,6 +60,7 @@ def get_arguments():
       Observation/Analysis time
       Area id
       Window size
+
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("--datetime", "-d", help="Date and time of observation - yyyymmddhh",
@@ -80,7 +83,7 @@ def get_arguments():
 
     args = parser.parse_args()
 
-    tanalysis = datetime.strptime(args.datetime, "%Y%m%d%H")
+    tanalysis = dt.datetime.strptime(args.datetime, "%Y%m%d%H")
     area_id = args.area_id
     if "template" in args.config_file:
         print("Template file given as master config, aborting!")
@@ -123,20 +126,23 @@ if __name__ == "__main__":
         LOG.error("File " + str(filename) + " does not exist!")
         sys.exit(-1)
 
-    comp = ncCTTHComposite()
-    comp.load(filename)
+    delta_t = dt.timedelta(minutes=30)
+    comp = CloudproductCompositer(time_of_analysis, delta_t, areaid, OPTIONS, "CTTH")
 
-    palette = ctth_height()
+    # FIXME!
+    # comp.load(filename)
 
-    ctth_data = comp.height.data
-    ctth_data = ctth_data / 500.0 + 1
-    ctth_data = ctth_data.astype(np.uint8)
+    # palette = ctth_height()
 
-    cmap = ColormapCompositor("mesan_cloudheight_composite")
-    colors, sqpal = cmap.build_colormap(palette, np.uint8, {})
+    # ctth_data = comp.height.data
+    # ctth_data = ctth_data / 500.0 + 1
+    # ctth_data = ctth_data.astype(np.uint8)
 
-    attrs = {"_FillValue": 0}
-    xdata = xr.DataArray(ctth_data, dims=["y", "x"], attrs=attrs).astype("uint8")
-    pimage = XRImage(xdata)
-    pimage.palettize(colors)
-    pimage.save(filename.strip(".nc") + "_height.png")
+    # cmap = ColormapCompositor("mesan_cloudheight_composite")
+    # colors, sqpal = cmap.build_colormap(palette, np.uint8, {})
+
+    # attrs = {"_FillValue": 0}
+    # xdata = xr.DataArray(ctth_data, dims=["y", "x"], attrs=attrs).astype("uint8")
+    # pimage = XRImage(xdata)
+    # pimage.palettize(colors)
+    # pimage.save(filename.strip(".nc") + "_height.png")
