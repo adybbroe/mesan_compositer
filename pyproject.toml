@@ -23,7 +23,10 @@ dependencies = [
 
 
 [project.optional-dependencies]
-test = ["mock", "pytest"]
+test = [
+    "pytest",
+    "freezegun",
+]
 netcdf4-python = ["netCDF4"]
 
 
