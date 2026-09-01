@@ -220,7 +220,6 @@ class RecordingLogger:
 
 def make_thread_class(name: str) -> type[RecordingThread]:
     """Create a thread-fake subclass with its own instance registry."""
-
     return type(name, (RecordingThread,), {"instances": []})
 
 
@@ -232,7 +231,6 @@ def make_geo_message(
     include_pge: bool = True,
 ) -> SimpleNamespace:
     """Build a representative accepted NWCSAF/Geo Posttroll-like message."""
-
     uid = (
         f"S_NWC_{product}_MSG3_MSG-N-VISIR_"
         f"{start_time:%Y%m%dT%H%M%SZ}_PLAX.nc"
@@ -258,7 +256,6 @@ def make_polar_message(
     orbit_number: int = 12345,
 ) -> SimpleNamespace:
     """Build a representative polar Posttroll-like message."""
-
     uid = (
         f"S_NWC_{product}_noaa20_{orbit_number:05d}_"
         f"{start_time:%Y%m%dT%H%M%SZ}_{start_time:%Y%m%dT%H%M%SZ}.nc"

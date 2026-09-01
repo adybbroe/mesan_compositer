@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014-2023, 2026 Adam.Dybbroe
+# Copyright (c) 2014-2026 Adam.Dybbroe
 
 # Author(s):
 
-#   Adam.Dybbroe <a000680@c14526.ad.smhi.se>
+#   Adam.Dybbroe <Firstname.Lastname at smhi.se>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,126 +23,29 @@
 """Make quick look images of the ctth composite."""
 
 import argparse
-import datetime as dt
-import logging
-import logging.config
-import os
-import sys
-from logging import handlers
 
-from mesan_compositer.config import get_config
-from mesan_compositer.make_ct_composite import CloudproductCompositer
-
-# from satpy.composites import ColormapCompositor
-# import numpy as np
-# import xarray as xr
-# from mesan_compositer import ctth_height
-# from trollimage.xrimage import XRImage
-
-
-LOG = logging.getLogger(__name__)
-
-#: Default time format
-_DEFAULT_TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
-
-#: Default log format
-_DEFAULT_LOG_FORMAT = "[%(levelname)s: %(asctime)s : %(name)s] %(message)s"
+from mesan_compositer.ct_quicklooks import ctth_quicklook_from_netcdf
 
 
 def get_arguments():
-    """Get command line arguments.
-
-    args.logging_conf_file, args.config_file, obs_time, area_id, wsize
-
-    Return:
-      File path of the logging.ini file
-      File path of the application configuration file
-      Observation/Analysis time
-      Area id
-      Window size
-
-    """
+    """Get command line arguments."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--datetime", "-d", help="Date and time of observation - yyyymmddhh",
-                        required=True)
-    parser.add_argument("--area_id", "-a", help="Area id",
-                        required=True)
-    parser.add_argument("-c", "--config_file",
+    parser.add_argument("-f", "--netcdf_filepath",
                         type=str,
-                        dest="config_file",
+                        dest="netcdf_filepath",
                         required=True,
-                        help="The file containing configuration parameters e.g. mesan_sat_config.yaml")
-    parser.add_argument("-l", "--logging",
-                        help="The path to the log-configuration file (e.g. './logging.ini')",
-                        dest="logging_conf_file",
-                        type=str,
-                        required=False)
-    parser.add_argument("-v", "--verbose",
-                        help="print debug messages too",
-                        action="store_true")
+                        help="The netcdf file path of the cloud type composite.")
 
     args = parser.parse_args()
 
-    tanalysis = dt.datetime.strptime(args.datetime, "%Y%m%d%H")
-    area_id = args.area_id
-    if "template" in args.config_file:
-        print("Template file given as master config, aborting!")
-        sys.exit()
-
-    return args.logging_conf_file, args.config_file, tanalysis, area_id
+    return args.netcdf_filepath
 
 
 if __name__ == "__main__":
 
-    (logfile, config_filename, time_of_analysis, areaid) = get_arguments()
-
-    if logfile:
-        logging.config.fileConfig(logfile)
-
-    handler = logging.StreamHandler(sys.stderr)
-    formatter = logging.Formatter(fmt=_DEFAULT_LOG_FORMAT,
-                                  datefmt=_DEFAULT_TIME_FORMAT)
-    handler.setFormatter(formatter)
-    handler.setLevel(logging.DEBUG)
-
-    logging.getLogger("").addHandler(handler)
-    logging.getLogger("").setLevel(logging.DEBUG)
-    logging.getLogger("satpy").setLevel(logging.INFO)
-
-    LOG = logging.getLogger("ctth_quicklooks")
-
-    log_handlers = logging.getLogger("").handlers
-    for log_handle in log_handlers:
-        if type(log_handle) is handlers.SMTPHandler:
-            LOG.debug("Mail notifications to: %s", str(log_handle.toaddrs))
-
-    OPTIONS = get_config(config_filename)
-
-    values = {"area": areaid, }
-    bname = time_of_analysis.strftime(OPTIONS["ctth_composite_filename"]) % values
-    path = OPTIONS["composite_output_dir"]
-    filename = os.path.join(path, bname) + ".nc"
-    if not os.path.exists(filename):
-        LOG.error("File " + str(filename) + " does not exist!")
-        sys.exit(-1)
-
-    delta_t = dt.timedelta(minutes=30)
-    comp = CloudproductCompositer(time_of_analysis, delta_t, areaid, OPTIONS, "CTTH")
-
-    # FIXME!
-    # comp.load(filename)
-
-    # palette = ctth_height()
-
-    # ctth_data = comp.height.data
-    # ctth_data = ctth_data / 500.0 + 1
-    # ctth_data = ctth_data.astype(np.uint8)
-
-    # cmap = ColormapCompositor("mesan_cloudheight_composite")
-    # colors, sqpal = cmap.build_colormap(palette, np.uint8, {})
-
-    # attrs = {"_FillValue": 0}
-    # xdata = xr.DataArray(ctth_data, dims=["y", "x"], attrs=attrs).astype("uint8")
-    # pimage = XRImage(xdata)
-    # pimage.palettize(colors)
-    # pimage.save(filename.strip(".nc") + "_height.png")
+    netcdfpath = get_arguments()
+    #group_name = "CTTH_ALTI_group"
+    group_name = "ctth_alti"
+    # group_name = 'ctth_alti'
+    # ctype_quicklook_from_netcdf("CT_group", netcdfpath)
+    ctth_quicklook_from_netcdf(group_name, netcdfpath, destpath="./")
