@@ -302,10 +302,11 @@ def do_cloudamount(filename, time_of_analysis, area_id, config_options):
         ctype = cloudComposite(filename, "ct", areaname=area_id)
         ctype.load()
 
-    values = {"area": area_id, }
-    bname = time_of_analysis.strftime(config_options["cloudamount_filename"]) % values
+    file_parser = Parser(config_options["cloudheight_filename"])
+    bname = file_parser.compose({"area":area_id, "obstime":time_of_analysis})
+
     path = config_options["composite_output_dir"]
-    filename = os.path.join(path, bname + ".dat")
+    filename = os.path.join(path, bname)
 
     derive_sobs(ctype, ipar, npix, filename)
     return filename

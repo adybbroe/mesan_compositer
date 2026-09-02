@@ -32,6 +32,9 @@ TEST_YAML_CONFIG_CONTENT = """
 ct_composite_filename: mesan_composite_{area}_{obstime:%Y%m%d_%H%M}_ct.nc
 ctth_composite_filename: mesan_composite_{area}_{obstime:%Y%m%d_%H%M}_ctth.nc
 
+cloudamount_filename: mesan_composite_{area}_{obstime:%Y%m%d_%H%M}_clamount.dat
+cloudheight_filename: mesan_composite_{area}_{obstime:%Y%m%d_%H%M}_clheight.dat
+
 cloud_amount_ipar: 71
 number_of_pixels: 24
 absolute_time_threshold_minutes: 35
