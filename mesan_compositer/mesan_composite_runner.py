@@ -38,6 +38,7 @@ from dataclasses import dataclass
 from functools import partial
 from itertools import count
 from multiprocessing import Manager, Pool
+from pathlib import Path
 from queue import Empty, Queue
 from urllib.parse import urlparse
 
@@ -459,24 +460,19 @@ class FileListener(threading.Thread):
         return True
 
 
-def create_message(resultfile, scene, servername):
+def create_message(resultfile, scene, product_name):
     """Create the posttroll message."""
     to_send = {}
-    to_send["uri"] = ("ssh://%s/%s" % (servername, resultfile))
-    to_send["uid"] = resultfile
-    to_send["sensor"] = scene.get("instrument")
-    if not to_send["sensor"]:
-        to_send["sensor"] = scene.get("sensor")
-
-    to_send["platform_name"] = scene["platform_name"]
-    to_send["orbit_number"] = scene.get("orbit_number")
+    to_send["uri"] = resultfile
+    to_send["uid"] = Path(resultfile).name
+    to_send["product"] = product_name
     to_send["type"] = "netCDF"
     to_send["format"] = "MESAN"
     to_send["data_processing_level"] = "3"
     to_send["start_time"] = scene["starttime"]
     to_send["end_time"] = scene["endtime"]
     pub_message = Message("/" + to_send["format"] + "/" + to_send["data_processing_level"] +
-                          "/polar/direct_readout/",
+                          "/" + to_send["type"] ,
                           "file", to_send).encode()
 
     return pub_message
@@ -672,8 +668,6 @@ class CompositeWorker:
 
     def __call__(self, scene, job_id, publish_q, config_options):
         """Run the composite worker."""
-        servername = config_options.get("servername", socket.gethostname())
-
         try:
             LOG.debug("%s: Start compositer...", self.product)
 
@@ -690,7 +684,7 @@ class CompositeWorker:
             if not result_file:
                 return self.make_result(status="no_result")
 
-            self.publish_result(result_file, scene, servername, publish_q)
+            self.publish_result(result_file, scene, publish_q)
             self.log_elapsed_time(job_id)
 
             if "generate_superobservations_live_runner" not in config_options:
@@ -746,9 +740,9 @@ class CompositeWorker:
 
         return (time_of_analysis, dt.timedelta(minutes=time_window), area_id)
 
-    def publish_result(self, result_file, scene, servername, publish_q):
+    def publish_result(self, result_file, scene, publish_q):
         """Publish the generated composite."""
-        pubmsg = create_message( result_file, scene, servername, )
+        pubmsg = create_message(result_file, scene, self.product)
 
         LOG.info("Sending: %s", pubmsg)
         publish_q.put(pubmsg)
