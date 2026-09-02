@@ -204,8 +204,8 @@ def do_cloudheight(filename, time_of_analysis, area_id, config_options):
     return filename
 
 
-if __name__ == "__main__":
-
+def main():
+    """Generate the cloud height super observations."""
     cmd_args = get_arguments()
     setup_logging(cmd_args)
 
@@ -214,7 +214,7 @@ if __name__ == "__main__":
     file_parser = Parser(configuration["ctth_composite_filename"])
     filename = cmd_args.netcdf_filepath
 
-    res = file_parser.parse(Path(filename).name)
+    res = file_parser.parse(Path(filename).name.strip(".nc"))
     areaid = res["area"]
     time_of_analysis = res["obstime"]
 
@@ -224,3 +224,6 @@ if __name__ == "__main__":
 
     resultfile = do_cloudheight(filename, time_of_analysis, areaid, configuration)
     LOG.info("Cloud top height super observations generated: %s", resultfile)
+
+if __name__ == "__main__":
+    main()

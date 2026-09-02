@@ -312,8 +312,8 @@ def do_cloudamount(filename, time_of_analysis, area_id, config_options):
     return filename
 
 
-if __name__ == "__main__":
-
+def main():
+    """Generate the cloud amount super observations."""
     cmd_args = get_arguments()
     setup_logging(cmd_args)
 
@@ -322,13 +322,17 @@ if __name__ == "__main__":
     file_parser = Parser(configuration["ct_composite_filename"])
     filename = cmd_args.netcdf_filepath
 
-    res = file_parser.parse(Path(filename).name)
+    res = file_parser.parse(Path(filename).name.strip(".nc"))
     areaid = res["area"]
     time_of_analysis = res["obstime"]
 
     if not os.path.exists(filename):
         LOG.error("File " + str(filename) + " does not exist!")
-        sys.exit(-1)
+        return
 
     resultfile = do_cloudamount(filename, time_of_analysis, areaid, configuration)
     LOG.info("Cloud amount super observations generated: %s", resultfile)
+
+
+if __name__ == "__main__":
+    main()

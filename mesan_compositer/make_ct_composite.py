@@ -120,9 +120,12 @@ class CloudproductCompositer:
         # specifcations in the config file:
         LOG.info("Output file name is generated from observation " +
                  "time and info in config file:")
-        file_parser = Parser(config_options["ct_composite_filename"])
-        bname = file_parser.compose({"area":areaid, "obstime":obstime})
+        if product == "CT":
+            file_parser = Parser(config_options["ct_composite_filename"])
+        else:
+            file_parser = Parser(config_options["ctth_composite_filename"])
 
+        bname = file_parser.compose({"area":areaid, "obstime":obstime})
         path = config_options["composite_output_dir"]
         self.filename = os.path.join(path, bname)
 
