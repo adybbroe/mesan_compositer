@@ -27,20 +27,26 @@ observations of cloud height and print to stdout
 """
 
 import argparse
+import datetime as dt
 import logging
 import logging.config
 import os
 import shutil
 import sys
 import tempfile
-from datetime import datetime
-from logging import handlers
+from pathlib import Path
 
 import dask.array as da
 import numpy as np
 import xarray as xr
+from trollsift import Parser
 
 from mesan_compositer.config import get_config
+from mesan_compositer.logger import setup_logging
+from mesan_compositer.netcdf_io import cloudComposite
+
+DEFAULT_SUPEROBS_WINDOW_SIZE_NPIX = 32
+USE_LEGACY_WRITING = False
 
 LOG = logging.getLogger(__name__)
 
@@ -57,49 +63,43 @@ DLENMIN = 4
 def get_arguments():
     """Get command line arguments.
 
-    args.logging_conf_file, args.config_file, obs_time, area_id, wsize
+    args.logging_conf_file, args.config_file, args.obs_time, args.composite-filename
 
     Return:
-      File path of the logging.ini file
+      File path of the log-config yaml file
       File path of the application configuration file
       Observation/Analysis time
-      Area id
-      Window size
+
 
     """
     parser = argparse.ArgumentParser()
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--datetime", "-d", help="Date and time of observation - yyyymmddhh",
-                        required=True)
-    parser.add_argument("--area_id", "-a", help="Area id",
-                        required=True)
-    parser.add_argument("--size", "-s", help="Size of integration area in pixels",
-                        required=True)
+    parser.add_argument("-f", "--netcdf_filepath",
+                        type=str,
+                        dest="netcdf_filepath",
+                        required=True,
+                        help="The netcdf file path of the cloud top height composite.")
     parser.add_argument("-c", "--config_file",
                         type=str,
                         dest="config_file",
                         required=True,
                         help="The file containing configuration parameters e.g. mesan_sat_config.yaml")
     parser.add_argument("-l", "--logging",
-                        help="The path to the log-configuration file (e.g. './logging.ini')",
-                        dest="logging_conf_file",
+                        help="The path to the log-configuration file (e.g. './log_config.yaml')",
+                        dest="log_config_file",
                         type=str,
                         required=False)
-    parser.add_argument("-v", "--verbose",
-                        help="print debug messages too",
-                        action="store_true")
+    parser.add_argument("-v", "--verbose", dest="verbosity", action="count", default=0,
+                        help="Verbosity (between 1 and 2 occurrences with more leading to more "
+                        "verbose logging). WARN=0, INFO=1, "
+                        "DEBUG=2. This is overridden by the log config file if specified.")
 
     args = parser.parse_args()
 
-    wsize = args.size
-    area_id = args.area_id
-    obs_time = datetime.strptime(args.datetime, "%Y%m%d%H")
     if "template" in args.config_file:
-        print("Template file given as master config, aborting!")
+        print("Template file given as master config, aborting!")  # noqa: T201
         sys.exit()
 
-    return args.logging_conf_file, args.config_file, obs_time, area_id, wsize
+    return args
 
 
 def derive_sobs(ctth_comp, npix, filepath):
@@ -126,7 +126,7 @@ def derive_sobs(ctth_comp, npix, filepath):
                                       mode="w", delete=False) as file_obj:
         write_data(file_obj, so_lon, so_lat, height)
 
-    now = datetime.utcnow()
+    now = dt.datetime.now(dt.timezone.utc)
     fname_with_timestamp = str(filepath) + now.strftime("_%Y%m%d%H%M%S")
     # Change the file permissions to match current umask:
     umask = os.umask(0o666)
@@ -142,87 +142,84 @@ def write_data(fileobj, longitudes, latitudes, clheight):
     cortyp = 1
     sd_ = 999.9
 
-    # Create a Dataset with lon, lat and cloud top height in meters:
     shape = clheight.shape
-    # height_ds = xr.Dataset(data_vars={"clheight": clheight,
-    #                                   "lon": longitudes[:shape[0], :shape[1]],
-    #                                   # 'lat': latitudes[:shape[0], :shape[1]],
-    #                                   "minus_sixti": xr.DataArray(data=(np.ones(shape)*-60).astype("int32"),
-    #                                                               dims=["y", "x"]),
-    #                                   "minus_999": xr.DataArray(data=(np.ones(shape)*-999).astype("int32"),
-    #                                                             dims=["y", "x"]),
-    #                                   "five_nines": xr.DataArray(data=(np.ones(shape)*99999).astype("int32"),
-    #                                                              dims=["y", "x"]),
-    #                                   "sdv": xr.DataArray(data=np.ones(shape)*sd_,
-    #                                                       dims=["y", "x"]),
-    #                                   "cortyp": xr.DataArray(data=(np.ones(shape)*cortyp).astype("int32"),
-    #                                                          dims=["y", "x"])
-    #                                   }
-    #                        )
-
-    # df = height_ds.to_dataframe()
-
     height = clheight.data
-    # height = clheight.data.compute()
 
-    for y in range(shape[0]):
-        yidx = shape[0]-1-y
-        for x in range(shape[1]):
-            xidx = x
-            if height[yidx, xidx] < 0:
-                continue
+    if USE_LEGACY_WRITING:
+        for y in range(shape[0]):
+            yidx = shape[0]-1-y
+            for x in range(shape[1]):
+                xidx = x
+                if height[yidx, xidx] < 0:
+                    continue
 
-            result = "%8d %7.2f %7.2f %5d %d %d %8.2f %8.2f\n" % \
-                (99999, latitudes[yidx, xidx], longitudes[yidx, xidx], -999, cortyp, -60,
-                 height[yidx, xidx], sd_)
-            fileobj.write(result)
+                result = "%8d %7.2f %7.2f %5d %d %d %8.2f %8.2f\n" % \
+                    (99999, latitudes[yidx, xidx], longitudes[yidx, xidx], -999, cortyp, -60,
+                     height[yidx, xidx], sd_)
+                fileobj.write(result)
+    else:
+        # Reverse the array to fit with the old format, going from south to north (y-axis first):
+        height_ = np.asarray(height)[::-1]
+        latitudes_ = np.asarray(latitudes[:shape[0], :shape[1]])[::-1]
+        longitudes_ = np.asarray(longitudes[:shape[0], :shape[1]])[::-1]
+
+        valid = height_ >= 0
+
+        data = np.column_stack(
+            [
+                np.full(valid.sum(), 99999),
+                latitudes_[valid],
+                longitudes_[valid],
+                np.full(valid.sum(), -999),
+                np.full(valid.sum(), cortyp),
+                np.full(valid.sum(), -60),
+                height_[valid],
+                np.full(valid.sum(), sd_),
+            ]
+        )
+
+        np.savetxt(fileobj, data, fmt="%8d %7.2f %7.2f %5d %d %d %8.2f %8.2f")
+
+
+def do_cloudheight(filename, time_of_analysis, area_id, config_options):
+    """Make the cloud height super observations."""
+    npix = int(config_options.get("number_of_pixels", DEFAULT_SUPEROBS_WINDOW_SIZE_NPIX))
+
+    # Make Super observations:
+    LOG.info("Make Cloud Top Height super observations")
+    try:
+        ctth = cloudComposite(filename, "CTTH_ALTI_group", areaname=area_id)
+        ctth.load()
+    except KeyError:
+        ctth = cloudComposite(filename, "ctth_alti", areaname=area_id)
+        ctth.load()
+
+    values = {"area": area_id, }
+
+    bname = time_of_analysis.strftime(config_options["cloudheight_filename"]) % values
+    path = config_options["composite_output_dir"]
+    filename = os.path.join(path, bname + ".dat")
+    LOG.info("Make Cloud Height super observations. Output file = %s", str(filename))
+    derive_sobs(ctth, npix, filename)
+    return filename
+
 
 if __name__ == "__main__":
 
-    (logfile, config_filename, obstime, areaid, window_size) = get_arguments()
+    cmd_args = get_arguments()
+    setup_logging(cmd_args)
 
-    if logfile:
-        logging.config.fileConfig(logfile)
+    configuration = get_config(cmd_args.config_file)
 
-    handler = logging.StreamHandler(sys.stderr)
-    handler.setLevel(logging.DEBUG)
+    file_parser = Parser(configuration["ctth_composite_filename"])
+    filename = cmd_args.netcdf_filepath
 
-    if not logfile:
-        formatter = logging.Formatter(fmt=_DEFAULT_LOG_FORMAT,
-                                      datefmt=_DEFAULT_TIME_FORMAT)
-        handler.setFormatter(formatter)
+    res = file_parser.parse(Path(filename).name)
+    areaid = res["area"]
+    time_of_analysis = res["obstime"]
 
-    logging.getLogger("").addHandler(handler)
-    logging.getLogger("").setLevel(logging.DEBUG)
-
-    LOG = logging.getLogger("prt_nwcsaf_cloudheight")
-
-    log_handlers = logging.getLogger("").handlers
-    for log_handle in log_handlers:
-        if type(log_handle) is handlers.SMTPHandler:
-            LOG.debug("Mail notifications to: %s", str(log_handle.toaddrs))
-
-    OPTIONS = get_config(config_filename)
-
-    values = {"area": areaid, }
-    bname = obstime.strftime(OPTIONS["ctth_composite_filename"]) % values
-    path = OPTIONS["composite_output_dir"]
-    filename = os.path.join(path, bname) + ".nc"
     if not os.path.exists(filename):
         LOG.error("File " + str(filename) + " does not exist!")
         sys.exit(-1)
 
-    # Load the Cloud Height composite from file
-    from netcdf_io import cloudComposite
-
-    #ctth = cloudComposite(filename, "CTTH_ALTI", areaname=areaid)
-    ctth = cloudComposite(filename, "CTTH_ALTI_group", areaname=areaid)
-
-    ctth.load()
-
-    NPIX = int(window_size)
-
-    bname = obstime.strftime(OPTIONS["cloudheight_filename"]) % values
-    path = OPTIONS["composite_output_dir"]
-    filename = os.path.join(path, bname + ".dat")
-    derive_sobs(ctth, NPIX, filename)
+    do_cloudheight(filename, time_of_analysis, areaid, configuration)

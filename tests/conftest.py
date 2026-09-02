@@ -24,7 +24,9 @@
 
 import os
 
+import numpy as np
 import pytest
+import xarray as xr
 
 TEST_YAML_CONFIG_CONTENT = """
 ct_composite_filename: mesan_composite_%(area)s_%Y%m%d_%H%M_ct
@@ -173,3 +175,82 @@ def _create_empty_nwcsaf_files_fromlist(basedir, filelist, product=None):
         file_path.touch()
         files.append(file_path)
     return files
+
+
+@pytest.fixture
+def cloud_type_netcdf(tmp_path):
+    """Create a small cloud-type NetCDF file for super observation creation tests."""
+    shape = (16, 8)
+
+    ct = np.full(shape, 5, dtype=np.uint8)
+
+    # First 8x8 block becomes invalid for cloud amount.
+    ct[:8, :] = 0
+
+    lons = np.tile(np.arange(shape[1], dtype=float), (shape[0], 1))
+    lats = np.tile(np.arange(shape[0], dtype=float)[:, None], (1, shape[1]))
+
+    ds = xr.Dataset(
+        {
+            "ct": (
+                ("y", "x"),
+                ct,
+            ),
+        },
+        coords={
+            "lon": (
+                ("y", "x"),
+                lons,
+            ),
+            "lat": (
+                ("y", "x"),
+                lats,
+            ),
+        },
+    )
+
+    filename = tmp_path / "ct.nc"
+    ds.to_netcdf(filename)
+
+    return filename
+
+
+@pytest.fixture
+def cloud_top_height_netcdf(tmp_path):
+    """Create a small cloud-top-height NetCDF file for super observation creation tests."""
+    shape = (24, 8)
+
+    height = np.full(shape, 1000.0, dtype=np.float32)
+
+    # Middle 8x8 block is invalid and should not produce a superob.
+    height[8:16, :] = np.nan
+
+    # Last 8x8 block has a different height.
+    height[16:24, :] = 3000.0
+
+    lons = np.tile(np.arange(shape[1], dtype=np.float32), (shape[0], 1))
+    lats = np.tile(np.arange(shape[0], dtype=np.float32)[:, None], (1, shape[1]))
+
+    ds = xr.Dataset(
+        {
+            "ctth_alti": (
+                ("y", "x"),
+                height,
+            ),
+        },
+        coords={
+            "lon": (
+                ("y", "x"),
+                lons,
+            ),
+            "lat": (
+                ("y", "x"),
+                lats,
+            ),
+        },
+    )
+
+    filename = tmp_path / "ctth.nc"
+    ds.to_netcdf(filename)
+
+    return filename

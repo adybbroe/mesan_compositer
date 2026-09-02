@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019 - 2023 Adam.Dybbroe
+# Copyright (c) 2019 - 2023, 2026 Adam.Dybbroe
 
 # Author(s):
 
@@ -109,17 +109,17 @@ def create_ct_variable(nc_file, var_name):
 _PATTERN = ("S_NWC_{product:s}_{platform_name:s}_{orbit:05d}_" +
             "{start_time:%Y%m%dT%H%M%S%f}Z_{end_time:%Y%m%dT%H%M%S%f}Z.nc")
 _MSG_CT_PATTERN = "S_NWC_CT_{satellite:s}_{area:s}-VISIR_{nominal_time:%Y%m%dT%H%M%SZ}_PLAX.nc"
+_MSG_CTTH_PATTERN = "SAFNWC_{satellite:s}_CTTH_{nominal_time:%Y%m%d%H%M}_{area:s}_______.PLAX.CTTH.0.h5"
 
-CONFIG_OPTIONS = {"ct_composite_filename": "mesan_composite_%(area)s_%Y%m%d_%H%M_ct",
-                  "ctth_composite_filename": "mesan_composite_%(area)s_%Y%m%d_%H%M_ctth",
-                  "cloudamount_filename": "mesan_composite_%(area)s_%Y%m%d_%H%M_clamount",
-                  "cloudheight_filename": "mesan_composite_%(area)s_%Y%m%d_%H%M_clheight",
+CONFIG_OPTIONS = {"ct_composite_filename": "mesan_composite_{area}_{obstime:%Y%m%d_%H%M}_ct.nc",
+                  "ctth_composite_filename": "mesan_composite_{area}_{obstime:%Y%m%d_%H%M}_ctth.nc",
+                  "cloudamount_filename": "mesan_composite_{area}_{obstime:%Y%m%d_%H%M}_clamount.dat",
+                  "cloudheight_filename": "mesan_composite_{area}_{obstime:%Y%m%d_%H%M}_clheight.dat",
                   "pps_filename": _PATTERN,
                   "msg_satellites": "Meteosat-11 Meteosat-10 Meteosat-9 Meteosat-8",
-                  # 'msg_cty_filename': 'SAFNWC_%(satellite)s_CT___%Y%m%d%H%M_%(area)s.PLAX.CTTH.0.h5',
                   "msg_cty_filename": _MSG_CT_PATTERN,
                   "msg_cty_file_ext": "PLAX.CTTH.0.h5",
-                  "msg_ctth_filename": "SAFNWC_%(satellite)s_CTTH_%Y%m%d%H%M_%(area)s.PLAX.CTTH.0.h5",
+                  "msg_ctth_filename": _MSG_CTTH_PATTERN,
                   "msg_ctth_file_ext": "PLAX.CTTH.0.h5",
                   "cloud_amount_ipar": 71,
                   "number_of_pixels": 24,

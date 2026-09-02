@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014-2024, 2026 Adam.Dybbroe
+# Copyright (c) 2014-2026 Adam.Dybbroe
 
 # Author(s):
 
@@ -27,20 +27,26 @@ amount/cover and print to stdout.
 """
 
 import argparse
+import datetime as dt
 import logging
 import logging.config
 import os
+import shutil
 import sys
-from datetime import datetime
-from logging import handlers
+import tempfile
+from pathlib import Path
 
 import dask.array as da
 import numpy as np
 import xarray as xr
+from trollsift import Parser
 
 from mesan_compositer.config import get_config
+from mesan_compositer.logger import setup_logging
+from mesan_compositer.netcdf_io import cloudComposite
 
-FAST_AND_ROUGH = False
+DEFAULT_SUPEROBS_WINDOW_SIZE_NPIX = 32
+USE_LEGACY_WRITING = False
 
 LOG = logging.getLogger(__name__)
 
@@ -158,57 +164,47 @@ nctypecl = {"71": ntctypecl, "73": nlctypecl, "74": nmctypecl, "75": nhctypecl}
 def get_arguments():
     """Get command line arguments.
 
-    args.logging_conf_file, args.config_file, obs_time, area_id, wsize
+    args.logging_conf_file, args.config_file, args.obs_time, args.composite-filename
 
     Return:
-      File path of the logging.ini file
+      File path of the log-config yaml file
       File path of the application configuration file
       Observation/Analysis time
-      Area id
-      Window size
+
 
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("--datetime", "-d", help="Date and time of observation - yyyymmddhh",
-                        required=True)
-    parser.add_argument("--area_id", "-a", help="Area id",
-                        required=True)
-    parser.add_argument("--ipar", "-i", help="Parameter id",
-                        required=True)
-    parser.add_argument("--size", "-s", help="Size of integration area in pixels",
-                        required=True)
+    parser.add_argument("-f", "--netcdf_filepath",
+                        type=str,
+                        dest="netcdf_filepath",
+                        required=True,
+                        help="The netcdf file path of the cloud type composite.")
     parser.add_argument("-c", "--config_file",
                         type=str,
                         dest="config_file",
                         required=True,
                         help="The file containing configuration parameters e.g. mesan_sat_config.yaml")
     parser.add_argument("-l", "--logging",
-                        help="The path to the log-configuration file (e.g. './logging.ini')",
-                        dest="logging_conf_file",
+                        help="The path to the log-configuration file (e.g. './log_config.yaml')",
+                        dest="log_config_file",
                         type=str,
                         required=False)
-    parser.add_argument("-v", "--verbose",
-                        help="print debug messages too",
-                        action="store_true")
+    parser.add_argument("-v", "--verbose", dest="verbosity", action="count", default=0,
+                        help="Verbosity (between 1 and 2 occurrences with more leading to more "
+                        "verbose logging). WARN=0, INFO=1, "
+                        "DEBUG=2. This is overridden by the log config file if specified.")
 
     args = parser.parse_args()
 
-    wsize = args.size
-    area_id = args.area_id
-    ipar = args.ipar
-    obs_time = datetime.strptime(args.datetime, "%Y%m%d%H")
     if "template" in args.config_file:
-        print("Template file given as master config, aborting!")
+        print("Template file given as master config, aborting!")  # noqa: T201
         sys.exit()
 
-    return args.logging_conf_file, args.config_file, obs_time, area_id, wsize, ipar
+    return args
 
 
 def derive_sobs(ct_comp, ipar, npix, resultfile):
     """Derive the super observations and print data to file."""
-    import shutil
-    import tempfile
-
     # Get the lon,lat:
     lons, lats = ct_comp.lon, ct_comp.lat
     ctype = da.nan_to_num(ct_comp.data).astype("int32")
@@ -233,7 +229,7 @@ def derive_sobs(ct_comp, ipar, npix, resultfile):
                                      mode="w", delete=False) as file_obj:
         write_data(file_obj, so_lon, so_lat, clamount)
 
-    now = datetime.utcnow()
+    now = dt.datetime.now(dt.timezone.utc)
     fname_with_timestamp = str(resultfile) + now.strftime("_%Y%m%d%H%M%S")
     # Change the file permissions to match current umask:
     umask = os.umask(0o666)
@@ -251,90 +247,86 @@ def write_data(fileobj, longitudes, latitudes, clamount):
 
     # Create a Dataset with lon, lat and cloud amount:
     shape = clamount.shape
-    if FAST_AND_ROUGH:
-        clamount_ds = xr.Dataset(data_vars={"clamount": clamount,
-                                            "lon": longitudes[:shape[0], :shape[1]],
-                                            # 'lat': latitudes[:shape[0], :shape[1]],
-                                            "minus_sixti": xr.DataArray(data=(np.ones(shape)*-60).astype("int32"),
-                                                                        dims=["y", "x"]),
-                                            "minus_999": xr.DataArray(data=(np.ones(shape)*-999).astype("int32"),
-                                                                      dims=["y", "x"]),
-                                            "five_nines": xr.DataArray(data=(np.ones(shape)*99999).astype("int32"),
-                                                                       dims=["y", "x"]),
-                                            "SDcc": xr.DataArray(data=np.ones(shape)*SDcc,
-                                                                 dims=["y", "x"]),
-                                            "cortyp": xr.DataArray(data=(np.ones(shape)*cortyp).astype("int32"),
-                                                                   dims=["y", "x"])
-                                            }
-                                 )
 
-        df = clamount_ds.to_dataframe()
-        df.to_csv(fileobj, columns=["five_nines", "latitude", "longitude",
-                                    "minus_999", "cortyp", "minus_sixti", "clamount", "SDcc"],
-                  sep=" ", index=False, header=False)
 
-    else:
+    if USE_LEGACY_WRITING:
         for y in range(shape[0]):
             yidx = shape[0]-1-y
             for x in range(shape[1]):
                 xidx = x
                 if np.isnan(clamount.data[yidx, xidx]):
                     continue
-                # print(latitudes[yidx, xidx], longitudes[yidx, xidx])
+
                 result = "%8d %7.2f %7.2f %5d %2.2d %2.2d %8.2f %8.2f\n" % \
                     (99999, latitudes[yidx, xidx], longitudes[yidx, xidx], -999, cortyp, -60,
                      clamount.data[yidx, xidx], SDcc)
                 fileobj.write(result)
+    else:
+        # Reverse the array to fit with the old format, going from south to north (y-axis first):
+        clamount_ = np.asarray(clamount)[::-1]
+        latitudes_ = np.asarray(latitudes[:shape[0], :shape[1]])[::-1]
+        longitudes_ = np.asarray(longitudes[:shape[0], :shape[1]])[::-1]
+
+        valid = ~np.isnan(clamount_)
+
+        data = np.column_stack(
+            [
+                np.full(valid.sum(), 99999),
+                latitudes_[valid],
+                longitudes_[valid],
+                np.full(valid.sum(), -999),
+                np.full(valid.sum(), cortyp),
+                np.full(valid.sum(), -60),
+                clamount_[valid],
+                np.full(valid.sum(), SDcc),
+            ]
+        )
+
+        np.savetxt(fileobj, data, fmt="%8d %7.2f %7.2f %5d %2.2d %2.2d %8.2f %8.2f")
+
+
+def do_cloudamount(filename, time_of_analysis, area_id, config_options):
+    """Make the cloud amount super observations."""
+    npix = int(config_options.get("number_of_pixels", DEFAULT_SUPEROBS_WINDOW_SIZE_NPIX))
+    ipar = str(config_options.get("cloud_amount_ipar"))
+    if not ipar:
+        raise IOError("No ipar value in config file!")
+
+    # Make Super observations:
+    LOG.info("Make Cloud Type super observations")
+
+    try:
+        ctype = cloudComposite(filename, "CT_group", areaname=area_id)
+        ctype.load()
+    except KeyError:
+        ctype = cloudComposite(filename, "ct", areaname=area_id)
+        ctype.load()
+
+    values = {"area": area_id, }
+    bname = time_of_analysis.strftime(config_options["cloudamount_filename"]) % values
+    path = config_options["composite_output_dir"]
+    filename = os.path.join(path, bname + ".dat")
+
+    derive_sobs(ctype, ipar, npix, filename)
+    return filename
 
 
 if __name__ == "__main__":
 
-    (logfile, config_filename, obstime, areaid, window_size, iparam) = get_arguments()
+    cmd_args = get_arguments()
+    setup_logging(cmd_args)
 
-    if logfile:
-        logging.config.fileConfig(logfile)
+    configuration = get_config(cmd_args.config_file)
 
-    handler = logging.StreamHandler(sys.stderr)
-    handler.setLevel(logging.DEBUG)
+    file_parser = Parser(configuration["ct_composite_filename"])
+    filename = cmd_args.netcdf_filepath
 
-    if not logfile:
-        formatter = logging.Formatter(fmt=_DEFAULT_LOG_FORMAT,
-                                      datefmt=_DEFAULT_TIME_FORMAT)
-        handler.setFormatter(formatter)
+    res = file_parser.parse(Path(filename).name)
+    areaid = res["area"]
+    time_of_analysis = res["obstime"]
 
-    logging.getLogger("").addHandler(handler)
-    logging.getLogger("").setLevel(logging.DEBUG)
-
-    LOG = logging.getLogger("prt_nwcsaf_cloudamount")
-
-    log_handlers = logging.getLogger("").handlers
-    for log_handle in log_handlers:
-        if type(log_handle) is handlers.SMTPHandler:
-            LOG.debug("Mail notifications to: %s", str(log_handle.toaddrs))
-
-    OPTIONS = get_config(config_filename)
-
-    values = {"area": areaid, }
-    bname = obstime.strftime(OPTIONS["ct_composite_filename"]) % values
-    path = OPTIONS["composite_output_dir"]
-    filename = os.path.join(path, bname) + ".nc"
     if not os.path.exists(filename):
         LOG.error("File " + str(filename) + " does not exist!")
         sys.exit(-1)
 
-    # Load the Cloud Type composite from file
-    # ctype = load_ct_composite(filename, 'CT_group')
-    from netcdf_io import cloudComposite
-
-    # ctype = cloudComposite(filename, "CT", areaname=areaid)
-    ctype = cloudComposite(filename, "CT_group", areaname=areaid)
-    ctype.load()
-
-    IPAR = str(iparam)
-    NPIX = int(window_size)
-
-    bname = obstime.strftime(OPTIONS["cloudamount_filename"]) % values
-    path = OPTIONS["composite_output_dir"]
-    filename = os.path.join(path, bname + ".dat")
-
-    derive_sobs(ctype, IPAR, NPIX, filename)
+    do_cloudamount(filename, time_of_analysis, areaid, configuration)

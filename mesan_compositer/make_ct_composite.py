@@ -23,13 +23,13 @@
 """Make a Cloud Type composite."""
 
 import argparse
+import datetime as dt
 import logging
 import os
 import pathlib
 import shutil
 import sys
 import tempfile
-from datetime import datetime, timedelta
 from glob import glob
 from logging import handlers
 from tempfile import gettempdir
@@ -39,7 +39,7 @@ from trollsift import Parser, globify
 
 from mesan_compositer.composite_tools import METEOSAT, METOPS, MSGSATS, GeoMetaData, get_ppslist
 from mesan_compositer.config import get_config
-from mesan_compositer.ct_quicklooks import ctype_quicklook_from_netcdf
+from mesan_compositer.ct_quicklooks import ctth_quicklook_from_netcdf, ctype_quicklook_from_netcdf
 from mesan_compositer.load_cloud_products import blend_cloud_products
 from mesan_compositer.utils import NoGeoScenesError
 
@@ -98,8 +98,8 @@ def get_arguments():
 
     args = parser.parse_args()
 
-    tanalysis = datetime.strptime(args.datetime, "%Y%m%d%H")
-    delta_t = timedelta(minutes=int(args.time_window))
+    tanalysis = dt.datetime.strptime(args.datetime, "%Y%m%d%H")
+    delta_t = dt.timedelta(minutes=int(args.time_window))
     if "template" in args.config_file:
         print("Template file given as master config, aborting!")  # noqa: T201
         sys.exit()
@@ -137,11 +137,6 @@ class CloudproductCompositer:
         self.time_window = (obstime - tdiff, obstime + tdiff)
         LOG.debug("Time window (used only for polar sat scenes): " +
                   str(self.time_window[0]) + " - " + str(self.time_window[1]))
-
-        # geo_tdiff = timedelta(minutes=1)
-        # self._geo_time_window = (obstime - geo_tdiff, obstime + geo_tdiff)
-        # LOG.debug("Time window (used only for the Geo scenes): " +
-        #          str(self._geo_time_window[0]) + " - " + str(self._geo_time_window[1]))
 
         self.polar_satellites = config_options["polar_satellites"]
         LOG.debug("Polar satellites supported: %s", str(self.polar_satellites))
@@ -277,10 +272,10 @@ class CloudproductCompositer:
         ppsgds = []
         gds_list = self._get_all_pps_files(self._options.get("pps_metop_gds_dir"))
         if len(gds_list) > 0:
-            now = datetime.utcnow()
+            now = dt.datetime.now(dt.timezone.utc)
             LOG.info("Number of Metop GDS files in dir: " + str(len(gds_list)))
             ppsgds = self.get_pps_scenes(gds_list, satellites=METOPS, variant="global")
-            tic = datetime.utcnow()
+            tic = dt.datetime.now(dt.timezone.utc)
             LOG.info("Retrieve the metop-gds list took " +
                      str((tic - now).seconds) + " sec")
 
@@ -301,7 +296,7 @@ class CloudproductCompositer:
         # Now find the scene closest in time and make list with that one first.
         # FIXME! Here we should rather just sort the scenes by time relative to the nominal/obstime.
         found_idx = -1
-        tdiff = timedelta(minutes=120)
+        tdiff = dt.timedelta(minutes=120)
         for idx in range(len(self.msg_scenes)):
             scene = self.msg_scenes[idx]
             LOG.debug("Time slot for scene: %s" % str(scene.timeslot))
@@ -343,7 +338,7 @@ class CloudproductCompositer:
                                        dir=os.path.dirname(self.filename))
 
         self.blended_scene.save_dataset(self.group_name, filename=tmpfname)
-        now = datetime.utcnow()
+        now = dt.datetime.now(dt.timezone.utc)
         fname_with_timestamp = str(self.filename) + now.strftime("_%Y%m%d%H%M%S.nc")
 
         # Change the file permissions to match current umask:
@@ -357,8 +352,10 @@ class CloudproductCompositer:
 
     def quicklook(self, netcdf_filename):
         """Make a quicklook image from the netCDF file."""
-        # FIXME! This is hard coded for a cloud type image!
-        return ctype_quicklook_from_netcdf(self.group_name, netcdf_filename)
+        if self.group_name in ["ctth_alti"]:
+            return ctth_quicklook_from_netcdf(self.group_name, netcdf_filename)
+        else:
+            return ctype_quicklook_from_netcdf(self.group_name, netcdf_filename)
 
 
 if __name__ == "__main__":

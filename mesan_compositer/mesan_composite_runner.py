@@ -50,9 +50,8 @@ from mesan_compositer.config import get_config
 from mesan_compositer.ct_quicklooks import ctth_quicklook_from_netcdf
 from mesan_compositer.logger import setup_logging
 from mesan_compositer.make_ct_composite import CloudproductCompositer
-from mesan_compositer.netcdf_io import cloudComposite
-from mesan_compositer.prt_nwcsaf_cloudamount import derive_sobs as derive_sobs_clamount
-from mesan_compositer.prt_nwcsaf_cloudheight import derive_sobs as derive_sobs_clheight
+from mesan_compositer.prt_nwcsaf_cloudamount import do_cloudamount
+from mesan_compositer.prt_nwcsaf_cloudheight import do_cloudheight
 from mesan_compositer.utils import NoGeoScenesError, check_uri, get_local_ips
 
 LOG = logging.getLogger(__name__)
@@ -111,7 +110,7 @@ def get_arguments():
 
     args = parser.parse_args()
     if "template" in args.config_file:
-        print("Template file given as master config, aborting!")
+        print("Template file given as master config, aborting!")  # noqa: T201
         sys.exit()
 
     return args
@@ -1098,55 +1097,6 @@ def do_ctth_composite(time_of_analysis, delta_t, area_id, config_options):
     ctth_quicklook_from_netcdf(ctcomp.group_name, output_filepath)
     LOG.debug("CTTH quicklook done.")
     return output_filepath
-
-
-def do_cloudamount(filename, time_of_analysis, area_id, config_options):
-    """Make the cloud amount super observations."""
-    npix = int(config_options.get("number_of_pixels", DEFAULT_SUPEROBS_WINDOW_SIZE_NPIX))
-    ipar = str(config_options.get("cloud_amount_ipar"))
-    if not ipar:
-        raise IOError("No ipar value in config file!")
-
-    # Make Super observations:
-    LOG.info("Make Cloud Type super observations")
-
-    try:
-        ctype = cloudComposite(filename, "CT_group", areaname=area_id)
-        ctype.load()
-    except KeyError:
-        ctype = cloudComposite(filename, "ct", areaname=area_id)
-        ctype.load()
-
-    values = {"area": area_id, }
-    bname = time_of_analysis.strftime(config_options["cloudamount_filename"]) % values
-    path = config_options["composite_output_dir"]
-    filename = os.path.join(path, bname + ".dat")
-
-    derive_sobs_clamount(ctype, ipar, npix, filename)
-    return filename
-
-
-def do_cloudheight(filename, time_of_analysis, area_id, config_options):
-    """Make the cloud height super observations."""
-    npix = int(config_options.get("number_of_pixels", DEFAULT_SUPEROBS_WINDOW_SIZE_NPIX))
-
-    # Make Super observations:
-    LOG.info("Make Cloud Top Height super observations")
-    try:
-        ctth = cloudComposite(filename, "CTTH_ALTI_group", areaname=area_id)
-        ctth.load()
-    except KeyError:
-        ctth = cloudComposite(filename, "ctth_alti", areaname=area_id)
-        ctth.load()
-
-    values = {"area": area_id, }
-
-    bname = time_of_analysis.strftime(config_options["cloudheight_filename"]) % values
-    path = config_options["composite_output_dir"]
-    filename = os.path.join(path, bname + ".dat")
-    LOG.info("Make Cloud Height super observations. Output file = %s", str(filename))
-    derive_sobs_clheight(ctth, npix, filename)
-    return filename
 
 
 def main():
