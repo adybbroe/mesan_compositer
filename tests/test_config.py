@@ -29,8 +29,8 @@ def test_get_yaml_configuration(fake_yamlconfig_file):
     """Test read and get the yaml configuration from file."""
     config = get_config(fake_yamlconfig_file)
 
-    assert config["ct_composite_filename"] == "mesan_composite_{area}_{obstime:%Y%m%d_%H%M}_ct.nc"
-    assert config["ctth_composite_filename"] == "mesan_composite_{area}_{obstime:%Y%m%d_%H%M}_ctth.nc"
+    assert config["ct_composite_filename"] == "mesan_composite_{area}_{obstime:%Y%m%d_%H%M}_ct"
+    assert config["ctth_composite_filename"] == "mesan_composite_{area}_{obstime:%Y%m%d_%H%M}_ctth"
 
     assert config["generate_superobservations_live_runner"]["cloudtype"]["generate"]
     assert config["generate_superobservations_live_runner"]["ctth"]["generate"]

@@ -29,11 +29,11 @@ import pytest
 import xarray as xr
 
 TEST_YAML_CONFIG_CONTENT = """
-ct_composite_filename: mesan_composite_{area}_{obstime:%Y%m%d_%H%M}_ct.nc
-ctth_composite_filename: mesan_composite_{area}_{obstime:%Y%m%d_%H%M}_ctth.nc
+ct_composite_filename: mesan_composite_{area}_{obstime:%Y%m%d_%H%M}_ct
+ctth_composite_filename: mesan_composite_{area}_{obstime:%Y%m%d_%H%M}_ctth
 
-cloudamount_filename: mesan_composite_{area}_{obstime:%Y%m%d_%H%M}_clamount.dat
-cloudheight_filename: mesan_composite_{area}_{obstime:%Y%m%d_%H%M}_clheight.dat
+cloudamount_filename: mesan_composite_{area}_{obstime:%Y%m%d_%H%M}_clamount
+cloudheight_filename: mesan_composite_{area}_{obstime:%Y%m%d_%H%M}_clheight
 
 cloud_amount_ipar: 71
 number_of_pixels: 24
