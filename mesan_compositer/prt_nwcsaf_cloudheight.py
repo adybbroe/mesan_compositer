@@ -222,4 +222,5 @@ if __name__ == "__main__":
         LOG.error("File " + str(filename) + " does not exist!")
         sys.exit(-1)
 
-    do_cloudheight(filename, time_of_analysis, areaid, configuration)
+    resultfile = do_cloudheight(filename, time_of_analysis, areaid, configuration)
+    LOG.info("Cloud top height super observations generated: %s", resultfile)

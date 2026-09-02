@@ -329,4 +329,5 @@ if __name__ == "__main__":
         LOG.error("File " + str(filename) + " does not exist!")
         sys.exit(-1)
 
-    do_cloudamount(filename, time_of_analysis, areaid, configuration)
+    resultfile = do_cloudamount(filename, time_of_analysis, areaid, configuration)
+    LOG.info("Cloud amount super observations generated: %s", resultfile)

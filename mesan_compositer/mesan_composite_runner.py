@@ -693,14 +693,23 @@ class CompositeWorker:
             self.publish_result(result_file, scene, servername, publish_q)
             self.log_elapsed_time(job_id)
 
-            super_obs_file = self.make_super_observations(
-                result_file,
-                time_of_analysis,
-                area_id,
-                config_options,
-            )
+            if "generate_superobservations_live_runner" not in config_options:
+                return self.make_result(status="success", result_file=result_file, super_obs_file=None)
 
-            LOG.info("%s super observations generated: %s", self.product, super_obs_file)
+            for product_name in config_options["generate_superobservations_live_runner"].keys():
+                product_id = config_options["generate_superobservations_live_runner"][product_name]["name"]
+                if product_id == self.product:
+                    if config_options["generate_superobservations_live_runner"][product_name]["generate"]:
+                        super_obs_file = self.make_super_observations(
+                            result_file,
+                            time_of_analysis,
+                            area_id,
+                            config_options,
+                        )
+                        LOG.info("%s super observations generated: %s", self.product, super_obs_file)
+                    else:
+                        LOG.info("No super observations configured for product: %s", self.product)
+                        super_obs_file = None
 
             return self.make_result(status="success", result_file=result_file, super_obs_file=super_obs_file)
 
@@ -776,7 +785,7 @@ class CloudTypeCompositeWorker(CompositeWorker):
 
     def make_super_observations(self, result_file, time_of_analysis, area_id, config_options):
         """Make the cloud parameter super observations."""
-        return do_cloudamount(result_file, time_of_analysis, area_id, config_options, )
+        return do_cloudamount(result_file, time_of_analysis, area_id, config_options)
 
 
 class CloudTopHeightCompositeWorker(CompositeWorker):

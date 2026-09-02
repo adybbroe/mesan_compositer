@@ -12,6 +12,7 @@ import pytest
 from _mesan_runner_fakes import ScriptedQueue
 
 from mesan_compositer import mesan_composite_runner as runner
+from mesan_compositer.config import get_config
 
 
 @pytest.fixture
@@ -28,22 +29,14 @@ def scene():
     }
 
 
-@pytest.fixture
-def config():
-    """Fixture to create a default Mesan-runner configuration."""
-    return {
-        "absolute_time_threshold_minutes": "35",
-        "mesan_area_id": "mesanEx",
-        "number_of_pixels": 24,
-    }
-
-
 def test_ctype_worker_publishes_and_returns_picklable_success_record(
-    monkeypatch,
-    scene,
-    config,
+        monkeypatch,
+        scene,
+        fake_yamlconfig_file,
 ):
     """Test that the the Ctype worker publishes and returns picklable success-record."""
+    config = get_config(fake_yamlconfig_file)
+
     analysis_time = dt.datetime(2026, 8, 3, 22, 0, tzinfo=dt.timezone.utc),
     composite = Mock(return_value="/output/ct.nc")
     superobs = Mock(return_value="/output/cloud_amount.dat")
@@ -117,9 +110,11 @@ def test_ctype_worker_uses_default_area_when_configuration_omits_it(monkeypatch,
 def test_ctype_worker_does_not_publish_or_generate_superobs_without_result(
     monkeypatch,
     scene,
-    config,
+    fake_yamlconfig_file,
 ):
     """Test that the Ctype worker does not publish or try generate superobs without a result."""
+    config = get_config(fake_yamlconfig_file)
+
     create_message = Mock()
     superobs = Mock()
     publish_queue = ScriptedQueue()
@@ -154,12 +149,14 @@ def test_ctype_worker_does_not_publish_or_generate_superobs_without_result(
 
 
 def test_ctype_worker_reraises_processing_exception_for_asyncresult(
-    monkeypatch,
-    caplog,
-    scene,
-    config,
+        monkeypatch,
+        caplog,
+        scene,
+        fake_yamlconfig_file
 ):
     """Test that the Ctype worker re-raises processing exception for async-result."""
+    config = get_config(fake_yamlconfig_file)
+
     monkeypatch.setattr(
         runner,
         "get_analysis_time",
@@ -183,8 +180,10 @@ def test_ctype_worker_reraises_processing_exception_for_asyncresult(
     assert "Failed in CT composite worker" in caplog.text
 
 
-def test_ctth_worker_publishes_and_returns_success_record(monkeypatch, scene, config):
+def test_ctth_worker_publishes_and_returns_success_record(monkeypatch, scene, fake_yamlconfig_file):
     """Test that the CTTH worker publishes and returns a success record."""
+    config = get_config(fake_yamlconfig_file)
+
     scene = dict(scene, product="CTTH")
     analysis_time = dt.datetime(2026, 8, 3, 22, 0, tzinfo=dt.timezone.utc)
     composite = Mock(return_value="/output/ctth.nc")
@@ -229,8 +228,10 @@ def test_ctth_worker_publishes_and_returns_success_record(monkeypatch, scene, co
     }
 
 
-def test_ctth_worker_does_not_publish_without_result(monkeypatch, scene, config):
+def test_ctth_worker_does_not_publish_without_result(monkeypatch, scene, fake_yamlconfig_file):
     """Test that the CTTH worker dows not publish without a result."""
+    config = get_config(fake_yamlconfig_file)
+
     scene = dict(scene, product="CTTH")
     create_message = Mock()
     superobs = Mock()
@@ -261,12 +262,14 @@ def test_ctth_worker_does_not_publish_without_result(monkeypatch, scene, config)
 
 
 def test_ctth_worker_reraises_processing_exception_for_asyncresult(
-    monkeypatch,
-    caplog,
-    scene,
-    config,
+        monkeypatch,
+        caplog,
+        scene,
+        fake_yamlconfig_file,
 ):
     """Test the CTTH worker: That it re-raises processing exception for async-result."""
+    config = get_config(fake_yamlconfig_file)
+
     scene = dict(scene, product="CTTH")
     monkeypatch.setattr(
         runner,
@@ -292,12 +295,14 @@ def test_ctth_worker_reraises_processing_exception_for_asyncresult(
 
 
 def test_ctype_worker_success_tolerates_non_datetime_registry_value(
-    monkeypatch,
-    caplog,
-    scene,
-    config,
+        monkeypatch,
+        caplog,
+        scene,
+        fake_yamlconfig_file,
 ):
     """Test the Ctype worker: That it tolerates non-datetime registry value."""
+    config = get_config(fake_yamlconfig_file)
+
     analysis_time = dt.datetime(2026, 8, 3, 22, 0, tzinfo=dt.timezone.utc)
     monkeypatch.setattr(runner, "get_analysis_time", Mock(return_value=analysis_time))
     monkeypatch.setattr(
@@ -326,9 +331,9 @@ def test_ctype_worker_success_tolerates_non_datetime_registry_value(
 
 
 def test_ctth_worker_uses_default_area_and_tolerates_non_datetime_job_id(
-    monkeypatch,
-    caplog,
-    scene,
+        monkeypatch,
+        caplog,
+        scene
 ):
     """Test the CTTH worker: That is uses default area and tolerates non-datetime-job-id."""
     scene = dict(scene, product="CTTH")
@@ -350,15 +355,16 @@ def test_ctth_worker_uses_default_area_and_tolerates_non_datetime_job_id(
             scene,
             "legacy-non-datetime-value",
             ScriptedQueue(),
-            {},
+            {}
         )
 
     composite.assert_called_once_with(
         analysis_time,
         dt.timedelta(minutes=30),
         runner.DEFAULT_AREA,
-        {},
+        {}
     )
+
     assert result["status"] == "success"
     assert "No area id specified" in caplog.text
     assert "Job entry is not a datetime instance" in caplog.text

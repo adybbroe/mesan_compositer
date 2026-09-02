@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2023 Adam.Dybbroe
+# Copyright (c) 2023, 2026 Adam.Dybbroe
 
 # Author(s):
 
@@ -24,17 +24,17 @@
 
 
 import yaml
-from yaml import UnsafeLoader
 
 
 def get_config(configfile):
-    """Get the configuration from file."""
-    with open(configfile, "r") as fp_:
-        config = yaml.load(fp_, Loader=UnsafeLoader)
+    """Read configuration from a YAML file."""
+    with open(configfile, encoding="utf-8") as fp_:
+        config = yaml.safe_load(fp_)
 
-    options = {}
-    for item in config:
-        if not isinstance(config[item], dict):
-            options[item] = config[item]
+    if config is None:
+        return {}
 
-    return options
+    if not isinstance(config, dict):
+        raise ValueError("Configuration root must be a mapping")
+
+    return config

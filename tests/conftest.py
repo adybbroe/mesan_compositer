@@ -29,10 +29,8 @@ import pytest
 import xarray as xr
 
 TEST_YAML_CONFIG_CONTENT = """
-ct_composite_filename: mesan_composite_%(area)s_%Y%m%d_%H%M_ct
-ctth_composite_filename: mesan_composite_%(area)s_%Y%m%d_%H%M_ctth
-cloudamount_filename: mesan_composite_%(area)s_%Y%m%d_%H%M_clamount
-cloudheight_filename: mesan_composite_%(area)s_%Y%m%d_%H%M_clheight
+ct_composite_filename: mesan_composite_{area}_{obstime:%Y%m%d_%H%M}_ct.nc
+ctth_composite_filename: mesan_composite_{area}_{obstime:%Y%m%d_%H%M}_ctth.nc
 
 cloud_amount_ipar: 71
 number_of_pixels: 24
@@ -40,6 +38,15 @@ absolute_time_threshold_minutes: 35
 mesan_area_id: mesanEx
 
 composite_output_dir: /path/to/cloud/composites/output
+
+generate_superobservations_live_runner:
+  cloudtype:
+    name: CT
+    generate: true
+
+  ctth:
+    name: CTTH
+    generate: true
 
 # Example: S_NWC_CT_metopb_14320_20150622T1642261Z_20150622T1654354Z.nc
 pps_filename: "S_NWC_{product:s}_{platform_name:s}_{orbit:05d}_{start_time:%Y%m%dT%H%M%S%f}Z_{end_time:%Y%m%dT%H%M%S%f}Z.nc"
@@ -65,7 +72,7 @@ msg_satellites:
   - Meteosat-9
   - Meteosat-8
 
-#msg_dir: /path/to/nwcsaf/geo/cloud/products
+msg_dir: /path/to/nwcsaf/geo/cloud/products
 
 # Meteosat area name for the NWCSAF Geo products
 msg_areaname: MSG-N

@@ -116,14 +116,13 @@ class CloudproductCompositer:
             raise ValueError("Cloud products must be one of CT or CTTH!")
         self.product = product
 
-        values = {"area": areaid, }
-
         # Generate the filename from the observation time and the
         # specifcations in the config file:
         LOG.info("Output file name is generated from observation " +
                  "time and info in config file:")
-        cprod_comp_filename = "{name}_composite_filename".format(name=self.product.lower())
-        bname = obstime.strftime(config_options[cprod_comp_filename]) % values
+        file_parser = Parser(config_options["ct_composite_filename"])
+        bname = file_parser.compose({"area":areaid, "obstime":obstime})
+
         path = config_options["composite_output_dir"]
         self.filename = os.path.join(path, bname)
 
