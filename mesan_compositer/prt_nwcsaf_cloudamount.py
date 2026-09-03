@@ -302,7 +302,7 @@ def do_cloudamount(filename, time_of_analysis, area_id, config_options):
         ctype = cloudComposite(filename, "ct", areaname=area_id)
         ctype.load()
 
-    file_parser = Parser(config_options["cloudheight_filename"])
+    file_parser = Parser(config_options["cloudamount_filename"])
     bname = file_parser.compose({"area":area_id, "obstime":time_of_analysis})
 
     path = config_options["composite_output_dir"]
