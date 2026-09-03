@@ -248,7 +248,6 @@ def write_data(fileobj, longitudes, latitudes, clamount):
     # Create a Dataset with lon, lat and cloud amount:
     shape = clamount.shape
 
-
     if USE_LEGACY_WRITING:
         for y in range(shape[0]):
             yidx = shape[0]-1-y

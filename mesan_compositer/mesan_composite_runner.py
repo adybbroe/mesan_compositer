@@ -472,7 +472,7 @@ def create_message(resultfile, scene, product_name):
     to_send["start_time"] = scene["starttime"]
     to_send["end_time"] = scene["endtime"]
     pub_message = Message("/" + to_send["format"] + "/" + to_send["data_processing_level"] +
-                          "/" + to_send["type"] ,
+                          "/" + to_send["type"] +"/" + str(product_name),
                           "file", to_send).encode()
 
     return pub_message
