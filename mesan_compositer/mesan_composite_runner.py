@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2015-2023, 2026 Adam.Dybbroe
+# Copyright (c) 2015-2026 Adam.Dybbroe
 
 # Author(s):
 
-#   Adam.Dybbroe <adam.dybbroe@smhi.se>
+#   Adam Dybbroe <Firstname.Lastname at smhi.se>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -665,6 +665,7 @@ class CompositeWorker:
     """Base class for generating a MESAN cloud composite."""
 
     product = ""
+    super_obs_file = None
 
     def __call__(self, scene, job_id, publish_q, config_options):
         """Run the composite worker."""

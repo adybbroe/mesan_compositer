@@ -26,14 +26,17 @@ pytestmark = pytest.mark.skipif(
 
 
 def _real_worker_success(value):
+    """Test this."""
     return {"value": value, "worker_pid": os.getpid()}
 
 
 def _real_worker_failure():
+    """Test this."""
     raise RuntimeError("real pool worker failure")
 
 
 def _wait_for_completion(completion_queue, pending_jobs, timeout=10.0):
+    """Test this."""
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         completed = runner.collect_pool_results(
@@ -47,6 +50,7 @@ def _wait_for_completion(completion_queue, pending_jobs, timeout=10.0):
 
 
 def test_real_pool_success_flows_through_callback_and_asyncresult_get():
+    """Test this."""
     context = mp.get_context("spawn")
     pool = context.Pool(processes=1)
     completion_queue = Queue()
@@ -79,6 +83,7 @@ def test_real_pool_success_flows_through_callback_and_asyncresult_get():
 
 
 def test_real_pool_exception_is_reported_by_asyncresult_get(caplog):
+    """Test this."""
     context = mp.get_context("spawn")
     pool = context.Pool(processes=1)
     completion_queue = Queue()

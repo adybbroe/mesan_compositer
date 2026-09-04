@@ -33,7 +33,6 @@ oldstuff/
 set_env.txt
 mesan_compositer/test_output
 output/
-test_*py
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
