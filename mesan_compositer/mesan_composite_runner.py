@@ -978,6 +978,36 @@ def process_message(msg, state):
         raise
 
 
+def run_message_loop(listener_q, state, *, warning_seconds, warning_repeat_seconds, hard_timeout_seconds):
+    """Run the message loop."""
+    while True:
+        # Calling AsyncResult.get() inside this function is what surfaces
+        # child-process Python exceptions in the parent log.
+        collect_pool_results(state.completion_q, state.pending_jobs)
+
+        monitor_pending_pool_jobs(
+            state.pending_jobs,
+            state.pool,
+            warning_seconds=warning_seconds,
+            warning_repeat_seconds=warning_repeat_seconds,
+            hard_timeout_seconds=hard_timeout_seconds,
+        )
+
+        msg = get_next_message(listener_q)
+        if msg is NO_MESSAGE:
+            continue
+
+        if msg is None:
+            LOG.info("Listener requested shutdown")
+            break
+
+        try:
+            process_message(msg, state)
+        except Exception:
+            LOG.exception(
+                "Unhandled exception while processing message: %r", msg)
+
+
 def mesan_live_runner(config_options):
     """Start and run the Mesan cloud composite processing in real-time."""
     LOG.info("*** Start the runner for the Mesan composite generator:")
@@ -1023,33 +1053,10 @@ def mesan_live_runner(config_options):
     )
 
     try:
-        while True:
-            # Calling AsyncResult.get() inside this function is what surfaces
-            # child-process Python exceptions in the parent log.
-            collect_pool_results(state.completion_q, state.pending_jobs)
-
-            monitor_pending_pool_jobs(
-                state.pending_jobs,
-                state.pool,
-                warning_seconds=warning_seconds,
-                warning_repeat_seconds=warning_repeat_seconds,
-                hard_timeout_seconds=hard_timeout_seconds,
-            )
-
-            msg = get_next_message(listener_q)
-            if msg is NO_MESSAGE:
-                continue
-
-            if msg is None:
-                LOG.info("Listener requested shutdown")
-                break
-
-            try:
-                process_message(msg, state)
-            except Exception:
-                LOG.exception(
-                    "Unhandled exception while processing message: %r", msg)
-
+        run_message_loop(listener_q, state,
+                         warning_seconds=warning_seconds,
+                         warning_repeat_seconds=warning_repeat_seconds,
+                         hard_timeout_seconds=hard_timeout_seconds)
     except StuckPoolJob:
         LOG.critical(
             "A pool job exceeded the hard timeout; terminating the service "
