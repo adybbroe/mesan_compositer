@@ -84,7 +84,7 @@ jobs:
       - name: Install mesan_compositer
         shell: bash -l {0}
         run: |
-          python -m pip install --no-deps -e .
+          python -m pip install -e ".[test]"
 
       - name: Run unit tests
         shell: bash -l {0}

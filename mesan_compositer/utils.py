@@ -34,6 +34,7 @@ LOG = logging.getLogger(__name__)
 
 class NoGeoScenesError(Exception):
     """Custom Exception to capture cases where no Geo scenes can be found."""
+
     pass
 
 

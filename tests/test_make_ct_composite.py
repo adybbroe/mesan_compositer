@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019 - 2023 Adam.Dybbroe
+# Copyright (c) 2019 - 2023, 2026 Adam.Dybbroe
 
 # Author(s):
 
@@ -106,34 +106,6 @@ def create_ct_variable(nc_file, var_name):
     var.attrs["valid_range"] = np.array([1, 15], dtype=np.uint8)
 
 
-_PATTERN = ("S_NWC_{product:s}_{platform_name:s}_{orbit:05d}_" +
-            "{start_time:%Y%m%dT%H%M%S%f}Z_{end_time:%Y%m%dT%H%M%S%f}Z.nc")
-_MSG_CT_PATTERN = "S_NWC_CT_{satellite:s}_{area:s}-VISIR_{nominal_time:%Y%m%dT%H%M%SZ}_PLAX.nc"
-
-CONFIG_OPTIONS = {"ct_composite_filename": "mesan_composite_%(area)s_%Y%m%d_%H%M_ct",
-                  "ctth_composite_filename": "mesan_composite_%(area)s_%Y%m%d_%H%M_ctth",
-                  "cloudamount_filename": "mesan_composite_%(area)s_%Y%m%d_%H%M_clamount",
-                  "cloudheight_filename": "mesan_composite_%(area)s_%Y%m%d_%H%M_clheight",
-                  "pps_filename": _PATTERN,
-                  "msg_satellites": "Meteosat-11 Meteosat-10 Meteosat-9 Meteosat-8",
-                  # 'msg_cty_filename': 'SAFNWC_%(satellite)s_CT___%Y%m%d%H%M_%(area)s.PLAX.CTTH.0.h5',
-                  "msg_cty_filename": _MSG_CT_PATTERN,
-                  "msg_cty_file_ext": "PLAX.CTTH.0.h5",
-                  "msg_ctth_filename": "SAFNWC_%(satellite)s_CTTH_%Y%m%d%H%M_%(area)s.PLAX.CTTH.0.h5",
-                  "msg_ctth_file_ext": "PLAX.CTTH.0.h5",
-                  "cloud_amount_ipar": 71,
-                  "number_of_pixels": 24,
-                  "absolute_time_threshold_minutes": 35,
-                  "mesan_area_id": "mesanEx",
-                  "polar_satellites": "NOAA-20 Metop-C Metop-B NOAA-19 Metop-A NOAA-18 NOAA-15 Suomi-NPP EOS-Aqua",
-                  "min_num_of_pps_dr_files": 10,
-                  "composite_output_dir": "/home/a000680/data/mesan/output",
-                  "pps_direct_readout_dir": "/home/a000680/data/mesan/satin/pps",
-                  "pps_metop_gds_dir": "/home/a000680/data/mesan/satin",
-                  "msg_dir": "/home/a000680/data/mesan/satin/msg",
-                  "msg_areaname": "MSG-N"}
-
-
 @pytest.fixture
 def fake_pps_filenames(tmp_path):
     """Create a NWCSAF/PPS fake file names."""
@@ -179,17 +151,20 @@ class TestctCompositor:
 
     @patch("mesan_compositer.make_ct_composite.CloudproductCompositer._get_all_geo_files")
     @patch("mesan_compositer.make_ct_composite.CloudproductCompositer._get_all_pps_files")
-    def test_make_composite(self, get_all_pps, get_all_geo, fake_pps_filenames):
+    def test_make_composite(self, get_all_pps, get_all_geo, fake_pps_filenames,
+                            fake_yamlconfig_file):
         """Test make a cloudtype composite of the list of pps&Geo scenes."""
         get_all_pps.return_value = fake_pps_filenames
         get_all_geo.return_value = []
+
+        configuration = get_config(fake_yamlconfig_file)
 
         t_analysis = datetime(2019, 11, 5, 19, 0)
         delta_t = timedelta(seconds=2100)
         areaid = "mesanEx"
 
         with patch.object(CloudproductCompositer, "get_pps_scenes") as get_pps_scenes:
-            ctcomp = CloudproductCompositer(t_analysis, delta_t, areaid, CONFIG_OPTIONS, "CT")
+            ctcomp = CloudproductCompositer(t_analysis, delta_t, areaid, configuration, "CT")
 
             with pytest.raises(NoGeoScenesError) as exec_info:
                 ctcomp.get_catalogue()
@@ -219,7 +194,6 @@ def test_setup_ct_compositer(fake_yamlconfig_file,
     config["pps_direct_readout_dir"] = str(nwcsaf_pps_ct_filename.parent)
 
     ctcomp = CloudproductCompositer(time_of_analysis, delta_time_window, area_id, config, "CT")
-
     ctcomp.get_catalogue()
 
     assert len(ctcomp.pps_scenes) == 1

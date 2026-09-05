@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2023 Adam.Dybbroe
+# Copyright (c) 2023-2026 Adam.Dybbroe
 
 # Author(s):
 
@@ -85,7 +85,7 @@ def get_arguments():
     tanalysis = datetime.strptime(args.datetime, "%Y%m%d%H")
     delta_t = timedelta(minutes=int(args.time_window))
     if "template" in args.config_file:
-        print("Template file given as master config, aborting!")
+        print("Template file given as master config, aborting!")  # noqa: T201
         sys.exit()
 
     return args.logging_conf_file, args.config_file, tanalysis, args.area_id, delta_t
@@ -118,3 +118,4 @@ if __name__ == "__main__":
     ctcomp.get_catalogue()
     ctcomp.blend_cloud_products()
     output_filepath = ctcomp.write()
+    qlook_filepath = ctcomp.quicklook(output_filepath)

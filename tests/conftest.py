@@ -22,15 +22,26 @@
 
 """Fixtures for unittests."""
 
-import os
+from __future__ import annotations
 
+import datetime as dt
+import os
+from itertools import count
+from queue import Queue
+from types import SimpleNamespace
+
+import numpy as np
 import pytest
+import xarray as xr
+
+from mesan_compositer import mesan_composite_runner as runner
 
 TEST_YAML_CONFIG_CONTENT = """
-ct_composite_filename: mesan_composite_%(area)s_%Y%m%d_%H%M_ct
-ctth_composite_filename: mesan_composite_%(area)s_%Y%m%d_%H%M_ctth
-cloudamount_filename: mesan_composite_%(area)s_%Y%m%d_%H%M_clamount
-cloudheight_filename: mesan_composite_%(area)s_%Y%m%d_%H%M_clheight
+ct_composite_filename: mesan_composite_{area}_{obstime:%Y%m%d_%H%M}_ct
+ctth_composite_filename: mesan_composite_{area}_{obstime:%Y%m%d_%H%M}_ctth
+
+cloudamount_filename: mesan_composite_{area}_{obstime:%Y%m%d_%H%M}_clamount
+cloudheight_filename: mesan_composite_{area}_{obstime:%Y%m%d_%H%M}_clheight
 
 cloud_amount_ipar: 71
 number_of_pixels: 24
@@ -38,6 +49,15 @@ absolute_time_threshold_minutes: 35
 mesan_area_id: mesanEx
 
 composite_output_dir: /path/to/cloud/composites/output
+
+generate_superobservations_live_runner:
+  cloudtype:
+    name: CT
+    generate: true
+
+  ctth:
+    name: CTTH
+    generate: true
 
 # Example: S_NWC_CT_metopb_14320_20150622T1642261Z_20150622T1654354Z.nc
 pps_filename: "S_NWC_{product:s}_{platform_name:s}_{orbit:05d}_{start_time:%Y%m%dT%H%M%S%f}Z_{end_time:%Y%m%dT%H%M%S%f}Z.nc"
@@ -63,7 +83,7 @@ msg_satellites:
   - Meteosat-9
   - Meteosat-8
 
-#msg_dir: /path/to/nwcsaf/geo/cloud/products
+msg_dir: /path/to/nwcsaf/geo/cloud/products
 
 # Meteosat area name for the NWCSAF Geo products
 msg_areaname: MSG-N
@@ -173,3 +193,151 @@ def _create_empty_nwcsaf_files_fromlist(basedir, filelist, product=None):
         file_path.touch()
         files.append(file_path)
     return files
+
+
+@pytest.fixture
+def cloud_type_netcdf(tmp_path):
+    """Create a small cloud-type NetCDF file for super observation creation tests."""
+    shape = (16, 8)
+
+    ct = np.full(shape, 5, dtype=np.uint8)
+
+    # First 8x8 block becomes invalid for cloud amount.
+    ct[:8, :] = 0
+
+    lons = np.tile(np.arange(shape[1], dtype=float), (shape[0], 1))
+    lats = np.tile(np.arange(shape[0], dtype=float)[:, None], (1, shape[1]))
+
+    ds = xr.Dataset(
+        {
+            "ct": (
+                ("y", "x"),
+                ct,
+            ),
+        },
+        coords={
+            "lon": (
+                ("y", "x"),
+                lons,
+            ),
+            "lat": (
+                ("y", "x"),
+                lats,
+            ),
+        },
+    )
+
+    filename = tmp_path / "ct.nc"
+    ds.to_netcdf(filename)
+
+    return filename
+
+
+@pytest.fixture
+def cloud_top_height_netcdf(tmp_path):
+    """Create a small cloud-top-height NetCDF file for super observation creation tests."""
+    shape = (24, 8)
+
+    height = np.full(shape, 1000.0, dtype=np.float32)
+
+    # Middle 8x8 block is invalid and should not produce a superob.
+    height[8:16, :] = np.nan
+
+    # Last 8x8 block has a different height.
+    height[16:24, :] = 3000.0
+
+    lons = np.tile(np.arange(shape[1], dtype=np.float32), (shape[0], 1))
+    lats = np.tile(np.arange(shape[0], dtype=np.float32)[:, None], (1, shape[1]))
+
+    ds = xr.Dataset(
+        {
+            "ctth_alti": (
+                ("y", "x"),
+                height,
+            ),
+        },
+        coords={
+            "lon": (
+                ("y", "x"),
+                lons,
+            ),
+            "lat": (
+                ("y", "x"),
+                lats,
+            ),
+        },
+    )
+
+    filename = tmp_path / "ctth.nc"
+    ds.to_netcdf(filename)
+
+    return filename
+
+@pytest.fixture
+def geo_ct_message():
+    """Return a representative GEO CT file message."""
+    start_time = dt.datetime(2026, 8, 3, 22, 0, tzinfo=dt.timezone.utc)
+    return SimpleNamespace(
+        type="file",
+        data={
+            "platform_name": "Meteosat-10",
+            "sensor": ["seviri"],
+            "start_time": start_time,
+            "end_time": None,
+            "uri": "/CT/S_NWC_CT_MSG3_MSG-N-VISIR_20260803T220000Z_PLAX.nc",
+            "uid": "S_NWC_CT_MSG3_MSG-N-VISIR_20260803T220000Z_PLAX.nc",
+            "pge": "CT",
+        },
+    )
+
+
+@pytest.fixture
+def geo_ctth_message():
+    """Return a representative GEO CTTH file message."""
+    start_time = dt.datetime(2026, 8, 3, 22, 0, tzinfo=dt.timezone.utc)
+    return SimpleNamespace(
+        type="file",
+        data={
+            "platform_name": "Meteosat-10",
+            "sensor": ["seviri"],
+            "start_time": start_time,
+            "end_time": None,
+            "uri": "/CTTH/S_NWC_CTTH_MSG3_MSG-N-VISIR_20260803T220000Z_PLAX.nc",
+            "uid": "S_NWC_CTTH_MSG3_MSG-N-VISIR_20260803T220000Z_PLAX.nc",
+            "pge": "CTTH",
+        },
+    )
+
+
+@pytest.fixture
+def polar_ct_message():
+    """Return a representative polar CT file message."""
+    start_time = dt.datetime(2026, 8, 3, 22, 0, tzinfo=dt.timezone.utc)
+    return SimpleNamespace(
+        type="file",
+        data={
+            "platform_name": "NOAA-20",
+            "sensor": ["viirs"],
+            "start_time": start_time,
+            "end_time": start_time + dt.timedelta(minutes=8),
+            "orbit_number": 12345,
+            "uri": "/CT/S_NWC_CT_NOAA20_12345_20260803T220000Z.nc",
+            "uid": "S_NWC_CT_NOAA20_12345_20260803T220000Z.nc",
+            "pge": "CT",
+        },
+    )
+
+
+@pytest.fixture
+def runner_state():
+    """Return minimal mutable state for process_message/run_message_loop tests."""
+    return runner.RunnerState(
+        pool=None,
+        publisher_q=Queue(),
+        completion_q=Queue(),
+        composite_files={},
+        jobs_dict={},
+        pending_jobs={},
+        token_counter=count(1),
+        config_options={},
+    )
