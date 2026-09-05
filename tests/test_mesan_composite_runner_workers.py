@@ -248,7 +248,7 @@ def test_create_message_contains_area(scene):
 
     encoded = worker.create_message("/data/mesan/mesan_ct.nc", scene)
 
-    msg = Message.from_string(encoded)
+    msg = Message.decode(encoded)
 
     assert msg.data["product"] == "CT"
     assert msg.data["area"] == "mesanEx"
