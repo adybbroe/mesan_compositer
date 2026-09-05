@@ -9,6 +9,7 @@ from queue import Empty, Queue
 from unittest.mock import Mock
 
 import pytest
+from posttroll.message import Message
 
 from mesan_compositer import mesan_composite_runner as runner
 
@@ -39,14 +40,14 @@ class DummyCompositeWorker(runner.CompositeWorker):
         self.composite_calls = []
         self.superobs_calls = []
 
-    def make_composite(self, time_of_analysis, delta_t, area_id, config_options):
+    def make_composite(self, time_of_analysis, delta_t, config_options):
         """Make the composite."""
-        self.composite_calls.append((time_of_analysis, delta_t, area_id, config_options))
+        self.composite_calls.append((time_of_analysis, delta_t, config_options))
         return self.result_file
 
-    def make_super_observations(self, result_file, time_of_analysis, area_id, config_options):
+    def make_super_observations(self, result_file, time_of_analysis, config_options):
         """Make the super observations."""
-        self.superobs_calls.append((result_file, time_of_analysis, area_id, config_options))
+        self.superobs_calls.append((result_file, time_of_analysis, config_options))
         return self.superobs_file
 
 
@@ -68,23 +69,22 @@ def test_base_worker_publishes_and_returns_picklable_success(monkeypatch, scene)
     worker = DummyCompositeWorker()
     publish_q = Queue()
     analysis_time = scene["starttime"]
+
     monkeypatch.setattr(runner, "get_analysis_time", Mock(return_value=analysis_time))
-    monkeypatch.setattr(runner, "create_message", Mock(return_value=b"posttroll-message"))
+    monkeypatch.setattr(worker, "create_message", Mock(return_value=b"posttroll-message"))
     monkeypatch.setattr(runner.os, "getpid", lambda: 9876)
 
-    result = worker(
-        scene,
-        dt.datetime.now(dt.timezone.utc),
-        publish_q,
-        _worker_config(generate=True),
-    )
+    config = _worker_config(generate=True)
+    result = worker(scene, dt.datetime.now(dt.timezone.utc), publish_q, config)
 
-    assert worker.composite_calls[0][:3] == (
-        analysis_time,
-        dt.timedelta(minutes=35),
-        "mesanEx",
-    )
-    assert worker.superobs_calls[0][0] == "/output/test.nc"
+    assert worker.area_id == "mesanEx"
+    assert worker.composite_calls == [
+        (analysis_time, dt.timedelta(minutes=35), config)
+    ]
+    assert worker.superobs_calls == [
+        ("/output/test.nc", analysis_time, config)
+    ]
+    worker.create_message.assert_called_once_with("/output/test.nc", scene)
     assert publish_q.get_nowait() == b"posttroll-message"
     assert result == {
         "status": "success",
@@ -100,8 +100,9 @@ def test_base_worker_skips_superobs_when_disabled(monkeypatch, scene):
     """Test base worker skips super obbing when disabled."""
     worker = DummyCompositeWorker()
     publish_q = Queue()
+
     monkeypatch.setattr(runner, "get_analysis_time", Mock(return_value=scene["starttime"]))
-    monkeypatch.setattr(runner, "create_message", Mock(return_value=b"message"))
+    monkeypatch.setattr(worker, "create_message", Mock(return_value=b"message"))
 
     result = worker(scene, dt.datetime.now(dt.timezone.utc), publish_q, _worker_config(generate=False))
 
@@ -115,14 +116,16 @@ def test_base_worker_without_superobs_configuration(monkeypatch, scene):
     """Test base worker without super obs configuration."""
     worker = DummyCompositeWorker()
     publish_q = Queue()
+
     monkeypatch.setattr(runner, "get_analysis_time", Mock(return_value=scene["starttime"]))
-    monkeypatch.setattr(runner, "create_message", Mock(return_value=b"message"))
+    monkeypatch.setattr(worker, "create_message", Mock(return_value=b"message"))
 
     result = worker(scene, dt.datetime.now(dt.timezone.utc), publish_q, {})
 
     assert worker.superobs_calls == []
     assert result["status"] == "success"
     assert result["super_obs_file"] is None
+    assert publish_q.get_nowait() == b"message"
 
 
 def test_base_worker_returns_no_result_without_publishing(monkeypatch, scene):
@@ -130,8 +133,9 @@ def test_base_worker_returns_no_result_without_publishing(monkeypatch, scene):
     worker = DummyCompositeWorker(result_file=None)
     publish_q = Queue()
     create_message = Mock()
+
     monkeypatch.setattr(runner, "get_analysis_time", Mock(return_value=scene["starttime"]))
-    monkeypatch.setattr(runner, "create_message", create_message)
+    monkeypatch.setattr(worker, "create_message", create_message)
     monkeypatch.setattr(runner.os, "getpid", lambda: 123)
 
     result = worker(scene, "legacy-job-value", publish_q, {})
@@ -149,22 +153,25 @@ def test_base_worker_returns_no_result_without_publishing(monkeypatch, scene):
 
 
 def test_base_worker_uses_default_area(monkeypatch, scene):
-    """Test this."""
+    """Test default area is stored on the worker."""
     worker = DummyCompositeWorker(result_file=None)
+
     monkeypatch.setattr(runner, "get_analysis_time", Mock(return_value=scene["starttime"]))
 
     worker(scene, "job", Queue(), {})
 
-    _, delta_t, area_id, _ = worker.composite_calls[0]
-    assert delta_t == dt.timedelta(minutes=30)
-    assert area_id == runner.DEFAULT_AREA
+    assert worker.area_id == runner.DEFAULT_AREA
+    assert worker.composite_calls == [
+        (scene["starttime"], dt.timedelta(minutes=30), {})
+    ]
 
 
 def test_base_worker_logs_non_datetime_job_id(monkeypatch, caplog, scene):
-    """Test this."""
+    """Test warning for legacy/non-datetime job id."""
     worker = DummyCompositeWorker()
+
     monkeypatch.setattr(runner, "get_analysis_time", Mock(return_value=scene["starttime"]))
-    monkeypatch.setattr(runner, "create_message", Mock(return_value=b"message"))
+    monkeypatch.setattr(worker, "create_message", Mock(return_value=b"message"))
 
     with caplog.at_level(logging.WARNING, logger=runner.LOG.name):
         result = worker(scene, "legacy-value", Queue(), {})
@@ -174,9 +181,10 @@ def test_base_worker_logs_non_datetime_job_id(monkeypatch, caplog, scene):
 
 
 def test_base_worker_reraises_processing_exception(monkeypatch, caplog, scene):
-    """Test this."""
+    """Test worker processing exceptions are reraised."""
     worker = DummyCompositeWorker()
     worker.make_composite = Mock(side_effect=RuntimeError("composite failed"))
+
     monkeypatch.setattr(runner, "get_analysis_time", Mock(return_value=scene["starttime"]))
 
     with caplog.at_level(logging.ERROR, logger=runner.LOG.name):
@@ -187,42 +195,62 @@ def test_base_worker_reraises_processing_exception(monkeypatch, caplog, scene):
 
 
 def test_cloud_type_worker_dispatches_to_product_functions(monkeypatch, scene):
-    """Test this."""
+    """Test CT worker dispatch."""
     analysis_time = scene["starttime"]
     composite = Mock(return_value="/output/ct.nc")
     superobs = Mock(return_value="/output/clamount.dat")
+
     monkeypatch.setattr(runner, "do_cloud_type_composite", composite)
     monkeypatch.setattr(runner, "do_cloudamount", superobs)
 
     worker = runner.CloudTypeCompositeWorker()
+    worker.area_id = "mesanEx"
     config = {}
     delta_t = dt.timedelta(minutes=35)
 
-    assert worker.make_composite(analysis_time, delta_t, "mesanEx", config) == "/output/ct.nc"
-    assert worker.make_super_observations(
-        "/output/ct.nc", analysis_time, "mesanEx", config
-    ) == "/output/clamount.dat"
+    assert worker.make_composite(analysis_time, delta_t, config) == "/output/ct.nc"
+    assert (
+        worker.make_super_observations("/output/ct.nc", analysis_time, config)
+        == "/output/clamount.dat"
+    )
 
     composite.assert_called_once_with(analysis_time, delta_t, "mesanEx", config)
     superobs.assert_called_once_with("/output/ct.nc", analysis_time, "mesanEx", config)
 
 
 def test_ctth_worker_dispatches_to_product_functions(monkeypatch, scene):
-    """Test this."""
+    """Test CTTH worker dispatch."""
     analysis_time = scene["starttime"]
     composite = Mock(return_value="/output/ctth.nc")
     superobs = Mock(return_value="/output/clheight.dat")
+
     monkeypatch.setattr(runner, "do_ctth_composite", composite)
     monkeypatch.setattr(runner, "do_cloudheight", superobs)
 
     worker = runner.CloudTopHeightCompositeWorker()
+    worker.area_id = "mesanEx"
     config = {}
     delta_t = dt.timedelta(minutes=35)
 
-    assert worker.make_composite(analysis_time, delta_t, "mesanEx", config) == "/output/ctth.nc"
-    assert worker.make_super_observations(
-        "/output/ctth.nc", analysis_time, "mesanEx", config
-    ) == "/output/clheight.dat"
+    assert worker.make_composite(analysis_time, delta_t, config) == "/output/ctth.nc"
+    assert (
+        worker.make_super_observations("/output/ctth.nc", analysis_time, config)
+        == "/output/clheight.dat"
+    )
 
     composite.assert_called_once_with(analysis_time, delta_t, "mesanEx", config)
     superobs.assert_called_once_with("/output/ctth.nc", analysis_time, "mesanEx", config)
+
+def test_create_message_contains_area(scene):
+    """Test created Posttroll message contains product and area."""
+    worker = runner.CloudTypeCompositeWorker()
+    worker.area_id = "mesanEx"
+
+    encoded = worker.create_message("/data/mesan/mesan_ct.nc", scene)
+
+    msg = Message.from_string(encoded)
+
+    assert msg.data["product"] == "CT"
+    assert msg.data["area"] == "mesanEx"
+    assert msg.data["uri"] == "/data/mesan/mesan_ct.nc"
+    assert msg.data["uid"] == "mesan_ct.nc"

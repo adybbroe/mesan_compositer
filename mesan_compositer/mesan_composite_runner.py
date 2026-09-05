@@ -460,24 +460,6 @@ class FileListener(threading.Thread):
         return True
 
 
-def create_message(resultfile, scene, product_name):
-    """Create the posttroll message."""
-    to_send = {}
-    to_send["uri"] = resultfile
-    to_send["uid"] = Path(resultfile).name
-    to_send["product"] = product_name
-    to_send["type"] = "netCDF"
-    to_send["format"] = "MESAN"
-    to_send["data_processing_level"] = "3"
-    to_send["start_time"] = scene["starttime"]
-    to_send["end_time"] = scene["endtime"]
-    pub_message = Message("/" + to_send["format"] + "/" + to_send["data_processing_level"] +
-                          "/" + to_send["type"] +"/" + str(product_name),
-                          "file", to_send).encode()
-
-    return pub_message
-
-
 def make_scene_id(product, platform_name, orbit_number, start_time):
     """Return the identifier used to prevent duplicate processing."""
     return (
@@ -665,20 +647,22 @@ class CompositeWorker:
     """Base class for generating a MESAN cloud composite."""
 
     product = ""
-    super_obs_file = None
+
+    def __init__(self):
+        """Intialize the object."""
+        self.area_id = None
 
     def __call__(self, scene, job_id, publish_q, config_options):
         """Run the composite worker."""
         try:
             LOG.debug("%s: Start compositer...", self.product)
 
-            time_of_analysis, delta_t, area_id = self.get_processing_parameters(scene, config_options)
-            LOG.info("Make %s composite for area id = %s", self.product, area_id)
+            (time_of_analysis, delta_t, self.area_id) = self.get_processing_parameters(scene, config_options)
+            LOG.info("Make %s composite for area id = %s", self.product, self.area_id)
 
             result_file = self.make_composite(
                 time_of_analysis,
                 delta_t,
-                area_id,
                 config_options,
             )
 
@@ -687,6 +671,8 @@ class CompositeWorker:
 
             self.publish_result(result_file, scene, publish_q)
             self.log_elapsed_time(job_id)
+
+            super_obs_file = None
 
             if "generate_superobservations_live_runner" not in config_options:
                 return self.make_result(status="success", result_file=result_file, super_obs_file=None)
@@ -698,7 +684,6 @@ class CompositeWorker:
                         super_obs_file = self.make_super_observations(
                             result_file,
                             time_of_analysis,
-                            area_id,
                             config_options,
                         )
                         LOG.info("%s super observations generated: %s", self.product, super_obs_file)
@@ -712,12 +697,12 @@ class CompositeWorker:
             LOG.exception("Failed in %s composite worker", self.product)
             raise
 
-    def make_composite(self, time_of_analysis, delta_t, area_id, config_options):
+    def make_composite(self, time_of_analysis, delta_t, config_options):
         """Make composite."""
         raise NotImplementedError
 
 
-    def make_super_observations(self, result_file, time_of_analysis, area_id, config_options):
+    def make_super_observations(self, result_file, time_of_analysis, config_options):
         """Make super observations."""
         raise NotImplementedError
 
@@ -743,10 +728,33 @@ class CompositeWorker:
 
     def publish_result(self, result_file, scene, publish_q):
         """Publish the generated composite."""
-        pubmsg = create_message(result_file, scene, self.product)
+        pubmsg = self.create_message(result_file, scene)
 
         LOG.info("Sending: %s", pubmsg)
         publish_q.put(pubmsg)
+
+    def create_message(self, resultfile, scene):
+        """Create the Posttroll message."""
+        to_send = {
+            "uri": resultfile,
+            "uid": Path(resultfile).name,
+            "product": self.product,
+            "type": "netCDF",
+            "format": "MESAN",
+            "area": self.area_id,
+            "data_processing_level": "3",
+            "start_time": scene["starttime"],
+            "end_time": scene["endtime"],
+        }
+
+        return Message(
+            f"/{to_send['format']}/"
+            f"{to_send['data_processing_level']}/"
+            f"{to_send['type']}/"
+            f"{self.product}",
+            "file",
+            to_send,
+        ).encode()
 
     def log_elapsed_time(self, job_id):
         """Log elapsed processing time."""
@@ -774,13 +782,13 @@ class CloudTypeCompositeWorker(CompositeWorker):
 
     product = "CT"
 
-    def make_composite(self, time_of_analysis, delta_t, area_id, config_options):
+    def make_composite(self, time_of_analysis, delta_t, config_options):
         """Make the high resolution cloud composite."""
-        return do_cloud_type_composite(time_of_analysis, delta_t, area_id, config_options)
+        return do_cloud_type_composite(time_of_analysis, delta_t, self.area_id, config_options)
 
-    def make_super_observations(self, result_file, time_of_analysis, area_id, config_options):
+    def make_super_observations(self, result_file, time_of_analysis, config_options):
         """Make the cloud parameter super observations."""
-        return do_cloudamount(result_file, time_of_analysis, area_id, config_options)
+        return do_cloudamount(result_file, time_of_analysis, self.area_id, config_options)
 
 
 class CloudTopHeightCompositeWorker(CompositeWorker):
@@ -788,23 +796,27 @@ class CloudTopHeightCompositeWorker(CompositeWorker):
 
     product = "CTTH"
 
-    def make_composite(self, time_of_analysis, delta_t, area_id, config_options):
+    def make_composite(self, time_of_analysis, delta_t, config_options):
         """Make the high resolution cloud composite."""
-        return do_ctth_composite(time_of_analysis, delta_t, area_id, config_options)
+        return do_ctth_composite(time_of_analysis, delta_t, self.area_id, config_options)
 
-    def make_super_observations(self, result_file, time_of_analysis, area_id, config_options):
+    def make_super_observations(self, result_file, time_of_analysis, config_options):
         """Make the cloud parameter super observations."""
-        return do_cloudheight(result_file, time_of_analysis, area_id, config_options, )
+        return do_cloudheight(result_file, time_of_analysis, self.area_id, config_options, )
 
 
 def ctype_composite_worker(scene, job_id, publish_q, config_options):
     """Create a CT composite."""
-    return _CT_WORKER( scene, job_id, publish_q, config_options)
+    worker = CloudTypeCompositeWorker()
+
+    return worker(scene, job_id, publish_q, config_options)
 
 
 def ctth_composite_worker(scene, job_id, publish_q, config_options):
     """Create a CTTH composite."""
-    return _CTTH_WORKER(scene, job_id, publish_q, config_options, )
+    worker = CloudTopHeightCompositeWorker()
+
+    return worker(scene, job_id, publish_q, config_options)
 
 
 NO_MESSAGE = object()
@@ -813,9 +825,6 @@ COMPOSITE_WORKERS = {
     "CT": ctype_composite_worker,
     "CTTH": ctth_composite_worker,
 }
-
-_CT_WORKER = CloudTypeCompositeWorker()
-_CTTH_WORKER = CloudTopHeightCompositeWorker()
 
 
 def get_next_message(listener_q):
