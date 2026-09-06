@@ -208,24 +208,10 @@ def cloud_type_netcdf(tmp_path):
     lons = np.tile(np.arange(shape[1], dtype=float), (shape[0], 1))
     lats = np.tile(np.arange(shape[0], dtype=float)[:, None], (1, shape[1]))
 
-    ds = xr.Dataset(
-        {
-            "ct": (
-                ("y", "x"),
-                ct,
-            ),
-        },
-        coords={
-            "lon": (
-                ("y", "x"),
-                lons,
-            ),
-            "lat": (
-                ("y", "x"),
-                lats,
-            ),
-        },
-    )
+    ds = xr.Dataset({"ct": (("y", "x"), ct)},
+                    coords={"lon": (("y", "x"),  lons),
+                            "lat": (("y", "x"),  lats),
+                            })
 
     filename = tmp_path / "ct.nc"
     ds.to_netcdf(filename)
@@ -249,24 +235,10 @@ def cloud_top_height_netcdf(tmp_path):
     lons = np.tile(np.arange(shape[1], dtype=np.float32), (shape[0], 1))
     lats = np.tile(np.arange(shape[0], dtype=np.float32)[:, None], (1, shape[1]))
 
-    ds = xr.Dataset(
-        {
-            "ctth_alti": (
-                ("y", "x"),
-                height,
-            ),
-        },
-        coords={
-            "lon": (
-                ("y", "x"),
-                lons,
-            ),
-            "lat": (
-                ("y", "x"),
-                lats,
-            ),
-        },
-    )
+    ds = xr.Dataset({"ctth_alti": (("y", "x"), height)},
+                    coords={"lon": (("y", "x"), lons),
+                            "lat": (("y", "x"), lats)
+                            })
 
     filename = tmp_path / "ctth.nc"
     ds.to_netcdf(filename)
