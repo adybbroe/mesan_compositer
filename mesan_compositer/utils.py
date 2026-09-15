@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019, 2023 Adam.Dybbroe
+# Copyright (c) 2019-2026 Adam.Dybbroe
 
 # Author(s):
 
-#   Adam.Dybbroe <a000680@c21529.ad.smhi.se>
+#   Adam Dybbroe <Firstname.Lastname at smhi.se>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,15 +25,16 @@
 import logging
 import os
 import socket
+from urllib.parse import urlparse
 
 import netifaces
-from six.moves.urllib.parse import urlparse
 
 LOG = logging.getLogger(__name__)
 
 
 class NoGeoScenesError(Exception):
     """Custom Exception to capture cases where no Geo scenes can be found."""
+
     pass
 
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014-2023 Adam.Dybbroe
+# Copyright (c) 2014-2023, 2026 Adam.Dybbroe
 
 # Author(s):
 
@@ -22,11 +22,10 @@
 
 """Collection of minor helper tools for the generation of Mesan composites."""
 
+import datetime as dt
 import logging
 import os
-from datetime import datetime, timedelta
 
-import six
 from trollsift import Parser
 
 from mesan_compositer.pps_msg_conversions import get_bit_from_flags
@@ -141,24 +140,6 @@ class GeoMetaData:
         self.areaid = areaid
         self.platform_name = platform_name
         self.uri = filename
-        # self._hrit_pattern = '{rate:1s}-000-{hrit_format:_<6s}-{platform_shortname:4s}_{service:_<7s}-{channel:_<9s}-{segment:06d}___-{start_time:%Y%m%d%H%M}-__'  # noqa
-        # self._hrit_path = None
-        # self.hrit_files = None
-
-    # def find_hrit_files(self, hrit_path):
-    #     """Find the matching hrit files for the cloud scene."""
-    #     self._hrit_path = hrit_path
-    #     self.hrit_files = []
-
-    #     p__ = Parser(self._hrit_pattern)
-    #     hrit_files = self._hrit_path.glob(globify(self._hrit_pattern))
-
-    #     for hrit_fname in hrit_files:
-    #         res = p__.parse(hrit_fname.name)
-    #         if self.timeslot - timedelta(seconds=1) < res['start_time'] < self.timeslot + timedelta(seconds=1):
-    #             self.hrit_files.append(hrit_fname)
-
-    #     self.hrit_files.sort()
 
     def __str__(self):
         """Print out the metadata content in human readable form."""
@@ -194,7 +175,7 @@ def get_analysis_time(start_t, end_t, minutes_resolution=60):
     if end_t and start_t > end_t:
         raise IOError("Start time greater than end time!")
     elif not end_t:
-        end_t = start_t + timedelta(seconds=300)
+        end_t = start_t + dt.timedelta(seconds=300)
         LOG.warning(
             "No end time, so assuming equal to start time + 5 minutes!")
     mean_time = (end_t - start_t) / 2 + start_t
@@ -205,8 +186,8 @@ def get_analysis_time(start_t, end_t, minutes_resolution=60):
     n_units = int(minutes_since_midnight / minutes_resolution + 0.5)
     res = minutes_since_midnight % minutes_resolution
 
-    retv_time = midnight + timedelta(minutes=n_units * minutes_resolution +
-                                     int(res/minutes_resolution))
+    retv_time = midnight + dt.timedelta(minutes=n_units * minutes_resolution +
+                                        int(res/minutes_resolution))
     return retv_time
 
 
@@ -221,7 +202,7 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
     plist = []
     files_old = True
     latest_file = None
-    latest_file_time = datetime(1970, 1, 1)
+    latest_file_time = dt.datetime(1970, 1, 1)
     LOG.info("Going through file list with %d files", len(filelist))
     for filename in filelist:
         bname = os.path.basename(filename)
@@ -242,12 +223,7 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
         geofilename = filename.replace(product, "CMA")
         orbit = "%05d" % res["orbit"]
         if "end_time" in res.keys():
-            if six.PY2:
-                # Requires Python 2.7:
-                delta_seconds = (res["end_time"]-res["start_time"]).total_seconds()
-                timeslot = res["start_time"] + timedelta(seconds=delta_seconds/2.)
-            else:
-                timeslot = res["start_time"] + (res["end_time"]-res["start_time"])/2.
+            timeslot = res["start_time"] + (res["end_time"]-res["start_time"])/2.
         else:
             timeslot = res["start_time"]
 
@@ -269,7 +245,7 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
                               variant=variant)
             plist.append(mda)
             files_old = False
-        elif (timewindow[0] - timeslot) < timedelta(seconds=3600 * 4):
+        elif (timewindow[0] - timeslot) < dt.timedelta(seconds=3600 * 4):
             files_old = False
 
     if files_old and latest_file is not None:
@@ -282,58 +258,6 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
                   len(filelist), filelist[0], filelist[-1])
 
     return plist
-
-
-# def get_msglist(filelist, timewindow, area_id, satellites=None):
-#     """Get the full list of metadata keys for all Meteosat SEVIRI slots provided in the list of files.
-
-#     Only consider the Meteosat slots defined by the *filelist*, and only for the satellites specified
-#     in the list *satellites* if provided.
-
-#     """
-#     if not satellites:
-#         satellites = ['Meteosat-8', 'Meteosat-9',
-#                       'Meteosat-10', 'Meteosat-11']
-#     metsats = [MSGSATS.get(s, 'MSGx') for s in satellites]
-
-#     mlist = []
-#     for filename in filelist:
-#         bname = os.path.basename(filename)
-#         LOG.debug("Filename: %s", str(bname))
-
-#         bnsplit = bname.split('_')
-#         sat = bnsplit[1]
-#         if sat not in metsats:
-#             LOG.warning('Satellite ' + str(sat) +
-#                         ' not in list: ' + str(metsats))
-#             continue
-
-#         platform_name = METEOSAT[sat]
-#         bnsplit = bname[17:].split('_')
-#         areaid = bnsplit[1].split('.')[0]
-#         if areaid != area_id:
-#             LOG.debug("Area id " + str(areaid) +
-#                       " not requested (" + str(area_id) + ")")
-#             LOG.debug("bnsplit = %s", str(bnsplit))
-#             continue
-
-#         # Hardcoded the filenaming convention! FIXME!
-#         try:
-#             timeslot = datetime.strptime(bnsplit[0], '%Y%m%d%H%M')
-#         except ValueError:
-#             LOG.error("Failure: Can't get the time of the msg scene! " +
-#                       str(bname))
-#             continue
-
-#         # Now filter out all passes outside time window:
-#         if (timeslot > timewindow[0] and
-#                 timeslot < timewindow[1]):
-#             mda = GeoMetaData(filename=filename,
-#                               areaid=areaid, timeslot=timeslot,
-#                               platform_name=platform_name)
-#             mlist.append(mda)
-
-#     return mlist
 
 
 def get_nwcsaf_files(basedir, file_ext):

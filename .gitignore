@@ -13,6 +13,7 @@ develop-eggs/
 dist/
 downloads/
 eggs/
+.eggs/
 lib/
 lib64/
 parts/
@@ -21,6 +22,17 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+
+*.log
+#*.png
+#*.nc
+*kurt*
+*~
+.*~
+oldstuff/
+set_env.txt
+mesan_compositer/test_output
+output/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
