@@ -115,7 +115,8 @@ def derive_sobs(ctth_comp, npix, filepath):
     # Get the lon,lat:
     lons, lats = ctth_comp.lon, ctth_comp.lat
     height = xr.DataArray(data=ctth_comp.data, dims=["y", "x"])
-    height = height.coarsen({"y": dy, "x": dx}, boundary="trim").mean(skipna=True)
+    #height = height.coarsen({"y": dy, "x": dx}, boundary="trim").mean(skipna=True)
+    height = height.coarsen({"y": dy, "x": dx}, boundary="trim").mean()
 
     so_lon = lons[int(dy/2)::dy, int(dx/2)::dx]
     so_lat = lats[int(dy/2)::dy, int(dx/2)::dx]
