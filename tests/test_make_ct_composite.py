@@ -180,9 +180,7 @@ class TestctCompositor:
             # TODO: Here we should try test the generation of the composite
 
 
-def test_setup_ct_compositer(fake_yamlconfig_file,
-                             nwcsaf_geo_ct_filename,
-                             nwcsaf_pps_ct_filename):
+def test_setup_ct_compositer(fake_yamlconfig_file, nwcsaf_geo_ct_filename, nwcsaf_pps_ct_filename):
     """Test set up the CT compositer."""
     config = get_config(fake_yamlconfig_file)
 

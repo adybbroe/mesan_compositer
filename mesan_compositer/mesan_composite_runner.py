@@ -48,11 +48,11 @@ from posttroll.publisher import Publish
 
 from mesan_compositer.composite_tools import get_analysis_time
 from mesan_compositer.config import get_config
-from mesan_compositer.ct_quicklooks import ctth_quicklook_from_netcdf
 from mesan_compositer.logger import setup_logging
 from mesan_compositer.make_ct_composite import CloudproductCompositer
 from mesan_compositer.prt_nwcsaf_cloudamount import do_cloudamount
 from mesan_compositer.prt_nwcsaf_cloudheight import do_cloudheight
+from mesan_compositer.quicklooks_from_netcdf import ctth_quicklook_from_netcdf
 from mesan_compositer.utils import NoGeoScenesError, check_uri, get_local_ips
 
 LOG = logging.getLogger(__name__)
@@ -1096,7 +1096,8 @@ def do_cloud_type_composite(time_of_analysis, delta_t, area_id, config_options):
 
     ctcomp.blend_cloud_products()
     output_filepath = ctcomp.write()
-    ctcomp.quicklook(output_filepath)
+    if config_options.get("do_ct_quicklook"):
+        ctcomp.quicklook(output_filepath)
 
     return output_filepath
 
@@ -1114,8 +1115,10 @@ def do_ctth_composite(time_of_analysis, delta_t, area_id, config_options):
     ctcomp.blend_cloud_products()
     output_filepath = ctcomp.write()
 
-    ctth_quicklook_from_netcdf(ctcomp.group_name, output_filepath)
-    LOG.debug("CTTH quicklook done.")
+    if config_options.get("do_ctth_quicklook"):
+        ctth_quicklook_from_netcdf(ctcomp.group_name, output_filepath)
+        LOG.debug("CTTH quicklook done.")
+
     return output_filepath
 
 

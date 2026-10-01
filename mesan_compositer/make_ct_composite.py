@@ -39,8 +39,8 @@ from trollsift import Parser, globify
 
 from mesan_compositer.composite_tools import METEOSAT, METOPS, MSGSATS, GeoMetaData, get_ppslist
 from mesan_compositer.config import get_config
-from mesan_compositer.ct_quicklooks import ctth_quicklook_from_netcdf, ctype_quicklook_from_netcdf
 from mesan_compositer.load_cloud_products import blend_cloud_products
+from mesan_compositer.quicklooks_from_netcdf import ctth_quicklook_from_netcdf, ctype_quicklook_from_netcdf
 from mesan_compositer.utils import NoGeoScenesError
 
 debug_on()
@@ -206,7 +206,12 @@ class CloudproductCompositer:
                 continue
 
             platform_name = res["satellite"]
-            areaid = res["area"]
+            try:
+                areaid = res["area"]
+            except KeyError:
+                areaid = self.msg_areaname
+                LOG.warning(f"Area id not in filename, falling back to {areaid}")
+
             timeslot = res["nominal_time"]
             if platform_name not in metsats:
                 LOG.warning("Satellite " + str(platform_name) + " not in list: " + str(metsats))
@@ -312,6 +317,7 @@ class CloudproductCompositer:
             self.msg_scenes = [best_scene] + self.msg_scenes
             LOG.info("The scene closest in time to the analysis time: %s" % str(self.msg_scenes[0]))
         else:
+            self.msg_scenes = []
             raise NoGeoScenesError("No valid Geo Scene within time window!")
 
     def blend_cloud_products(self):
