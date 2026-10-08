@@ -32,12 +32,13 @@ import sys
 import tempfile
 from glob import glob
 from logging import handlers
+from pathlib import Path
 from tempfile import gettempdir
 
 from satpy.utils import debug_on
 from trollsift import Parser, globify
 
-from mesan_compositer.composite_tools import METEOSAT, METOPS, MSGSATS, GeoMetaData, get_ppslist
+from mesan_compositer.composite_tools import METEOSAT, METOPS, MSGSATS, OSCAR_SATELLITE_NAMES, GeoMetaData, get_ppslist
 from mesan_compositer.config import get_config
 from mesan_compositer.load_cloud_products import blend_cloud_products
 from mesan_compositer.quicklooks_from_netcdf import ctth_quicklook_from_netcdf, ctype_quicklook_from_netcdf
@@ -122,8 +123,12 @@ class CloudproductCompositer:
                  "time and info in config file:")
         if product == "CT":
             file_parser = Parser(config_options["ct_composite_filename"])
+            self.geo_input_pattern = config_options["msg_ct_filename"]
         else:
             file_parser = Parser(config_options["ctth_composite_filename"])
+            self.geo_input_pattern = config_options["msg_ctth_filename"]
+
+        self.polar_input_pattern = config_options["pps_filename"]
 
         bname = file_parser.compose({"area":areaid, "obstime":obstime})
         path = config_options["composite_output_dir"]
@@ -205,7 +210,7 @@ class CloudproductCompositer:
                 LOG.debug("File name format not supported/requested: {fname}".format(fname=os.path.basename(geo_file)))
                 continue
 
-            platform_name = res["satellite"]
+            platform_name = MSGSATS.get(OSCAR_SATELLITE_NAMES.get(res["satellite"], res["satellite"]))
             try:
                 areaid = res["area"]
             except KeyError:
@@ -334,8 +339,10 @@ class CloudproductCompositer:
             geofilename = pathlib.Path(scene.geofilename)
             cloud_scenes.append([ppsfile, geofilename])
 
-        satpy_composite_name = {"CT": "ct", "CTTH": "ctth_alti"}.get(self.product)
-        self.blended_scene, group_name = blend_cloud_products(satpy_composite_name,
+        input_patterns = {"geo": self.geo_input_pattern,
+                          "polar": self.polar_input_pattern}
+        self.blended_scene, group_name = blend_cloud_products(self.product,
+                                                              input_patterns,
                                                               areaid, *cloud_scenes,
                                                               cache_dir=gettempdir())
         self.group_name = group_name
@@ -344,6 +351,12 @@ class CloudproductCompositer:
         """Write the composite to a netcdf file."""
         _, tmpfname = tempfile.mkstemp(suffix=os.path.basename(self.filename)+".nc",
                                        dir=os.path.dirname(self.filename))
+
+        # self._drop_timedim_in_scene() # Not needed - FIXME!
+        for key in self.blended_scene.keys():
+            LOG.debug("Before write: %s dims=%s shape=%s", key,
+                      self.blended_scene[key].dims,
+                      self.blended_scene[key].shape)
 
         self.blended_scene.save_dataset(self.group_name, filename=tmpfname)
         now = dt.datetime.now(dt.timezone.utc)
@@ -356,11 +369,26 @@ class CloudproductCompositer:
 
         shutil.copy(tmpfname, fname_with_timestamp)
         os.rename(tmpfname, self.filename + ".nc")
-        return self.filename + ".nc"
+        return Path(self.filename + ".nc")
+
+    def _drop_timedim_in_scene(self):
+        """Drop the time dimension in all scene data."""
+        for key in list(self.blended_scene.keys()):
+            data = self.blended_scene[key]
+
+            if "time" in data.dims:
+                if data.sizes["time"] != 1:
+                    raise ValueError(
+                        f"Expected singleton time dimension for {key}, "
+                        f"got {data.sizes['time']}"
+                    )
+
+                self.blended_scene[key] = data.squeeze("time", drop=True)
+                LOG.debug(f"Time dim dropped: {key}")
 
     def quicklook(self, netcdf_filename):
         """Make a quicklook image from the netCDF file."""
-        if self.group_name in ["ctth_alti"]:
+        if self.group_name in ["CTTH_ALTI_group", "ctth_alti"]:
             return ctth_quicklook_from_netcdf(self.group_name, netcdf_filename)
         else:
             return ctype_quicklook_from_netcdf(self.group_name, netcdf_filename)

@@ -37,6 +37,19 @@ CHUNK_SIZE = 4096
 
 LOG = logging.getLogger(__name__)
 
+
+def squeeze_time(data):
+    """Drop a singleton time dimension if present."""
+    if "time" in data.dims:
+        if data.sizes["time"] != 1:
+            raise ValueError(
+                f"Expected one time step, got {data.sizes['time']}"
+            )
+        data = data.squeeze("time", drop=True)
+
+    return data
+
+
 def ctth_quicklook_from_netcdf(group_name, netcdf_filename, destpath=None):
     """Make a Cloud Top Height quicklook image from the netCDF file."""
     nc_ = xr.open_dataset(netcdf_filename, decode_cf=True,
@@ -44,7 +57,7 @@ def ctth_quicklook_from_netcdf(group_name, netcdf_filename, destpath=None):
                           chunks={"columns": CHUNK_SIZE,
                                   "rows": CHUNK_SIZE})
 
-    ctth_alti = nc_[group_name][:]
+    ctth_alti = squeeze_time(nc_[group_name][:])
     ctth_alti = ctth_alti.where(ctth_alti < 63535)
 
     ctth_data = ctth_alti.data
