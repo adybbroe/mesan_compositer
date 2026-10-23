@@ -273,7 +273,7 @@ def blend_cloud_products(product, inputfile_patterns, areaid, *scenes, cache_dir
                       loader.scene["bowtie_mask"].shape)
 
         if satpy_composite_name in HEIGHT_PRODUCTS and "bowtie_mask" in loader.scene:
-            prepare_height_for_resampling(loader.scene, product)
+            prepare_height_for_resampling(loader.scene, satpy_composite_name)
 
         LOG.debug("%s after load: dims=%s shape=%s", satpy_composite_name,
                   loader.scene[satpy_composite_name].dims,
@@ -288,8 +288,8 @@ def blend_cloud_products(product, inputfile_patterns, areaid, *scenes, cache_dir
                                           reduce_data=False, cache_dir=cache_dir,
                                           mask_area=True)
         if satpy_composite_name  in HEIGHT_PRODUCTS:
-            restore_height_missing_values(local)
-            local["ctth_alti"].attrs["_FillValue"] = HEIGHT_FILL_VALUE
+            restore_height_missing_values(local, satpy_composite_name)
+            local[satpy_composite_name].attrs["_FillValue"] = HEIGHT_FILL_VALUE
 
         return local, satpy_composite_name
 
@@ -305,7 +305,7 @@ def blend_cloud_products(product, inputfile_patterns, areaid, *scenes, cache_dir
     # the scenes are blended.
     if satpy_composite_name  in HEIGHT_PRODUCTS:
         for scene in resampled.scenes:
-            restore_height_missing_values(scene)
+            restore_height_missing_values(scene, satpy_composite_name)
 
     LOG.debug("Getting the weights...")
     weights = []
@@ -319,8 +319,9 @@ def blend_cloud_products(product, inputfile_patterns, areaid, *scenes, cache_dir
     LOG.debug("Before blending...")
     blended = resampled.blend(blend_function=stack_with_weights)
 
-    if satpy_composite_name  in HEIGHT_PRODUCTS:
+    if satpy_composite_name in HEIGHT_PRODUCTS:
         try:
+            blended[group_name] = blended[group_name].fillna(HEIGHT_FILL_VALUE)
             blended[group_name].attrs["_FillValue"] = HEIGHT_FILL_VALUE
         except KeyError:
             LOG.exception("Failed setting fill value for %s.", group_name)

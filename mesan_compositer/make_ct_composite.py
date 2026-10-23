@@ -56,7 +56,8 @@ _DEFAULT_TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 _DEFAULT_LOG_FORMAT = "[%(levelname)s: %(asctime)s : %(name)s] %(message)s"
 
 CPROD_GROUP_NAME = {"CT": "CT_group",
-                    "CTTH": "CTTH_group"}
+                    "CTTH": "CTTH_group",
+                    "CBH": "CBH_group"}
 
 
 def get_arguments():
@@ -113,8 +114,8 @@ class CloudproductCompositer:
 
     def __init__(self, obstime, tdiff, areaid, config_options, product):
         """Initialize the cloud type composite instance."""
-        if product not in ["CT", "CTTH"]:
-            raise ValueError("Cloud products must be one of CT or CTTH!")
+        if product not in ["CT", "CTTH", "CBH"]:
+            raise ValueError("Cloud products must be one of CT, CTTH or CBH.")
         self.product = product
 
         # Generate the filename from the observation time and the
@@ -124,9 +125,12 @@ class CloudproductCompositer:
         if product == "CT":
             file_parser = Parser(config_options["ct_composite_filename"])
             self.geo_input_pattern = config_options["msg_ct_filename"]
-        else:
+        elif product == "CTTH":
             file_parser = Parser(config_options["ctth_composite_filename"])
             self.geo_input_pattern = config_options["msg_ctth_filename"]
+        else:
+            file_parser = Parser(config_options["cbh_composite_filename"])
+            self.geo_input_pattern = config_options["msg_cbh_filename"]
 
         self.polar_input_pattern = config_options["pps_filename"]
 
@@ -137,7 +141,8 @@ class CloudproductCompositer:
         LOG.info("Filename = " + str(self.filename))
 
         description = {"CT": "Cloud Type",
-                       "CTTH": "Cloud Top Temperature and Height"}.get(self.product)
+                       "CTTH": "Cloud Top Temperature and Height",
+                       "CBH": "Cloud Base Height"}.get(self.product)
         self.description = "{desc} composite for Mesan".format(desc=description)
         self.obstime = obstime
         self.timediff = tdiff
@@ -186,7 +191,8 @@ class CloudproductCompositer:
 
     def _get_msg_filepattern_from_config(self):
         msg_prod_filename = "msg_{prod}_filename".format(prod={"CT": "cty",
-                                                               "CTTH": "ctth"}.get(self.product))
+                                                               "CTTH": "ctth",
+                                                               "CBH": "cbh"}.get(self.product))
         return self._options[msg_prod_filename]
 
     def get_pps_scenes(self, pps_file_list, satellites=None, variant=None):
@@ -267,7 +273,7 @@ class CloudproductCompositer:
 
         dr_list = self._get_all_pps_files(pps_dr_dir)
         LOG.info("Number of direct readout pps %s files in dir: %s",
-                 {"CT": "cloudtype", "CTTH": "ctth"}.get(self.product),
+                 {"CT": "cloudtype", "CTTH": "ctth", "CBH": "cbh"}.get(self.product),
                  str(len(dr_list)))
 
         if len(dr_list) <= min_num_of_pps_dr_files:
@@ -389,6 +395,8 @@ class CloudproductCompositer:
     def quicklook(self, netcdf_filename):
         """Make a quicklook image from the netCDF file."""
         if self.group_name in ["CTTH_ALTI_group", "ctth_alti"]:
+            return ctth_quicklook_from_netcdf(self.group_name, netcdf_filename)
+        elif self.group_name in ["CBH_ALTI_group", "cbh_alti"]:
             return ctth_quicklook_from_netcdf(self.group_name, netcdf_filename)
         else:
             return ctype_quicklook_from_netcdf(self.group_name, netcdf_filename)
