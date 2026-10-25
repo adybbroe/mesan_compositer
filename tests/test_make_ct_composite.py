@@ -184,7 +184,8 @@ def test_setup_ct_compositer(fake_yamlconfig_file, nwcsaf_geo_ct_filename, nwcsa
     """Test set up the CT compositer."""
     config = get_config(fake_yamlconfig_file)
 
-    area_id = "mesanEx"
+    #area_id = "mesanEx"
+    area_id = "MSG-N"
     time_of_analysis = datetime.strptime("2023011811", "%Y%m%d%H")
     delta_time_window = timedelta(minutes=35)
 

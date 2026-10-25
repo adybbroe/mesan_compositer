@@ -190,7 +190,7 @@ class CloudproductCompositer:
         return glob(os.path.join(geo_dir, glob_str))
 
     def _get_msg_filepattern_from_config(self):
-        msg_prod_filename = "msg_{prod}_filename".format(prod={"CT": "cty",
+        msg_prod_filename = "msg_{prod}_filename".format(prod={"CT": "ct",
                                                                "CTTH": "ctth",
                                                                "CBH": "cbh"}.get(self.product))
         return self._options[msg_prod_filename]
