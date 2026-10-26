@@ -216,7 +216,9 @@ class CloudproductCompositer:
                 LOG.debug("File name format not supported/requested: {fname}".format(fname=os.path.basename(geo_file)))
                 continue
 
-            platform_name = MSGSATS.get(OSCAR_SATELLITE_NAMES.get(res["satellite"], res["satellite"]))
+            platform_name = OSCAR_SATELLITE_NAMES.get(res["satellite"], res["satellite"])
+            platform_name = MSGSATS.get(platform_name, platform_name)
+            # platform_name = MSGSATS.get(OSCAR_SATELLITE_NAMES.get(res["satellite"], res["satellite"]))
             try:
                 areaid = res["area"]
             except KeyError:

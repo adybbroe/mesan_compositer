@@ -231,8 +231,13 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
             continue
 
         product = res["product"]
-        geofilename = filename.replace(product, "CTTH")
-        #geofilename = filename.replace(product, "CMA")
+        geo_product = {
+            "CT": "CMA",
+            "CTTH": "CTTH",
+            "CBH": "CTTH",
+        }[product]
+        geofilename = filename.replace(product, geo_product)
+
         orbit = "%05d" % res["orbit"]
         if "end_time" in res.keys():
             timeslot = res["start_time"] + (res["end_time"]-res["start_time"])/2.
