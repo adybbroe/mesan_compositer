@@ -1,0 +1,10 @@
+[run]
+source = mesan_compositer
+branch = True
+omit =
+    tests/*
+    mesan_compositer/version.py
+
+[report]
+show_missing = True
+skip_covered = True
