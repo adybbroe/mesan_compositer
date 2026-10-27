@@ -25,6 +25,7 @@
 
 import argparse
 import logging
+import pathlib
 import sys
 from datetime import datetime, timedelta
 from logging import handlers
@@ -118,4 +119,4 @@ if __name__ == "__main__":
     ctcomp.get_catalogue()
     ctcomp.blend_cloud_products()
     output_filepath = ctcomp.write()
-    qlook_filepath = ctcomp.quicklook(output_filepath)
+    qlook_filepath = ctcomp.quicklook(pathlib.Path(output_filepath))
