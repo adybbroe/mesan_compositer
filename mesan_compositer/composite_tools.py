@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014-2023, 2026 Adam.Dybbroe
+# Copyright (c) 2014-2026 Adam.Dybbroe
 
 # Author(s):
 
-#   Adam.Dybbroe <adam.dybbroe@smhi.se>
+#   Adam Dybbroe <Firstname.Lastname at smhi.se>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -62,6 +62,9 @@ PLATFORM_NAME_INV = {"Suomi-NPP": "npp",
                      "NOAA-18": "noaa18",
                      "NOAA-15": "noaa15",
                      "NOAA-19": "noaa19"}
+
+VIIRS_SATELLITES = ["Suomi-NPP", "NOAA-20", "NOAA-21", "NOAA-22"]
+
 PLATFORM_NAME = {"npp": "Suomi-NPP",
                  "noaa20": "NOAA-20",
                  "noaa21": "NOAA-21",
@@ -228,7 +231,13 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
             continue
 
         product = res["product"]
-        geofilename = filename.replace(product, "CMA")
+        geo_product = {
+            "CT": "CMA",
+            "CTTH": "CTTH",
+            "CBH": "CTTH",
+        }[product]
+        geofilename = filename.replace(product, geo_product)
+
         orbit = "%05d" % res["orbit"]
         if "end_time" in res.keys():
             timeslot = res["start_time"] + (res["end_time"]-res["start_time"])/2.

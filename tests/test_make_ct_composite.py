@@ -23,6 +23,7 @@
 """Test the generation of the cloudtype composite."""
 
 from datetime import datetime, timedelta
+from pathlib import Path
 from unittest.mock import patch
 
 import h5netcdf
@@ -180,9 +181,7 @@ class TestctCompositor:
             # TODO: Here we should try test the generation of the composite
 
 
-def test_setup_ct_compositer(fake_yamlconfig_file,
-                             nwcsaf_geo_ct_filename,
-                             nwcsaf_pps_ct_filename):
+def test_setup_ct_compositer(fake_yamlconfig_file, nwcsaf_geo_ct_filename, nwcsaf_pps_ct_filename):
     """Test set up the CT compositer."""
     config = get_config(fake_yamlconfig_file)
 
@@ -204,11 +203,11 @@ def test_setup_ct_compositer(fake_yamlconfig_file,
                           "timeslot=2023-01-18 10:30:00"]
     assert str(ctcomp.msg_scenes[0]).split("\n") == expected_msg_scene
 
-    geofilename = str(nwcsaf_pps_ct_filename).replace("_CT_", "_CMA_")
-    expected_pps_scene = ["filename={filepath}".format(filepath=str(nwcsaf_pps_ct_filename)),
-                          "geofilename={filepath}".format(filepath=geofilename),
-                          "platform_name=Suomi-NPP",
-                          "orbit=00000",
-                          "timeslot=2023-01-18 10:40:49.500000",
-                          "variant=None"]
-    assert str(ctcomp.pps_scenes[0]).split("\n") == expected_pps_scene
+    scene = ctcomp.pps_scenes[0]
+
+    assert Path(scene.uri) == Path(nwcsaf_pps_ct_filename)
+    assert Path(scene.geofilename) == Path(str(nwcsaf_pps_ct_filename).replace("CT", "CMA"))
+    assert scene.platform_name == "Suomi-NPP"
+    assert scene.orbit == "00000"
+    assert scene.timeslot == datetime(2023, 1, 18, 10, 40, 49, 500000)
+    assert scene.variant is None
