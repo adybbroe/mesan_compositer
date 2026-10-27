@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014-2026 Adam.Dybbroe
+# Copyright (c) 2014-2026 Adam Dybbroe
 
 # Author(s):
 
@@ -20,18 +20,15 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Make a Cloud Type composite."""
+"""Helper functions to make the NWCSAF Cloud products compositet."""
 
-import argparse
 import datetime as dt
 import logging
 import os
 import pathlib
 import shutil
-import sys
 import tempfile
 from glob import glob
-from logging import handlers
 from pathlib import Path
 from tempfile import gettempdir
 
@@ -39,7 +36,6 @@ from satpy.utils import debug_on
 from trollsift import Parser, globify
 
 from mesan_compositer.composite_tools import METEOSAT, METOPS, MSGSATS, OSCAR_SATELLITE_NAMES, GeoMetaData, get_ppslist
-from mesan_compositer.config import get_config
 from mesan_compositer.load_cloud_products import blend_cloud_products
 from mesan_compositer.quicklooks_from_netcdf import ctth_quicklook_from_netcdf, ctype_quicklook_from_netcdf
 from mesan_compositer.utils import NoGeoScenesError
@@ -58,55 +54,6 @@ _DEFAULT_LOG_FORMAT = "[%(levelname)s: %(asctime)s : %(name)s] %(message)s"
 CPROD_GROUP_NAME = {"CT": "CT_group",
                     "CTTH": "CTTH_group",
                     "CBH": "CBH_group"}
-
-
-def get_arguments():
-    """Get command line arguments.
-
-    args.logging_conf_file, args.config_file, obs_time, area_id, wsize
-
-    Return:
-      File path of the logging.ini file
-      File path of the application configuration file
-      Observation/Analysis time
-      Area id
-      Window size
-
-    """
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--datetime", "-d", help="Date and time of observation - yyyymmddhh",
-                        required=True)
-    parser.add_argument("--time_window", "-t", help="Number of minutes before and after time window",
-                        required=True)
-    parser.add_argument("--area_id", "-a", help="Area id",
-                        required=True)
-    parser.add_argument("-c", "--config_file",
-                        type=str,
-                        dest="config_file",
-                        required=True,
-                        help="The file containing configuration parameters e.g. mesan_sat_config.yaml")
-    parser.add_argument("-l", "--logging",
-                        help="The path to the log-configuration file (e.g. './logging.ini')",
-                        dest="logging_conf_file",
-                        type=str,
-                        required=False)
-    parser.add_argument("-v", "--verbose",
-                        help="print debug messages too",
-                        action="store_true")
-    parser.add_argument("--ctype_out", help="Mesan Cloudtype composite output",
-                        required=False)
-    parser.add_argument("--background_ctth", help="CTTH background...",
-                        required=False)
-
-    args = parser.parse_args()
-
-    tanalysis = dt.datetime.strptime(args.datetime, "%Y%m%d%H")
-    delta_t = dt.timedelta(minutes=int(args.time_window))
-    if "template" in args.config_file:
-        print("Template file given as master config, aborting!")  # noqa: T201
-        sys.exit()
-
-    return args.logging_conf_file, args.config_file, tanalysis, args.area_id, delta_t
 
 
 class CloudproductCompositer:
@@ -402,33 +349,3 @@ class CloudproductCompositer:
             return ctth_quicklook_from_netcdf(self.group_name, netcdf_filename)
         else:
             return ctype_quicklook_from_netcdf(self.group_name, netcdf_filename)
-
-
-if __name__ == "__main__":
-
-    (logfile, config_filename, time_of_analysis, area_id, delta_time_window) = get_arguments()
-
-    handler = logging.StreamHandler(sys.stderr)
-
-    handler.setLevel(logging.DEBUG)
-    formatter = logging.Formatter(fmt=_DEFAULT_LOG_FORMAT,
-                                  datefmt=_DEFAULT_TIME_FORMAT)
-    handler.setFormatter(formatter)
-    logging.getLogger("").addHandler(handler)
-    # logging.getLogger('').setLevel(logging.DEBUG)
-    logging.getLogger("satpy").setLevel(logging.DEBUG)
-
-    LOG = logging.getLogger("make_ct_composite")
-
-    log_handlers = logging.getLogger("").handlers
-    for log_handle in log_handlers:
-        if type(log_handle) is handlers.SMTPHandler:
-            LOG.debug("Mail notifications to: %s", str(log_handle.toaddrs))
-
-    OPTIONS = get_config(config_filename)
-
-    ctcomp = CloudproductCompositer(time_of_analysis, delta_time_window, area_id, OPTIONS, "CT")
-    ctcomp.get_catalogue()
-    ctcomp.blend_cloud_products()
-    output_filepath = ctcomp.write()
-    qlook_filepath = ctcomp.quicklook(output_filepath)
