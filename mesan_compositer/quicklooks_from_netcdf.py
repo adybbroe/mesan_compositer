@@ -94,8 +94,7 @@ def ctype_quicklook_from_netcdf(group_name, netcdf_filename, destpath=None):
                           chunks={"columns": CHUNK_SIZE,
                                   "rows": CHUNK_SIZE})
 
-    cloudtype = nc_[group_name][:]
-
+    cloudtype = squeeze_time(nc_[group_name][:])
     palette = nwcsaf_cloudtype_2021()
 
     # Cloud type field:

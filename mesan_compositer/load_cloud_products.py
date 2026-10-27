@@ -36,6 +36,7 @@ from satpy import DataQuery, MultiScene, Scene
 from satpy import config as satpy_config
 from satpy.modifiers.angles import get_satellite_zenith_angle
 from satpy.multiscene.blend_funcs import stack
+from satpy.resample import get_area_def
 from satpy.utils import debug_on
 from trollsift import Parser, globify
 
@@ -89,10 +90,14 @@ class CloudProductsLoader:
 
         return hist
 
-    def prepare_satz_angles_on_area(self, product):
+    def prepare_satz_angles_on_area(self, product, areaid=None):
         """Derive the satellite zenith angles and attach data to Satpy scene object."""
+        if self._reader == "nwcsaf-pps_nc-remapped":
+            if areaid is None:
+                raise ValueError("areaid required for remapped PPS data")
+            self.scene[product].attrs["area"] = get_area_def(areaid)
+
         self.scene["satz"] = self._get_satz_angles(product)
-        self.scene["satz"].attrs["area"] = self.scene[product].attrs["area"]
 
     def _get_satz_angles(self, product):
         """Calculate the satellite zenith angles using Pyorbital."""
@@ -278,7 +283,7 @@ def blend_cloud_products(product, inputfile_patterns, areaid, *scenes, cache_dir
         LOG.debug("%s after load: dims=%s shape=%s", satpy_composite_name,
                   loader.scene[satpy_composite_name].dims,
                   loader.scene[satpy_composite_name].shape)
-        loader.prepare_satz_angles_on_area(satpy_composite_name)
+        loader.prepare_satz_angles_on_area(satpy_composite_name, areaid)
         loaded_scenes.append(loader.scene)
 
     RADIUS_OF_INFLUENCE = 6000
