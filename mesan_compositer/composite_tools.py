@@ -33,14 +33,20 @@ from mesan_compositer.pps_msg_conversions import get_bit_from_flags
 LOG = logging.getLogger(__name__)
 
 
+OSCAR_SATELLITE_NAMES = {"meteosat12": "Meteosat-12"}
+
 MSGSATS = {"Meteosat-9": "MSG2",
            "Meteosat-8": "MSG1",
            "Meteosat-10": "MSG3",
-           "Meteosat-11": "MSG4"}
+           "Meteosat-11": "MSG4",
+           "Meteosat-12": "MTG1"}
+
+
 METEOSAT = {"MSG1": "Meteosat-8",
             "MSG2": "Meteosat-9",
             "MSG3": "Meteosat-10",
-            "MSG4": "Meteosat-11"}
+            "MSG4": "Meteosat-11",
+            "MTG1": "Meteosat-12"}
 
 TERRA_AQUA_NAMES = {"eos1": "EOS-Terra",
                     "eos2": "EOS-Aqua"}
@@ -66,7 +72,9 @@ PLATFORM_NAME = {"npp": "Suomi-NPP",
                  "metopc": "Metop-C",
                  "noaa18": "NOAA-18",
                  "noaa15": "NOAA-15",
-                 "noaa19": "NOAA-19"}
+                 "noaa19": "NOAA-19",
+                 "meteosat12": "Meteosat-12",
+                 }
 
 METOPS = ["metop03", "metop02", "metop01"]
 
