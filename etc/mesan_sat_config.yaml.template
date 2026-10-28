@@ -1,16 +1,20 @@
 
 ct_composite_filename: mesan_composite_%(area)s_%Y%m%d_%H%M_ct
 ctth_composite_filename: mesan_composite_%(area)s_%Y%m%d_%H%M_ctth
+cbh_composite_filename: mesan_composite_{area}_{obstime:%Y%m%d_%H%M}_cbh
+
 cloudamount_filename: mesan_composite_%(area)s_%Y%m%d_%H%M_clamount
 cloudheight_filename: mesan_composite_%(area)s_%Y%m%d_%H%M_clheight
 
 pps_filename: "S_NWC_{product:s}_{platform_name:s}_{orbit:05d}_{start_time:%Y%m%dT%H%M%S%f}Z_{end_time:%Y%m%dT%H%M%S%f}Z.nc"
 
 msg_satellites: Meteosat-11 Meteosat-10 Meteosat-9 Meteosat-8
-msg_cty_filename: "SAFNWC_%(satellite)s_CT___%Y%m%d%H%M_%(area)s.PLAX.CTTH.0.h5"
-msg_cty_file_ext: PLAX.CTTH.0.h5
+msg_ct_filename: "SAFNWC_%(satellite)s_CT___%Y%m%d%H%M_%(area)s.PLAX.CTTH.0.h5"
+msg_ct_file_ext: PLAX.CTTH.0.h5
 msg_ctth_filename: "SAFNWC_%(satellite)s_CTTH_%Y%m%d%H%M_%(area)s.PLAX.CTTH.0.h5"
 msg_ctth_file_ext: PLAX.CTTH.0.h5
+
+msg_cbh_filename: "S_NWC_CBH_{satellite:s}_00000_{nominal_time:%Y%m%dT%H%M%S%f}Z_{end_time:%Y%m%dT%H%M%S%f}Z.nc"
 
 cloud_amount_ipar: 71
 number_of_pixels: 24
