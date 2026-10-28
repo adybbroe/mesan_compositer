@@ -36,6 +36,7 @@ from satpy import DataQuery, MultiScene, Scene
 from satpy import config as satpy_config
 from satpy.modifiers.angles import get_satellite_zenith_angle
 from satpy.multiscene.blend_funcs import stack
+from satpy.resample import get_area_def
 from satpy.utils import debug_on
 from trollsift import Parser, globify
 
@@ -51,7 +52,11 @@ class CloudProductsLoader:
         """Set up the instance."""
         self._cloud_files = cloud_files
         self.scene = None
-        self._reader = "nwcsaf-pps_nc"
+        if len(self._cloud_files) > 0 and "meteosat12" in [f.name for f in self._cloud_files][0]:
+            self._reader = "nwcsaf-pps_nc-remapped"
+        else:
+            self._reader = "nwcsaf-pps_nc"
+
         if len(self._cloud_files) > 0 and "MSG" in str(self._cloud_files[0].name):
             self._reader = "nwcsaf-geo"
 
@@ -62,7 +67,8 @@ class CloudProductsLoader:
         # Drop the time dimension if it is there:
         for key in self.scene.keys():
             try:
-                self.scene[key] = self.scene[key].reset_coords("time", drop=True)
+                if "time" in self.scene[key].dims:
+                    self.scene[key] = self.scene[key].squeeze("time", drop=True)
             except Exception as e:
                 LOG.exception(e)
                 LOG.debug("Did not manage to drop time dimension.")
@@ -78,14 +84,21 @@ class CloudProductsLoader:
 
         return hist
 
-    def prepare_satz_angles_on_area(self, product):
+    def prepare_satz_angles_on_area(self, product, areaid=None):
         """Derive the satellite zenith angles and attach data to Satpy scene object."""
+        if self._reader == "nwcsaf-pps_nc-remapped":
+            if areaid is None:
+                raise ValueError("areaid required for remapped PPS data")
+            self.scene[product].attrs["area"] = get_area_def(areaid)
+
         self.scene["satz"] = self._get_satz_angles(product)
-        self.scene["satz"].attrs["area"] = self.scene[product].attrs["area"]
 
     def _get_satz_angles(self, product):
         """Calculate the satellite zenith angles using Pyorbital."""
         data_array = self.scene[product]
+        if "time" in data_array.dims:
+            data_array = data_array.squeeze("time", drop=True)
+
         try:
             return get_satellite_zenith_angle(data_array)
         except KeyError:
@@ -144,6 +157,12 @@ def compute_satz_with_pyorbital(data_array):
     sat_zen = 90. - elevation
     LOG.debug("Satellite zenith angles derived on data")
 
+    LOG.debug("data_array dims/shape: %s %s", data_array.dims, data_array.shape)
+    LOG.debug("obs_time shape: %s", obs_time.shape)
+    LOG.debug("lon/lat shapes: %s %s", lon.shape, lat.shape)
+
+    LOG.debug("sat_zen shape: %s", sat_zen.shape)
+
     satz = xr.DataArray(data=sat_zen, dims=["y", "x"],
                         coords=dict(
                             lon=(["y", "x"], lon),
@@ -156,11 +175,15 @@ def compute_satz_with_pyorbital(data_array):
 
 
 def generate_observation_time_array(data_array):
-    """Generate the observation time array."""
-    shape = data_array.shape
-    time_step = (data_array.attrs["end_time"] - data_array.attrs["start_time"]) / shape[0]
-    starttime = data_array.attrs["start_time"]
-    obs_time = starttime + time_step * np.arange(shape[0])
+    """Generate observation time for each scan line."""
+    nlines = data_array.sizes["y"]
+
+    start_time = data_array.attrs["start_time"]
+    end_time = data_array.attrs["end_time"]
+
+    time_step = (end_time - start_time) / nlines
+    obs_time = start_time + time_step * np.arange(nlines)
+
     return obs_time[:, np.newaxis]
 
 
@@ -184,7 +207,7 @@ def blend_cloud_products(product, areaid, *scenes, cache_dir=None):
         # plt.bar(h_[1][1::], height=h_[0], width=800)
         # plt.savefig('barplot_{idx}'.format(idx=idx))
         # plt.clf()
-        loader.prepare_satz_angles_on_area(product)
+        loader.prepare_satz_angles_on_area(product, areaid)
         loaded_scenes.append(loader.scene)
 
     group_name = product.upper() + "_group"

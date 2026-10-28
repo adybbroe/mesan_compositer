@@ -37,7 +37,7 @@ from tempfile import gettempdir
 from satpy.utils import debug_on
 from trollsift import Parser, globify
 
-from mesan_compositer.composite_tools import METEOSAT, METOPS, MSGSATS, GeoMetaData, get_ppslist
+from mesan_compositer.composite_tools import METEOSAT, METOPS, MSGSATS, OSCAR_SATELLITE_NAMES, GeoMetaData, get_ppslist
 from mesan_compositer.config import get_config
 from mesan_compositer.load_cloud_products import blend_cloud_products
 from mesan_compositer.quicklooks_from_netcdf import ctth_quicklook_from_netcdf, ctype_quicklook_from_netcdf
@@ -205,8 +205,14 @@ class CloudproductCompositer:
                 LOG.debug("File name format not supported/requested: {fname}".format(fname=os.path.basename(geo_file)))
                 continue
 
-            platform_name = res["satellite"]
-            areaid = res["area"]
+            platform_name = OSCAR_SATELLITE_NAMES.get(res["satellite"], res["satellite"])
+            platform_name = MSGSATS.get(platform_name, platform_name)
+            try:
+                areaid = res["area"]
+            except KeyError:
+                areaid = self.msg_areaname
+                LOG.warning(f"Area id not in filename, falling back to {areaid}")
+
             timeslot = res["nominal_time"]
             if platform_name not in metsats:
                 LOG.warning("Satellite " + str(platform_name) + " not in list: " + str(metsats))
@@ -354,7 +360,7 @@ class CloudproductCompositer:
 
     def quicklook(self, netcdf_filename):
         """Make a quicklook image from the netCDF file."""
-        if self.group_name in ["ctth_alti"]:
+        if self.group_name in ["CTTH_ALTI_group", "ctth_alti"]:
             return ctth_quicklook_from_netcdf(self.group_name, netcdf_filename)
         else:
             return ctype_quicklook_from_netcdf(self.group_name, netcdf_filename)
@@ -387,4 +393,4 @@ if __name__ == "__main__":
     ctcomp.get_catalogue()
     ctcomp.blend_cloud_products()
     output_filepath = ctcomp.write()
-    qlook_filepath = ctcomp.quicklook(output_filepath)
+    qlook_filepath = ctcomp.quicklook(pathlib.Path(output_filepath))
