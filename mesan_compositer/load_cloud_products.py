@@ -50,6 +50,7 @@ LOG = logging.getLogger(__name__)
 HEIGHT_FILL_VALUE = 65535.0
 HEIGHT_PRODUCTS = {"ctth_alti", "cbh_alti"}
 
+HOME = os.environ.get("HOME")
 
 class CloudProductsLoader:
     """Class to load and prepare cloud products on area."""
@@ -91,13 +92,21 @@ class CloudProductsLoader:
         return hist
 
     def prepare_satz_angles_on_area(self, product, areaid=None):
-        """Derive the satellite zenith angles and attach data to Satpy scene object."""
+        """Derive satellite zenith angles and attach them to the scene."""
         if self._reader == "nwcsaf-pps_nc-remapped":
             if areaid is None:
                 raise ValueError("areaid required for remapped PPS data")
             self.scene[product].attrs["area"] = get_area_def(areaid)
 
-        self.scene["satz"] = self._get_satz_angles(product)
+        satz = self._get_satz_angles(product)
+
+        # The Pyorbital fallback doesn't attach a Satpy area definition.
+        # Copy the source product area so that satz is resampled together
+        # with the product.
+        if "area" not in satz.attrs and "area" in self.scene[product].attrs:
+            satz.attrs["area"] = self.scene[product].attrs["area"]
+
+        self.scene["satz"] = satz
 
     def _get_satz_angles(self, product):
         """Calculate the satellite zenith angles using Pyorbital."""
@@ -306,7 +315,7 @@ def blend_cloud_products(product, inputfile_patterns, areaid, *scenes, cache_dir
 
 if __name__ == "__main__":
     # base_dir = pathlib.Path("/data/lang/satellit/mesan/")
-    base_dir = pathlib.Path("/home/a000680/data/mesan")
+    base_dir = pathlib.Path(f"{HOME}/data/mesan")
 
     GEO_DIR = base_dir / "geo_in/20231006"
 
