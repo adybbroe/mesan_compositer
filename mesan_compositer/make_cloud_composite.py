@@ -20,7 +20,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Make a CTTH composite."""
+"""Generate CT, CTTH, or CBH cloud composites."""
 
 
 import argparse
@@ -72,7 +72,8 @@ def get_arguments():
                         required=True,
                         help="The file containing configuration parameters e.g. mesan_sat_config.yaml")
     parser.add_argument("--product", "-p",
-                        help="Cloud base height or cloud top height?",
+                        help="Cloud product to composite: CT, CTTH, or CBH.",
+                        choices=["CT", "CTTH", "CBH"],
                         required=True,
                         dest="product_name")
     parser.add_argument("-l", "--logging",
@@ -95,11 +96,10 @@ def get_arguments():
     return args, tanalysis, delta_t
 
 
-if __name__ == "__main__":
-
+def main():
+    """Generate a cloud product composite."""
     cmd_args, time_of_analysis, delta_time_window = get_arguments()
 
-    logfile = cmd_args.logging_conf_file
     config_filename = cmd_args.config_file
     area_id = cmd_args.area_id
     product_name = cmd_args.product_name
@@ -114,18 +114,23 @@ if __name__ == "__main__":
     # logging.getLogger('').setLevel(logging.DEBUG)
     logging.getLogger("satpy").setLevel(logging.DEBUG)
 
-    LOG = logging.getLogger("make_ct_composite")
+    log = logging.getLogger("make_cloud_composite")
 
     log_handlers = logging.getLogger("").handlers
     for log_handle in log_handlers:
         if type(log_handle) is handlers.SMTPHandler:
-            LOG.debug("Mail notifications to: %s", str(log_handle.toaddrs))
+            log.debug("Mail notifications to: %s", str(log_handle.toaddrs))
 
-    OPTIONS = get_config(config_filename)
+    options = get_config(config_filename)
 
-    ctcomp = CloudproductCompositer(time_of_analysis,
-                                    delta_time_window, area_id, OPTIONS, product_name)
-    ctcomp.get_catalogue()
-    ctcomp.blend_cloud_products()
-    output_filepath = ctcomp.write()
-    qlook_filepath = ctcomp.quicklook(output_filepath)
+    compositor = CloudproductCompositer(
+        time_of_analysis, delta_time_window, area_id, options, product_name
+    )
+    compositor.get_catalogue()
+    compositor.blend_cloud_products()
+    output_filepath = compositor.write()
+    compositor.quicklook(output_filepath)
+
+
+if __name__ == "__main__":
+    main()

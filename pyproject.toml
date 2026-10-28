@@ -40,14 +40,12 @@ Homepage = "https://github.com/adybbroe/mesan_compositer"
 
 
 [project.scripts]
-make_ct_composite = "mesan_compositer.make_ct_composite:main"
-make_ctth_composite = "mesan_compositer.make_ctth_composite:main"
+make_cloud_composite = "mesan_compositer.make_cloud_composite:main"
 prt_nwcsaf_cloudamount = "mesan_compositer.prt_nwcsaf_cloudamount:main"
 prt_nwcsaf_cloudheight = "mesan_compositer.prt_nwcsaf_cloudheight:main"
 ct_quicklooks = "mesan_compositer.ct_quicklooks:main"
 ctth_quicklooks = "mesan_compositer.ctth_quicklooks:main"
 mesan_composite_runner = "mesan_compositer.mesan_composite_runner:main"
-load_cloud_products = "mesan_compositer.load_cloud_products:main"
 
 
 [tool.hatch.metadata]
@@ -85,6 +83,7 @@ line-length = 120
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*.py" = ["S101"]
+"tests/test_cli_smoke.py" = ["S603"]
 
 
 [tool.hatch.build.targets.sdist]
@@ -92,6 +91,7 @@ include = [
     "/mesan_compositer",
     "/README.md",
     "/LICENSE",
+    "/RELEASING.md",
     "/pyproject.toml",
 ]
 
