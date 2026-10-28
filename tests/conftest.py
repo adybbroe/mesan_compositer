@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2023 - 2026 Adam.Dybbroe
+# Copyright (c) 2023-2026 Adam.Dybbroe
 
 # Author(s):
 
@@ -89,10 +89,12 @@ msg_dir: /path/to/nwcsaf/geo/cloud/products
 msg_areaname: MSG-N
 
 # S_NWC_CT_MSG4_MSG-N-VISIR_20230118T103000Z_PLAX.nc
-msg_cty_filename: "S_NWC_CT_{satellite:s}_{area:s}-VISIR_{nominal_time:%Y%m%dT%H%M%SZ}_PLAX.nc"
+msg_ct_filename: "S_NWC_CT_{satellite:s}_{area:s}-VISIR_{nominal_time:%Y%m%dT%H%M%SZ}_PLAX.nc"
 # SAFNWC_MSG4_CT___202301161145_MSG-N_______.PLAX.CTTH.0.h5
-#msg_cty_filename:  "SAFNWC_{satellite:s}_CT___{nominal_time:%Y%m%d%H%M}_{area:s}_______.PLAX.CTTH.0.h5"
+#msg_ct_filename:  "SAFNWC_{satellite:s}_CT___{nominal_time:%Y%m%d%H%M}_{area:s}_______.PLAX.CTTH.0.h5"
 msg_ctth_filename: "SAFNWC_{satellite:s}_CTTH_{nominal_time:%Y%m%d%H%M}_{area:s}_______.PLAX.CTTH.0.h5"
+
+msg_cbh_filename: "S_NWC_CBH_{satellite:s}_00000_{nominal_time:%Y%m%dT%H%M%S%f}Z_{end_time:%Y%m%dT%H%M%S%f}Z.nc"
 
 """  # noqa
 
