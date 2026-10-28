@@ -39,8 +39,8 @@ from trollsift import Parser, globify
 
 from mesan_compositer.composite_tools import METEOSAT, METOPS, MSGSATS, GeoMetaData, get_ppslist
 from mesan_compositer.config import get_config
-from mesan_compositer.ct_quicklooks import ctth_quicklook_from_netcdf, ctype_quicklook_from_netcdf
 from mesan_compositer.load_cloud_products import blend_cloud_products
+from mesan_compositer.quicklooks_from_netcdf import ctth_quicklook_from_netcdf, ctype_quicklook_from_netcdf
 from mesan_compositer.utils import NoGeoScenesError
 
 debug_on()
