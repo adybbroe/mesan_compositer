@@ -180,14 +180,6 @@ def compute_satz_with_pyorbital(data_array):
     return satz
 
 
-# def generate_observation_time_array(data_array):
-#     """Generate the observation time array."""
-#     shape = data_array.shape
-#     time_step = (data_array.attrs["end_time"] - data_array.attrs["start_time"]) / shape[0]
-#     starttime = data_array.attrs["start_time"]
-#     obs_time = starttime + time_step * np.arange(shape[0])
-#     return obs_time[:, np.newaxis]
-
 def generate_observation_time_array(data_array):
     """Generate observation time for each scan line."""
     nlines = data_array.sizes["y"]
@@ -218,29 +210,6 @@ def restore_height_missing_values(scene, product):
     """Restore temporary fill values to NaN after resampling."""
     data = scene[product]
     scene[product] = data.where(data != HEIGHT_FILL_VALUE)
-
-
-# def prepare_ctth_for_resampling(scene):
-#     """Keep only bow-tie deleted CTTH pixels as NaN during resampling."""
-#     ctth = scene["ctth_alti"]
-#     bowtie = scene["bowtie_mask"].astype(bool)
-
-#     # Ordinary missing CTTH values, such as cloud-free pixels, must remain
-#     # geometrically valid source pixels. Represent these temporarily using
-#     # the CTTH fill value.
-#     ctth = ctth.fillna(CTTH_FILL_VALUE)
-
-#     # Only bow-tie deleted pixels should be ignored by the resampler.
-#     ctth = ctth.where(~bowtie)
-
-#     ctth.attrs["_FillValue"] = CTTH_FILL_VALUE
-#     scene["ctth_alti"] = ctth
-
-
-# def restore_ctth_missing_values(scene):
-#     """Restore temporary CTTH fill values to NaN after resampling."""
-#     ctth = scene["ctth_alti"]
-#     scene["ctth_alti"] = ctth.where(ctth != CTTH_FILL_VALUE)
 
 
 def blend_cloud_products(product, inputfile_patterns, areaid, *scenes, cache_dir=None):

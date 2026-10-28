@@ -93,7 +93,6 @@ def get_arguments():
         sys.exit()
 
     return args, tanalysis, delta_t
-#return args.logging_conf_file, args.config_file, tanalysis, args.area_id, delta_t
 
 
 if __name__ == "__main__":
