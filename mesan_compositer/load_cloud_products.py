@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2023-2026 Adam.Dybbroe
+# Copyright (c) 2023-2026 Adam Dybbroe
 
 # Author(s):
 
-#   Adam.Dybbroe <Firstname.Lastname at smhi.se>
+#   Adam Dybbroe <Firstname.Lastname at smhi.se>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -40,9 +40,15 @@ from satpy.resample import get_area_def
 from satpy.utils import debug_on
 from trollsift import Parser, globify
 
+from mesan_compositer.composite_tools import PLATFORM_NAME, VIIRS_SATELLITES
+
 debug_on()
 
 LOG = logging.getLogger(__name__)
+
+
+HEIGHT_FILL_VALUE = 65535.0
+HEIGHT_PRODUCTS = {"ctth_alti", "cbh_alti"}
 
 
 class CloudProductsLoader:
@@ -187,58 +193,112 @@ def generate_observation_time_array(data_array):
     return obs_time[:, np.newaxis]
 
 
-def blend_cloud_products(product, areaid, *scenes, cache_dir=None):
+def prepare_height_for_resampling(scene, product):
+    """Prepare CTTH/CBH altitude for resampling."""
+    data = scene[product]
+
+    if "bowtie_mask" in scene:
+        bowtie = scene["bowtie_mask"].astype(bool)
+
+        data = data.fillna(HEIGHT_FILL_VALUE)
+        data = data.where(~bowtie)
+
+    scene[product] = data
+
+
+def restore_height_missing_values(scene, product):
+    """Restore temporary fill values to NaN after resampling."""
+    data = scene[product]
+    scene[product] = data.where(data != HEIGHT_FILL_VALUE)
+
+
+def blend_cloud_products(product, inputfile_patterns, areaid, *scenes, cache_dir=None):
     """Blend NWCSAF Geo and PPS cloud product scenes."""
     loaded_scenes = []
+    satpy_composite_name = {"CT": "ct", "CTTH": "ctth_alti", "CBH": "cbh_alti"}.get(product)
+
+    parsers = {}
+    for key in inputfile_patterns:
+        parsers[key] = Parser(inputfile_patterns[key])
+
     for _idx, files in enumerate(scenes):
         LOG.debug("Files: %s", str(files))
         loader = CloudProductsLoader(files)
-        loader.load([product])
-        # Special handling of no-data/fill value for the CTTH:
+
+        datasets = [satpy_composite_name]
         try:
-            loader.scene["ctth_alti"] = loader.scene["ctth_alti"].fillna(
-                loader.scene["ctth_alti"].scaled_FillValue)
-
-            loader.scene["ctth_alti"].attrs["_FillValue"] = loader.scene["ctth_alti"].scaled_FillValue
+            res = parsers["geo"].parse(files[0].name)
         except KeyError:
-            LOG.exception("Didn't manage set fill value for ctth_alti.")
+            res = parsers["polar"].parse(files[0].name)
 
-        # import matplotlib.pyplot as plt
-        # plt.bar(h_[1][1::], height=h_[0], width=800)
-        # plt.savefig('barplot_{idx}'.format(idx=idx))
-        # plt.clf()
-        loader.prepare_satz_angles_on_area(product, areaid)
+        try:
+            platform_name = res["satellite"]
+        except KeyError:
+            platform_name = res["platform_name"]
+
+        # bowtie_mask only applies to the PPS VIIRS CTTH/CBH data.
+        if satpy_composite_name in HEIGHT_PRODUCTS and PLATFORM_NAME.get(platform_name) in VIIRS_SATELLITES:
+            datasets.append("bowtie_mask")
+
+        loader.load(datasets)
+        if "bowtie_mask" in loader.scene:
+            LOG.debug("bowtie_mask: dims=%s shape=%s",
+                      loader.scene["bowtie_mask"].dims,
+                      loader.scene["bowtie_mask"].shape)
+
+        if satpy_composite_name in HEIGHT_PRODUCTS and "bowtie_mask" in loader.scene:
+            prepare_height_for_resampling(loader.scene, satpy_composite_name)
+
+        LOG.debug("%s after load: dims=%s shape=%s", satpy_composite_name,
+                  loader.scene[satpy_composite_name].dims,
+                  loader.scene[satpy_composite_name].shape)
+        loader.prepare_satz_angles_on_area(satpy_composite_name, areaid)
         loaded_scenes.append(loader.scene)
 
-    group_name = product.upper() + "_group"
+    RADIUS_OF_INFLUENCE = 6000
+    group_name = satpy_composite_name.upper() + "_group"
     if len(loaded_scenes) == 1:
-        local = loaded_scenes[0].resample(areaid, radius_of_influence=10000,
+        local = loaded_scenes[0].resample(areaid, radius_of_influence=RADIUS_OF_INFLUENCE,
                                           reduce_data=False, cache_dir=cache_dir,
-                                          mask_area=False)
-        return local, product
+                                          mask_area=True)
+        if satpy_composite_name  in HEIGHT_PRODUCTS:
+            restore_height_missing_values(local, satpy_composite_name)
+            local[satpy_composite_name].attrs["_FillValue"] = HEIGHT_FILL_VALUE
+
+        return local, satpy_composite_name
 
     mscn = MultiScene(loaded_scenes)
-    groups = {DataQuery(name=group_name): [product]}
+    groups = {DataQuery(name=group_name): [satpy_composite_name]}
     mscn.group(groups)
 
-    LOG.debug("Before call to resample on Multiscene...")
-    resampled = mscn.resample(areaid, radius_of_influence=10000,
-                              reduce_data=False, cache_dir=cache_dir, mask_area=False)
+    LOG.debug("Before call to resample on MultiScene...")
+    resampled = mscn.resample(areaid, radius_of_influence=RADIUS_OF_INFLUENCE,
+                              reduce_data=False, cache_dir=cache_dir, mask_area=True)
+
+    # Convert our temporary sentinel back to actual missing CTTH before
+    # the scenes are blended.
+    if satpy_composite_name  in HEIGHT_PRODUCTS:
+        for scene in resampled.scenes:
+            restore_height_missing_values(scene, satpy_composite_name)
 
     LOG.debug("Getting the weights...")
     weights = []
-    for _i, scene in enumerate(resampled.scenes):
+    for scene in resampled.scenes:
         wgt = 1 / scene["satz"]
         weights.append(da.nan_to_num(wgt))
 
     from functools import partial
     stack_with_weights = partial(stack, weights=weights)
-    LOG.debug("Before resampling...")
+
+    LOG.debug("Before blending...")
     blended = resampled.blend(blend_function=stack_with_weights)
-    try:
-        blended["CTTH_ALTI_group"].attrs["_FillValue"] = 63535.
-    except KeyError:
-        LOG.exception("Failed setting fill-value for the CTTH_ALTI_group.")
+
+    if satpy_composite_name in HEIGHT_PRODUCTS:
+        try:
+            blended[group_name] = blended[group_name].fillna(HEIGHT_FILL_VALUE)
+            blended[group_name].attrs["_FillValue"] = HEIGHT_FILL_VALUE
+        except KeyError:
+            LOG.exception("Failed setting fill value for %s.", group_name)
 
     LOG.debug("Before returning the blended scene")
     return blended, group_name

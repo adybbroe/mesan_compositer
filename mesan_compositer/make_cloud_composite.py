@@ -25,7 +25,6 @@
 
 import argparse
 import logging
-import pathlib
 import sys
 from datetime import datetime, timedelta
 from logging import handlers
@@ -72,6 +71,10 @@ def get_arguments():
                         dest="config_file",
                         required=True,
                         help="The file containing configuration parameters e.g. mesan_sat_config.yaml")
+    parser.add_argument("--product", "-p",
+                        help="Cloud base height or cloud top height?",
+                        required=True,
+                        dest="product_name")
     parser.add_argument("-l", "--logging",
                         help="The path to the log-configuration file (e.g. './logging.ini')",
                         dest="logging_conf_file",
@@ -89,12 +92,17 @@ def get_arguments():
         print("Template file given as master config, aborting!")  # noqa: T201
         sys.exit()
 
-    return args.logging_conf_file, args.config_file, tanalysis, args.area_id, delta_t
+    return args, tanalysis, delta_t
 
 
 if __name__ == "__main__":
 
-    (logfile, config_filename, time_of_analysis, area_id, delta_time_window) = get_arguments()
+    cmd_args, time_of_analysis, delta_time_window = get_arguments()
+
+    logfile = cmd_args.logging_conf_file
+    config_filename = cmd_args.config_file
+    area_id = cmd_args.area_id
+    product_name = cmd_args.product_name
 
     handler = logging.StreamHandler(sys.stderr)
 
@@ -115,8 +123,9 @@ if __name__ == "__main__":
 
     OPTIONS = get_config(config_filename)
 
-    ctcomp = CloudproductCompositer(time_of_analysis, delta_time_window, area_id, OPTIONS, "CTTH")
+    ctcomp = CloudproductCompositer(time_of_analysis,
+                                    delta_time_window, area_id, OPTIONS, product_name)
     ctcomp.get_catalogue()
     ctcomp.blend_cloud_products()
     output_filepath = ctcomp.write()
-    qlook_filepath = ctcomp.quicklook(pathlib.Path(output_filepath))
+    qlook_filepath = ctcomp.quicklook(output_filepath)
