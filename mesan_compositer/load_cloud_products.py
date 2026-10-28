@@ -34,9 +34,9 @@ import xarray as xr
 from pyorbital.orbital import Orbital
 from satpy import DataQuery, MultiScene, Scene
 from satpy import config as satpy_config
+from satpy.area import get_area_def
 from satpy.modifiers.angles import get_satellite_zenith_angle
 from satpy.multiscene.blend_funcs import stack
-from satpy.resample import get_area_def
 from satpy.utils import debug_on
 from trollsift import Parser, globify
 
