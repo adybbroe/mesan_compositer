@@ -63,8 +63,6 @@ PLATFORM_NAME_INV = {"Suomi-NPP": "npp",
                      "NOAA-15": "noaa15",
                      "NOAA-19": "noaa19"}
 
-VIIRS_SATELLITES = ["Suomi-NPP", "NOAA-20", "NOAA-21", "NOAA-22"]
-
 PLATFORM_NAME = {"npp": "Suomi-NPP",
                  "noaa20": "NOAA-20",
                  "noaa21": "NOAA-21",
@@ -231,11 +229,7 @@ def get_ppslist(filelist, timewindow, satellites=None, variant=None):
             continue
 
         product = res["product"]
-        geo_product = {
-            "CT": "CMA",
-            "CTTH": "CTTH",
-            "CBH": "CTTH",
-        }[product]
+        geo_product = "CMA"
         geofilename = filename.replace(product, geo_product)
 
         orbit = "%05d" % res["orbit"]

@@ -40,8 +40,6 @@ from satpy.multiscene.blend_funcs import stack
 from satpy.utils import debug_on
 from trollsift import Parser, globify
 
-from mesan_compositer.composite_tools import PLATFORM_NAME, VIIRS_SATELLITES
-
 debug_on()
 
 LOG = logging.getLogger(__name__)
@@ -203,16 +201,16 @@ def generate_observation_time_array(data_array):
 
 
 def prepare_height_for_resampling(scene, product):
-    """Prepare CTTH/CBH altitude for resampling."""
+    """Prepare CTTH/CBH altitude for resampling using CMA validity."""
     data = scene[product]
+    valid_observation = scene["cma"].notnull()
 
-    if "bowtie_mask" in scene:
-        bowtie = scene["bowtie_mask"].astype(bool)
-
-        data = data.fillna(HEIGHT_FILL_VALUE)
-        data = data.where(~bowtie)
-
-    scene[product] = data
+    # Preserve valid cloud-free pixels through nearest-neighbour resampling.
+    # Missing heights at pixels with a valid CMA observation are represented
+    # temporarily by a sentinel, while pixels without a CMA observation stay
+    # missing and are ignored by the resampler.
+    data = data.fillna(HEIGHT_FILL_VALUE)
+    scene[product] = data.where(valid_observation)
 
 
 def restore_height_missing_values(scene, product):
@@ -226,36 +224,20 @@ def blend_cloud_products(product, inputfile_patterns, areaid, *scenes, cache_dir
     loaded_scenes = []
     satpy_composite_name = {"CT": "ct", "CTTH": "ctth_alti", "CBH": "cbh_alti"}.get(product)
 
-    parsers = {}
-    for key in inputfile_patterns:
-        parsers[key] = Parser(inputfile_patterns[key])
+    del inputfile_patterns  # Retained in the API for compatibility with callers.
 
     for _idx, files in enumerate(scenes):
         LOG.debug("Files: %s", str(files))
         loader = CloudProductsLoader(files)
 
         datasets = [satpy_composite_name]
-        try:
-            res = parsers["geo"].parse(files[0].name)
-        except KeyError:
-            res = parsers["polar"].parse(files[0].name)
-
-        try:
-            platform_name = res["satellite"]
-        except KeyError:
-            platform_name = res["platform_name"]
-
-        # bowtie_mask only applies to the PPS VIIRS CTTH/CBH data.
-        if satpy_composite_name in HEIGHT_PRODUCTS and PLATFORM_NAME.get(platform_name) in VIIRS_SATELLITES:
-            datasets.append("bowtie_mask")
+        is_polar = loader._reader == "nwcsaf-pps_nc"
+        if satpy_composite_name in HEIGHT_PRODUCTS and is_polar:
+            datasets.append("cma")
 
         loader.load(datasets)
-        if "bowtie_mask" in loader.scene:
-            LOG.debug("bowtie_mask: dims=%s shape=%s",
-                      loader.scene["bowtie_mask"].dims,
-                      loader.scene["bowtie_mask"].shape)
 
-        if satpy_composite_name in HEIGHT_PRODUCTS and "bowtie_mask" in loader.scene:
+        if satpy_composite_name in HEIGHT_PRODUCTS and is_polar:
             prepare_height_for_resampling(loader.scene, satpy_composite_name)
 
         LOG.debug("%s after load: dims=%s shape=%s", satpy_composite_name,

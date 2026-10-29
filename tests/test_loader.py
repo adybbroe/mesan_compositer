@@ -22,11 +22,18 @@
 
 """Test loading the NWCSAF scenes."""
 
+import numpy as np
 import pytest
+import xarray as xr
 from pyresample import parse_area_file
 from satpy.tests.reader_tests.test_nwcsaf_nc import create_nwcsaf_geo_ct_file
 
-from mesan_compositer.load_cloud_products import CloudProductsLoader
+from mesan_compositer.load_cloud_products import (
+    HEIGHT_FILL_VALUE,
+    CloudProductsLoader,
+    prepare_height_for_resampling,
+    restore_height_missing_values,
+)
 
 # from satpy.readers.nwcsaf_nc import NcNWCSAF, read_nwcsaf_time
 
@@ -71,3 +78,28 @@ def test_geo_clouds_loader_load(nwcsaf_geo_ct_filename):
     scn.load(["ct"])
     dset_names = scn.scene.available_dataset_names()
     assert "ct" in dset_names
+
+
+def test_prepare_height_for_resampling_uses_cma_validity():
+    """Keep observed cloud-free pixels while masking pixels outside the CMA swath."""
+    scene = {
+        "ctth_alti": xr.DataArray([[np.nan, 5000.0, 6000.0, 2500.0]], dims=("y", "x")),
+        "cma": xr.DataArray([[0.0, 1.0, np.nan, 0.0]], dims=("y", "x")),
+    }
+
+    prepare_height_for_resampling(scene, "ctth_alti")
+
+    expected = xr.DataArray([[HEIGHT_FILL_VALUE, 5000.0, np.nan, 2500.0]], dims=("y", "x"))
+    xr.testing.assert_equal(scene["ctth_alti"], expected)
+
+
+def test_restore_height_missing_values_restores_sentinel():
+    """Convert the temporary height sentinel back to missing data."""
+    scene = {
+        "ctth_alti": xr.DataArray([[HEIGHT_FILL_VALUE, 5000.0, np.nan]], dims=("y", "x")),
+    }
+
+    restore_height_missing_values(scene, "ctth_alti")
+
+    expected = xr.DataArray([[np.nan, 5000.0, np.nan]], dims=("y", "x"))
+    xr.testing.assert_equal(scene["ctth_alti"], expected)

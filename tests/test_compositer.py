@@ -28,9 +28,13 @@ from datetime import datetime, timedelta
 
 import numpy as np
 
-from mesan_compositer.composite_tools import (GeoMetaData, PpsMetaData,
-                                              get_analysis_time,
-                                              get_weight_cloudtype)
+from mesan_compositer.composite_tools import (
+    GeoMetaData,
+    PpsMetaData,
+    get_analysis_time,
+    get_ppslist,
+    get_weight_cloudtype,
+)
 
 CTYPE_MSG = np.array([[6, 6, 6, 6, 6, 6, 6, 6, 6, 6],
                       [6, 6, 6, 6, 6, 6, 6, 19, 6, 6],
@@ -260,3 +264,15 @@ class TestTimeTools:
 
         res = get_analysis_time(t1_, t2_, minutes_resolution=15)
         assert res - datetime(2015, 6, 23, 13, 15) < dtime_eps
+
+
+def test_get_ppslist_uses_cma_as_height_product_companion(tmp_path):
+    """Pair polar CTTH and CBH products with CMA for observation validity."""
+    timewindow = (datetime(2026, 3, 15, 10, 40), datetime(2026, 3, 15, 11, 0))
+
+    for product in ("CTTH", "CBH"):
+        filename = f"S_NWC_{product}_noaa21_00000_20260315T1045371Z_20260315T1047018Z.nc"
+        result = get_ppslist([str(tmp_path / filename)], timewindow, satellites=["NOAA-21"])
+
+        assert len(result) == 1
+        assert pathlib.Path(result[0].geofilename).name == filename.replace(product, "CMA")
