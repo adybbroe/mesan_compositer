@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2015, 2019 Adam.Dybbroe
+# Copyright (c) 2014, 2015, 2019, 2026 Adam.Dybbroe
 
 # Author(s):
 
@@ -20,18 +20,20 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-"""Unit testing the pps format conversions
-"""
+"""Unit tests for the pps format conversions."""
 
 import unittest
 
 import numpy as np
+import pytest
 
 from mesan_compositer.pps_msg_conversions import get_bit_from_flags
-from nwcsaf_formats.pps_conversions import (ctth_convert_flags,
-                                            ctype_convert_flags,
-                                            map_cloudtypes,
-                                            old_processing_flag_palette)
+from nwcsaf_formats.pps_conversions import (
+    ctth_convert_flags,
+    ctype_convert_flags,
+    map_cloudtypes,
+    old_processing_flag_palette,
+)
 
 CTYPES_2012 = np.array(
     [0, 1, 2, 3, 4, 6, 8, 10, 12, 14, 15, 16, 17, 18, 19, 20], np.uint8)
@@ -40,21 +42,19 @@ CTYPES_2014 = np.array(
 
 
 class TestCtypeConversions(unittest.TestCase):
-    """Unit testing the functions to convert from new pps format content to
-    old
-    """
+    """Test the functions to convert from new pps format content to old."""
 
     def setUp(self):
-        """Set up"""
+        """Set up the test suite."""
         return
 
     def test_map_cloudtypes(self):
-        """Test mapping from new to old cloudtypes"""
+        """Test mapping from new to old cloudtypes."""
         res = map_cloudtypes(CTYPES_2014)
-        self.assertEqual(res.tolist(), CTYPES_2012.tolist())
+        assert res.tolist() == CTYPES_2012.tolist()
 
     def test_map_cloudtype_flags(self):
-        """Test mapping the flags from new to old cloudtype"""
+        """Test mapping the flags from new to old cloudtype."""
         # Low level inv, sea ice available and sea ice acc to ext map
         res = ctype_convert_flags(np.array([13], "int32"),
                                   np.array([0], "int32"),
@@ -89,21 +89,19 @@ class TestCtypeConversions(unittest.TestCase):
         np.testing.assert_allclose(bits, np.array([0, 0, 1], dtype=np.int8))
 
     def tearDown(self):
-        """Clean up"""
+        """Clean up the test suite."""
         return
 
 
 class TestCtthConversions(unittest.TestCase):
-    """Unit testing the functions to convert from new pps format content to
-    old, CTTH product
-    """
+    """Test the functions to convert from new pps format content to old, CTTH product."""
 
     def setUp(self):
-        """Set up"""
+        """Set up the test suite."""
         return
 
     def test_map_ctth_flags(self):
-        """Test mapping the flags from new to old ctth product"""
+        """Test mapping the flags from new to old ctth product."""
         res = 1  # [1, 0, 0, ]   Non processed
         res = ctth_convert_flags(np.array([0], "int32"),
                                  np.array([0], "int32"),
@@ -177,34 +175,37 @@ class TestCtthConversions(unittest.TestCase):
         np.testing.assert_allclose(bits, expected)
 
     def tearDown(self):
-        """Clean up"""
+        """Clean up the test suite."""
         return
 
 
 class TestFlagConversions(unittest.TestCase):
-    """Unit testing the functions to get the old flag palettes etc"""
+    """Unit testing the functions to get the old flag palettes etc."""
 
     def setUp(self):
-        """Set up"""
+        """Set up the test suite."""
         return
 
     def test_old_flags(self):
-        """Test retrieving the old flag palettes"""
+        """Test retrieving the old flag palettes."""
         retv = old_processing_flag_palette("cloudtype")
-        self.assertEqual(retv[3][0], "8: Twilight")
+        assert retv[3][0] == "8: Twilight"
         retv = old_processing_flag_palette("ctth")
-        self.assertEqual(retv[4][0], "16: 16: Missing NWP data")
-        self.assertRaises(
-            NotImplementedError, old_processing_flag_palette, "pc")
+        assert retv[4][0] == "16: 16: Missing NWP data"
+
+        with pytest.raises(NotImplementedError):
+            old_processing_flag_palette("pc")
+
+        # self.assertRaises(
+        #     NotImplementedError, old_processing_flag_palette, "pc")
 
     def tearDown(self):
-        """Clean up"""
+        """Clean up the test suite."""
         return
 
 
 def suite():
-    """The suite for test_pps_conversions
-    """
+    """Test the test_pps_conversions."""
     loader = unittest.TestLoader()
     mysuite = unittest.TestSuite()
     mysuite.addTest(loader.loadTestsFromTestCase(TestFlagConversions))

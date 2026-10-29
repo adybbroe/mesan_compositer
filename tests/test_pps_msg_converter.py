@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2019 Adam.Dybbroe
+# Copyright (c) 2014, 2019, 2026 Adam.Dybbroe
 
 # Author(s):
 
@@ -20,32 +20,28 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Unit testing the pps-msg format conversion tools
-"""
+"""Unit testing the pps-msg format conversion tools."""
+
 
 import unittest
 
 import numpy as np
 
-from mesan_compositer.pps_msg_conversions import (ctth_procflags2pps,
-                                                  ctype_procflags2pps,
-                                                  get_bit_from_flags)
+from mesan_compositer.pps_msg_conversions import ctth_procflags2pps, ctype_procflags2pps, get_bit_from_flags
 
 PFLAGS = [10, 156]
 CTYPE_MSG_PROCFLAGS = np.array(PFLAGS)
 
 
 class TestFlagConversions(unittest.TestCase):
-    """Unit testing the functions to convert msg flags to pps (old) flags"""
+    """Unit testing the functions to convert msg flags to pps (old) flags."""
 
     def setUp(self):
-        """Set up"""
+        """Set up the test suite."""
         return
 
     def test_ctype_procflags2pps(self):
-        """Test convert msg cloudtype quality flags to pps (<v2014) processing
-        flags
-        """
+        """Test convert msg cloudtype quality flags to pps (<v2014) processing flags."""
         # msg illumination bit 0,1,2 (undefined,night,twilight,day,sunglint) maps
         # to pps bits 2, 3 and 4:
         # msgbits = [1, 1, 1]
@@ -55,19 +51,19 @@ class TestFlagConversions(unittest.TestCase):
         res = 3  # [1, 1]
         res = ctype_procflags2pps(np.array([res], "int32"))
         get_bit_from_flags(res, range(4))
-        self.assertEqual(res[0], 0)
+        assert res[0] == 0
 
         res = 4  # [0, 0, 1]         # Example: Day and Sunglint - 3-bit value = 4
         res = ctype_procflags2pps(np.array([4], "int32"))
-        self.assertEqual(res[0], 16)
+        assert res[0] == 16
 
         # Example: Night - 3-bit value = 1
         res = ctype_procflags2pps(np.array([1], "int32"))
-        self.assertEqual(res[0], 4)
+        assert res[0] == 4
 
         # Example: Twilight - 3-bit value = 2
         res = ctype_procflags2pps(np.array([2], "int32"))
-        self.assertEqual(res[0], 8)
+        assert res[0] == 8
 
         # msg nwp-input bit 3 (nwp present?) maps to pps bit 7:
         # msg nwp-input bit 4 (low level inversion?) maps to pps bit 6:
@@ -78,7 +74,7 @@ class TestFlagConversions(unittest.TestCase):
         # res = 8
         # PPS bit 7 should be set
         res = ctype_procflags2pps(np.array([8], "int32"))
-        self.assertEqual(res[0], 128)
+        assert res[0] == 128
 
         # Example: All NWP parameters available (low level inversion) -
         # 2-bit value = 2
@@ -86,29 +82,29 @@ class TestFlagConversions(unittest.TestCase):
         # res = 16
         # PPS bits 6 and 7 should be set
         res = ctype_procflags2pps(np.array([16], "int32"))
-        self.assertEqual(res[0], 192)
+        assert res[0] == 192
 
         # Example: At least one NWP parameter missing - 2-bit value = 3
         #msgbits = [0, 0, 0, 1, 1]
         res = 24
         res = ctype_procflags2pps(np.array([24], "int32"))
-        self.assertEqual(res[0], 0)
+        assert res[0] == 0
 
         # msg seviri-input bits 5&6 maps to pps bit 8:
 
         # Example: All useful SEVIRI channels available - 2-bit value = 1
-        msgbits = [0, 0, 0, 0, 0, 1]
+        # msgbits = [0, 0, 0, 0, 0, 1]
         # res = 32
         # PPS bit 8 should not be set!
         res = ctype_procflags2pps(np.array([32], "int32"))
-        self.assertEqual(res[0], 0)
+        assert res[0] == 0
 
         # Example: At least one useful SEVIRI channel missing - 2-bit value = 2
-        #msgbits = [0, 0, 0, 0, 0, 0, 1]
+        # msgbits = [0, 0, 0, 0, 0, 0, 1]
         res = 64
         # PPS bit 8 should be set
         res = ctype_procflags2pps(np.array([64], "int32"))
-        self.assertEqual(res[0], 256)
+        assert res[0] == 256
 
         # Example: At least one mandatory SEVIRI channel missing - 2-bit value
         # = 3
@@ -116,7 +112,7 @@ class TestFlagConversions(unittest.TestCase):
         res = 96
         # PPS bit 8 should be set
         res = ctype_procflags2pps(np.array([96], "int32"))
-        self.assertEqual(res[0], 256)
+        assert res[0] == 256
 
         #
         # msg quality bits 7&8 maps to pps bit 9&10:
@@ -126,14 +122,14 @@ class TestFlagConversions(unittest.TestCase):
         # res = 128
         # PPS bit 9 should not be set!
         res = ctype_procflags2pps(np.array([128], "int32"))
-        self.assertEqual(res[0], 0)
+        assert res[0] == 0
 
         # Example: Poor quality (low confidence) - 2-bit value = 2
         # msgbits = [0, 0, 0, 0, 0, 0, 0, 0, 1]
         # res = 256
         # PPS bit 9 should be set
         res = ctype_procflags2pps(np.array([256], "int32"))
-        self.assertEqual(res[0], 512)
+        assert res[0] == 512
 
         # Example: Reclassified after spatial smoothing (very low confidence) -
         # 2-bit value = 3
@@ -141,7 +137,7 @@ class TestFlagConversions(unittest.TestCase):
         #res = 384
         # PPS bit 9 should be set
         res = ctype_procflags2pps(np.array([384], "int32"))
-        self.assertEqual(res[0], 1024)
+        assert res[0] == 1024
 
         #
         # msg bit 9 (stratiform-cumuliform distinction?) maps to pps bit 11:
@@ -151,7 +147,7 @@ class TestFlagConversions(unittest.TestCase):
         # msgbits = [0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
         # PPS bit 11 should be set
         res = ctype_procflags2pps(np.array([512], "int32"))
-        self.assertEqual(res[0], 2048)
+        assert res[0] == 2048
 
         # Example: Some combinations of the above
         # Twilight,
@@ -169,9 +165,7 @@ class TestFlagConversions(unittest.TestCase):
         np.testing.assert_allclose(bits, ppsbits)
 
     def test_ctth_procflags2pps(self):
-        """Test convert msg ctth quality flags (14 bits) to pps (<v2014)
-        processing flags
-        """
+        """Test convert msg ctth quality flags (14 bits) to pps (<v2014) processing flags."""
         # 2 bits to define processing status (maps to pps bits 0 and 1:)
         # Non-processed?
         # If non-processed in msg (0) then set pps bit 0 and nothing else.
@@ -189,7 +183,7 @@ class TestFlagConversions(unittest.TestCase):
         np.testing.assert_allclose(bits, ppsbits)
 
         # Example: non-processed because FOV is cloud free - 2-bit value = 1
-        msgbits = [1, ]
+        # msgbits = [1, ]
         # res = 1
         res = ctth_procflags2pps(np.array([1], "int32"))
         bits = get_bit_from_flags(res[0], range(2))
@@ -213,7 +207,7 @@ class TestFlagConversions(unittest.TestCase):
         #
         # 1 bit to define if RTTOV-simulations are available?
         # (maps to pps bit 3:)
-        msgbits = [0, 0, 1]
+        # msgbits = [0, 0, 1]
         # res = 4
         # PPS bit 3 should be set (and pps bit 0 for non-processed)
         res = ctth_procflags2pps(np.array([4], "int32"))
@@ -226,7 +220,7 @@ class TestFlagConversions(unittest.TestCase):
 
         # Example: All NWP parameters available, no thermal inversion - 3-bit
         # value = 1
-        msgbits = [0, 0, 0, 1]
+        # msgbits = [0, 0, 0, 1]
         # res = 8
         # No PPS bits should be set (only pps bit 0 for non-processed)
         res = ctth_procflags2pps(np.array([8], "int32"))
@@ -236,7 +230,7 @@ class TestFlagConversions(unittest.TestCase):
 
         # Example: All NWP parameters available, thermal inversion present - 3-bit
         # value = 2
-        msgbits = [0, 0, 0, 0, 1]
+        # msgbits = [0, 0, 0, 0, 1]
         # res = 16
         # PPS bit 5 should be set (and pps bit 0 for non-processed)
         res = ctth_procflags2pps(np.array([16], "int32"))
@@ -246,7 +240,7 @@ class TestFlagConversions(unittest.TestCase):
 
         # Example: Some NWP pressure levels missing, no thermal inversion - 3-bit
         # value = 3
-        msgbits = [0, 0, 0, 1, 1]
+        # msgbits = [0, 0, 0, 1, 1]
         # res = 24
         # No PPS bits should be set (only pps bit 0 for non-processed)
         res = ctth_procflags2pps(np.array([24], "int32"))
@@ -258,7 +252,7 @@ class TestFlagConversions(unittest.TestCase):
 
         # Example: Some NWP pressure levels missing, thermal inversion present - 3-bit
         # value = 4
-        msgbits = [0, 0, 0, 0, 0, 1]
+        # msgbits = [0, 0, 0, 0, 0, 1]
         res = 32
         # PPS bit 5 should be set (and pps bit 0 for non-processed)
         res = ctth_procflags2pps(np.array([32], "int32"))
@@ -270,7 +264,7 @@ class TestFlagConversions(unittest.TestCase):
 
         # Example: At least one mandatory NWP information is missing - 3-bit
         # value = 5
-        msgbits = [0, 0, 0, 1, 0, 1]
+        # msgbits = [0, 0, 0, 1, 0, 1]
         # res = 40
         # PPS bit 4 should be set (and pps bit 0 for non-processed)
         res = ctth_procflags2pps(np.array([40], "int32"))
@@ -349,13 +343,12 @@ class TestFlagConversions(unittest.TestCase):
         np.testing.assert_allclose(bits, ppsbits)
 
     def tearDown(self):
-        """Clean up"""
+        """Clean up the test suite."""
         return
 
 
 def suite():
-    """The suite for test_pps_msg_converter.
-    """
+    """Test the test_pps_msg_converter."""
     loader = unittest.TestLoader()
     mysuite = unittest.TestSuite()
     mysuite.addTest(loader.loadTestsFromTestCase(TestFlagConversions))
