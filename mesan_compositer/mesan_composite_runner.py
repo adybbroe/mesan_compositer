@@ -46,10 +46,10 @@ import posttroll.subscriber
 from posttroll.message import Message
 from posttroll.publisher import Publish
 
+from mesan_compositer.cloud_product_compositor import CloudProductCompositor
 from mesan_compositer.composite_tools import get_analysis_time
 from mesan_compositer.config import get_config
 from mesan_compositer.logger import setup_logging
-from mesan_compositer.make_ct_composite import CloudproductCompositer
 from mesan_compositer.prt_nwcsaf_cloudamount import do_cloudamount
 from mesan_compositer.prt_nwcsaf_cloudheight import do_cloudheight
 from mesan_compositer.quicklooks_from_netcdf import ctth_quicklook_from_netcdf
@@ -1087,7 +1087,7 @@ def mesan_live_runner(config_options):
 
 def do_cloud_type_composite(time_of_analysis, delta_t, area_id, config_options):
     """Make the cloud type composite."""
-    ctcomp = CloudproductCompositer(time_of_analysis, delta_t, area_id, config_options, "CT")
+    ctcomp = CloudProductCompositor(time_of_analysis, delta_t, area_id, config_options, "CT")
     try:
         ctcomp.get_catalogue()
     except NoGeoScenesError:
@@ -1104,7 +1104,7 @@ def do_cloud_type_composite(time_of_analysis, delta_t, area_id, config_options):
 
 def do_ctth_composite(time_of_analysis, delta_t, area_id, config_options):
     """Make the cloud top temperature height composite."""
-    ctcomp = CloudproductCompositer(time_of_analysis, delta_t, area_id, config_options, "CTTH")
+    ctcomp = CloudProductCompositor(time_of_analysis, delta_t, area_id, config_options, "CTTH")
     try:
         ctcomp.get_catalogue()
     except NoGeoScenesError:
