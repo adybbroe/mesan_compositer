@@ -36,7 +36,7 @@ from satpy.utils import debug_on
 from trollsift import Parser, globify
 
 from mesan_compositer.composite_tools import METEOSAT, METOPS, MSGSATS, OSCAR_SATELLITE_NAMES, GeoMetaData, get_ppslist
-from mesan_compositer.load_cloud_products import blend_cloud_products  # , get_error_dataset_name
+from mesan_compositer.load_cloud_products import blend_cloud_products, get_error_dataset_name
 from mesan_compositer.quicklooks_from_netcdf import ctth_quicklook_from_netcdf, ctype_quicklook_from_netcdf
 from mesan_compositer.utils import NoGeoScenesError
 
@@ -314,11 +314,11 @@ class CloudProductCompositor:
     def _output_dataset_names(self):
         """Return datasets that should be written to the composite file."""
         datasets = [self.group_name]
-        # error_dataset_name = get_error_dataset_name(
-        #     self.product, grouped=self.group_name.endswith("_group")
-        # )
-        # if error_dataset_name is not None and error_dataset_name in self.blended_scene:
-        #     datasets.append(error_dataset_name)
+        error_dataset_name = get_error_dataset_name(
+            self.product, grouped=self.group_name.endswith("_group")
+        )
+        if error_dataset_name is not None and error_dataset_name in self.blended_scene:
+            datasets.append(error_dataset_name)
         return datasets
 
     def write(self):
