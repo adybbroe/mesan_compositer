@@ -332,6 +332,7 @@ def blend_cloud_products(product, inputfile_patterns, areaid, *scenes, cache_dir
     weights = []
     for scene in resampled.scenes:
         wgt = 1 / scene["satz"]
+        wgt = _mask_weight_where_no_observation(scene, wgt)
         weights.append(da.nan_to_num(wgt))
 
     from functools import partial
@@ -352,6 +353,20 @@ def blend_cloud_products(product, inputfile_patterns, areaid, *scenes, cache_dir
 
     LOG.debug("Before returning the blended scene")
     return blended, group_name
+
+
+def _mask_weight_where_no_observation(scene, weight):
+    """Set blending weight to zero where CMA contains no observation."""
+    if "cma" not in scene:
+        return weight
+
+    cma = scene["cma"]
+    fill_value = cma.attrs.get("_FillValue")
+
+    if fill_value is None:
+        return weight.where(cma.notnull(), 0)
+
+    return weight.where(cma != fill_value, 0)
 
 
 if __name__ == "__main__":

@@ -55,6 +55,28 @@ GEO_TARGET_AREA = AreaDefinition(
 )
 
 
+@pytest.fixture
+def polar_ctth_with_no_observation_strip(tmp_path):
+    """Create polar CTTH/CMA files with a wide coherent no-observation strip."""
+    n_invalid_lines = 20
+
+    modified_ctth = tmp_path / POLAR_CTTH_FILE.name
+    modified_cma = tmp_path / POLAR_CMA_FILE.name
+
+    with xr.open_dataset(POLAR_CMA_FILE, decode_cf=False) as src:
+        ds = src.load()
+    ds["cma"].values[..., :n_invalid_lines, :] = 255
+    ds.to_netcdf(modified_cma)
+
+    with xr.open_dataset(POLAR_CTTH_FILE, decode_cf=False) as src:
+        ds = src.load()
+    ds["ctth_alti"].values[..., :n_invalid_lines, :] = 65535
+    ds["ctth_alti_err"].values[..., :n_invalid_lines, :] = 65535
+    ds.to_netcdf(modified_ctth)
+
+    return modified_ctth, modified_cma
+
+
 @pytest.mark.system
 def test_polar_satz_is_resampled_with_ctth(monkeypatch, tmp_path):
     """Satellite zenith angles must follow CTTH onto the target grid."""
@@ -187,7 +209,6 @@ def test_mixed_geo_polar_ctth_skips_error_if_not_available_for_all(monkeypatch, 
     assert "ancillary_variables" not in blended[group_name].attrs
 
 
-
 @pytest.mark.system
 def test_single_polar_ctth_scene_writes_ancillary_error(monkeypatch, tmp_path):
     """A CTTH composite with an error field must be writable as CF NetCDF."""
@@ -207,3 +228,38 @@ def test_single_polar_ctth_scene_writes_ancillary_error(monkeypatch, tmp_path):
         assert "ctth_alti" in ds
         assert "ctth_alti_err" in ds
         assert ds["ctth_alti"].attrs["ancillary_variables"] == "ctth_alti_err"
+
+
+@pytest.mark.system
+def test_invalid_polar_observations_do_not_mask_valid_other_scene(monkeypatch, tmp_path,
+                                                                  polar_ctth_with_no_observation_strip):
+    """Polar no-observation pixels must not override another valid scene."""
+    monkeypatch.setenv("TLES", str(DATA_DIR))
+
+    modified_ctth, modified_cma = polar_ctth_with_no_observation_strip
+
+    scene_with_gap = [modified_ctth, modified_cma]
+    valid_scene = [POLAR_CTTH_FILE_2, POLAR_CMA_FILE_2]
+
+    invalid, _ = blend_cloud_products("CTTH", [], TARGET_AREA, scene_with_gap,
+                                      cache_dir=str(tmp_path))
+
+    valid, valid_name = blend_cloud_products("CTTH", [], TARGET_AREA,
+                                             valid_scene, cache_dir=str(tmp_path))
+
+    blended, group_name = blend_cloud_products("CTTH", [], TARGET_AREA,
+                                               scene_with_gap, valid_scene, cache_dir=str(tmp_path))
+
+    cma = invalid["cma"]
+    no_observation = cma == cma.attrs["_FillValue"]
+    assert no_observation.any().compute().item()
+
+    valid_other_scene = valid[valid_name].notnull()
+
+    mask = no_observation & valid_other_scene
+    assert mask.any().compute().item()
+
+    expected = valid[valid_name].where(mask).reset_coords("time", drop=True)
+    actual = blended[group_name].where(mask).reset_coords("time", drop=True)
+
+    xr.testing.assert_allclose(actual, expected)
