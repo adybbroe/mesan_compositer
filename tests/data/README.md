@@ -21,3 +21,13 @@ The remapped Meteosat CTTH fixture is a 32 x 32 crop of the real `meps4km`
 product. It retains the fixed-grid projection coordinates and mapping metadata
 needed to exercise the `nwcsaf-pps_nc-remapped` single-scene path without
 requiring the full operational file.
+
+
+The reduced CTTH fixtures also retain `ctth_alti_err`, and the CBH fixture
+retains `cbh_alti_err`, so integration tests exercise propagation of the
+altitude standard-error fields through resampling and blending.
+
+The `*_legacy_test_*` Meteosat CTTH fixture intentionally omits `ctth_alti_err`.
+It is paired with a polar fixture that contains the error field to verify that
+mixed legacy/new composites fall back to primary-product-only blending when an
+ancillary dataset is not available for every contributing scene.
