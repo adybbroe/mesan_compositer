@@ -31,9 +31,9 @@ import numpy as np
 import pytest
 from satpy.tests.reader_tests.test_nwcsaf_nc import create_nwcsaf_geo_ct_file
 
+from mesan_compositer.cloud_product_compositor import CloudProductCompositor
 from mesan_compositer.composite_tools import GeoMetaData, PpsMetaData
 from mesan_compositer.config import get_config
-from mesan_compositer.make_ct_composite import CloudproductCompositer
 from mesan_compositer.utils import NoGeoScenesError
 
 
@@ -117,7 +117,7 @@ def fake_pps_filenames(tmp_path):
     return filenames
 
 
-class TestctCompositor:
+class TestCloudProductCompositor:
     """Test the ctCompositor class."""
 
     def setup_method(self):
@@ -150,8 +150,8 @@ class TestctCompositor:
 
         self.msg_scenes = [msg_meta_obj1, msg_meta_obj2, msg_meta_obj3]
 
-    @patch("mesan_compositer.make_ct_composite.CloudproductCompositer._get_all_geo_files")
-    @patch("mesan_compositer.make_ct_composite.CloudproductCompositer._get_all_pps_files")
+    @patch("mesan_compositer.cloud_product_compositor.CloudProductCompositor._get_all_geo_files")
+    @patch("mesan_compositer.cloud_product_compositor.CloudProductCompositor._get_all_pps_files")
     def test_make_composite(self, get_all_pps, get_all_geo, fake_pps_filenames,
                             fake_yamlconfig_file):
         """Test make a cloudtype composite of the list of pps&Geo scenes."""
@@ -164,8 +164,8 @@ class TestctCompositor:
         delta_t = timedelta(seconds=2100)
         areaid = "mesanEx"
 
-        with patch.object(CloudproductCompositer, "get_pps_scenes") as get_pps_scenes:
-            ctcomp = CloudproductCompositer(t_analysis, delta_t, areaid, configuration, "CT")
+        with patch.object(CloudProductCompositor, "get_pps_scenes") as get_pps_scenes:
+            ctcomp = CloudProductCompositor(t_analysis, delta_t, areaid, configuration, "CT")
 
             with pytest.raises(NoGeoScenesError) as exec_info:
                 ctcomp.get_catalogue()
@@ -181,8 +181,8 @@ class TestctCompositor:
             # TODO: Here we should try test the generation of the composite
 
 
-def test_setup_ct_compositer(fake_yamlconfig_file, nwcsaf_geo_ct_filename, nwcsaf_pps_ct_filename):
-    """Test set up the CT compositer."""
+def test_setup_cloud_product_compositor(fake_yamlconfig_file, nwcsaf_geo_ct_filename, nwcsaf_pps_ct_filename):
+    """Test setting up the cloud-product compositor for CT."""
     config = get_config(fake_yamlconfig_file)
 
     area_id = "mesanEx"
@@ -192,7 +192,7 @@ def test_setup_ct_compositer(fake_yamlconfig_file, nwcsaf_geo_ct_filename, nwcsa
     config["msg_dir"] = str(nwcsaf_geo_ct_filename.parent)
     config["pps_direct_readout_dir"] = str(nwcsaf_pps_ct_filename.parent)
 
-    ctcomp = CloudproductCompositer(time_of_analysis, delta_time_window, area_id, config, "CT")
+    ctcomp = CloudProductCompositor(time_of_analysis, delta_time_window, area_id, config, "CT")
     ctcomp.get_catalogue()
 
     assert len(ctcomp.pps_scenes) == 1

@@ -31,8 +31,8 @@ from logging import handlers
 
 from satpy.utils import debug_on
 
+from mesan_compositer.cloud_product_compositor import CloudProductCompositor
 from mesan_compositer.config import get_config
-from mesan_compositer.make_ct_composite import CloudproductCompositer
 
 debug_on()
 
@@ -123,7 +123,7 @@ def main():
 
     options = get_config(config_filename)
 
-    compositor = CloudproductCompositer(
+    compositor = CloudProductCompositor(
         time_of_analysis, delta_time_window, area_id, options, product_name
     )
     compositor.get_catalogue()

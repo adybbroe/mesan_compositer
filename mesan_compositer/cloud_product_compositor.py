@@ -20,7 +20,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Helper functions to make the NWCSAF Cloud products compositet."""
+"""Generate NWCSAF cloud-product composites."""
 
 import datetime as dt
 import logging
@@ -36,7 +36,7 @@ from satpy.utils import debug_on
 from trollsift import Parser, globify
 
 from mesan_compositer.composite_tools import METEOSAT, METOPS, MSGSATS, OSCAR_SATELLITE_NAMES, GeoMetaData, get_ppslist
-from mesan_compositer.load_cloud_products import blend_cloud_products
+from mesan_compositer.load_cloud_products import blend_cloud_products  # , get_error_dataset_name
 from mesan_compositer.quicklooks_from_netcdf import ctth_quicklook_from_netcdf, ctype_quicklook_from_netcdf
 from mesan_compositer.utils import NoGeoScenesError
 
@@ -51,34 +51,49 @@ _DEFAULT_TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 #: Default log format
 _DEFAULT_LOG_FORMAT = "[%(levelname)s: %(asctime)s : %(name)s] %(message)s"
 
-CPROD_GROUP_NAME = {"CT": "CT_group",
-                    "CTTH": "CTTH_group",
-                    "CBH": "CBH_group"}
+PRODUCT_CONFIG = {
+    "CT": {
+        "composite_filename": "ct_composite_filename",
+        "geo_filename": "msg_ct_filename",
+        "description": "Cloud Type",
+        "pps_log_name": "cloudtype",
+        "group_name": "CT_group",
+    },
+    "CTTH": {
+        "composite_filename": "ctth_composite_filename",
+        "geo_filename": "msg_ctth_filename",
+        "description": "Cloud Top Temperature and Height",
+        "pps_log_name": "ctth",
+        "group_name": "CTTH_group",
+    },
+    "CBH": {
+        "composite_filename": "cbh_composite_filename",
+        "geo_filename": "msg_cbh_filename",
+        "description": "Cloud Base Height",
+        "pps_log_name": "cbh",
+        "group_name": "CBH_group",
+    },
+}
 
 
-class CloudproductCompositer:
+class CloudProductCompositor:
     """The NWCSAF Cloud product composite generator class."""
 
     def __init__(self, obstime, tdiff, areaid, config_options, product):
         """Initialize the cloud type composite instance."""
-        if product not in ["CT", "CTTH", "CBH"]:
-            raise ValueError("Cloud products must be one of CT, CTTH or CBH.")
+        try:
+            product_config = PRODUCT_CONFIG[product]
+        except KeyError as exc:
+            raise ValueError("Cloud products must be one of CT, CTTH or CBH.") from exc
+
         self.product = product
 
         # Generate the filename from the observation time and the
-        # specifcations in the config file:
+        # specifications in the config file:
         LOG.info("Output file name is generated from observation " +
                  "time and info in config file:")
-        if product == "CT":
-            file_parser = Parser(config_options["ct_composite_filename"])
-            self.geo_input_pattern = config_options["msg_ct_filename"]
-        elif product == "CTTH":
-            file_parser = Parser(config_options["ctth_composite_filename"])
-            self.geo_input_pattern = config_options["msg_ctth_filename"]
-        else:
-            file_parser = Parser(config_options["cbh_composite_filename"])
-            self.geo_input_pattern = config_options["msg_cbh_filename"]
-
+        file_parser = Parser(config_options[product_config["composite_filename"]])
+        self.geo_input_pattern = config_options[product_config["geo_filename"]]
         self.polar_input_pattern = config_options["pps_filename"]
 
         bname = file_parser.compose({"area":areaid, "obstime":obstime})
@@ -87,10 +102,7 @@ class CloudproductCompositer:
 
         LOG.info("Filename = " + str(self.filename))
 
-        description = {"CT": "Cloud Type",
-                       "CTTH": "Cloud Top Temperature and Height",
-                       "CBH": "Cloud Base Height"}.get(self.product)
-        self.description = "{desc} composite for Mesan".format(desc=description)
+        self.description = f"{product_config['description']} composite for Mesan"
         self.obstime = obstime
         self.timediff = tdiff
         self.time_window = (obstime - tdiff, obstime + tdiff)
@@ -111,7 +123,7 @@ class CloudproductCompositer:
         self.pps_scenes = []
         self.msg_scenes = []
 
-        self.group_name = CPROD_GROUP_NAME.get(self.product)  # Ex. 'CT_group'
+        self.group_name = product_config["group_name"]
         self.blended_scene = None
 
     def _get_all_pps_files(self, pps_dir):
@@ -137,10 +149,7 @@ class CloudproductCompositer:
         return glob(os.path.join(geo_dir, glob_str))
 
     def _get_msg_filepattern_from_config(self):
-        msg_prod_filename = "msg_{prod}_filename".format(prod={"CT": "ct",
-                                                               "CTTH": "ctth",
-                                                               "CBH": "cbh"}.get(self.product))
-        return self._options[msg_prod_filename]
+        return self.geo_input_pattern
 
     def get_pps_scenes(self, pps_file_list, satellites=None, variant=None):
         """Get the list of valid pps scenes from file list."""
@@ -222,7 +231,7 @@ class CloudproductCompositer:
 
         dr_list = self._get_all_pps_files(pps_dr_dir)
         LOG.info("Number of direct readout pps %s files in dir: %s",
-                 {"CT": "cloudtype", "CTTH": "ctth", "CBH": "cbh"}.get(self.product),
+                 PRODUCT_CONFIG[self.product]["pps_log_name"],
                  str(len(dr_list)))
 
         if len(dr_list) <= min_num_of_pps_dr_files:
@@ -302,6 +311,16 @@ class CloudproductCompositer:
                                                               cache_dir=gettempdir())
         self.group_name = group_name
 
+    def _output_dataset_names(self):
+        """Return datasets that should be written to the composite file."""
+        datasets = [self.group_name]
+        # error_dataset_name = get_error_dataset_name(
+        #     self.product, grouped=self.group_name.endswith("_group")
+        # )
+        # if error_dataset_name is not None and error_dataset_name in self.blended_scene:
+        #     datasets.append(error_dataset_name)
+        return datasets
+
     def write(self):
         """Write the composite to a netcdf file."""
         _, tmpfname = tempfile.mkstemp(suffix=os.path.basename(self.filename)+".nc",
@@ -313,7 +332,11 @@ class CloudproductCompositer:
                       self.blended_scene[key].dims,
                       self.blended_scene[key].shape)
 
-        self.blended_scene.save_dataset(self.group_name, filename=tmpfname)
+        output_datasets = self._output_dataset_names()
+        if len(output_datasets) == 1:
+            self.blended_scene.save_dataset(self.group_name, filename=tmpfname)
+        else:
+            self.blended_scene.save_datasets(datasets=output_datasets, filename=tmpfname)
         now = dt.datetime.now(dt.timezone.utc)
         fname_with_timestamp = str(self.filename) + now.strftime("_%Y%m%d%H%M%S.nc")
 
@@ -343,9 +366,6 @@ class CloudproductCompositer:
 
     def quicklook(self, netcdf_filename):
         """Make a quicklook image from the netCDF file."""
-        if self.group_name in ["CTTH_ALTI_group", "ctth_alti"]:
+        if self.product in {"CTTH", "CBH"}:
             return ctth_quicklook_from_netcdf(self.group_name, netcdf_filename)
-        elif self.group_name in ["CBH_ALTI_group", "cbh_alti"]:
-            return ctth_quicklook_from_netcdf(self.group_name, netcdf_filename)
-        else:
-            return ctype_quicklook_from_netcdf(self.group_name, netcdf_filename)
+        return ctype_quicklook_from_netcdf(self.group_name, netcdf_filename)
