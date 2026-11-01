@@ -211,3 +211,29 @@ def test_setup_cloud_product_compositor(fake_yamlconfig_file, nwcsaf_geo_ct_file
     assert scene.orbit == "00000"
     assert scene.timeslot == datetime(2023, 1, 18, 10, 40, 49, 500000)
     assert scene.variant is None
+
+
+def test_height_compositor_writes_altitude_error_dataset():
+    """Height composites should write the propagated altitude-error field."""
+    compositor = object.__new__(CloudProductCompositor)
+    compositor.product = "CTTH"
+    compositor.group_name = "CTTH_ALTI_group"
+    compositor.blended_scene = {
+        "CTTH_ALTI_group": object(),
+        "CTTH_ALTI_ERR_group": object(),
+    }
+
+    assert compositor._output_dataset_names() == [
+        "CTTH_ALTI_group",
+        "CTTH_ALTI_ERR_group",
+    ]
+
+
+def test_cloud_type_compositor_has_no_error_dataset():
+    """Cloud type output should remain a single dataset."""
+    compositor = object.__new__(CloudProductCompositor)
+    compositor.product = "CT"
+    compositor.group_name = "CT_group"
+    compositor.blended_scene = {"CT_group": object()}
+
+    assert compositor._output_dataset_names() == ["CT_group"]

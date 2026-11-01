@@ -47,6 +47,11 @@ LOG = logging.getLogger(__name__)
 
 HEIGHT_FILL_VALUE = 65535.0
 HEIGHT_PRODUCTS = {"ctth_alti", "cbh_alti"}
+PRODUCT_DATASETS = {
+    "CT": {"primary": "ct", "error": None},
+    "CTTH": {"primary": "ctth_alti", "error": "ctth_alti_err"},
+    "CBH": {"primary": "cbh_alti", "error": "cbh_alti_err"},
+}
 
 HOME = os.environ.get("HOME")
 
@@ -65,10 +70,20 @@ class CloudProductsLoader:
         if len(self._cloud_files) > 0 and "MSG" in str(self._cloud_files[0].name):
             self._reader = "nwcsaf-geo"
 
-    def load(self, to_load):
-        """Load the cloud products."""
+    def load(self, to_load, optional=None):
+        """Load required datasets and any optional datasets that are available."""
         self.scene = Scene({self._reader: self._cloud_files})
         self.scene.load(to_load)
+
+        # Some NWCSAF datasets are loadable by name without being advertised
+        # by ``available_dataset_names()``.  Try optional datasets directly and
+        # keep the primary-product path unchanged when they are absent.
+        for name in optional or []:
+            try:
+                self.scene.load([name])
+            except KeyError:
+                LOG.debug("Optional dataset %s is not available", name)
+
         # Drop the time dimension if it is there:
         for key in self.scene.keys():
             try:
@@ -219,10 +234,30 @@ def restore_height_missing_values(scene, product):
     scene[product] = data.where(data != HEIGHT_FILL_VALUE)
 
 
+def get_error_dataset_name(product, grouped=False):
+    """Return the altitude-error dataset name for a height product."""
+    error_name = PRODUCT_DATASETS[product]["error"]
+    if error_name is None:
+        return None
+    if grouped:
+        return error_name.upper() + "_group"
+    return error_name
+
+
+def _set_ancillary_error(scene, primary_name, error_name):
+    """Link an altitude-error dataset to its corresponding height dataset."""
+    if error_name is None or error_name not in scene:
+        return
+
+    scene[primary_name].attrs["ancillary_variables"] = [scene[error_name]]
+
+
 def blend_cloud_products(product, inputfile_patterns, areaid, *scenes, cache_dir=None):
     """Blend NWCSAF Geo and PPS cloud product scenes."""
     loaded_scenes = []
-    satpy_composite_name = {"CT": "ct", "CTTH": "ctth_alti", "CBH": "cbh_alti"}.get(product)
+    product_datasets = PRODUCT_DATASETS[product]
+    satpy_composite_name = product_datasets["primary"]
+    error_dataset_name = product_datasets["error"]
 
     del inputfile_patterns  # Retained in the API for compatibility with callers.
 
@@ -235,7 +270,8 @@ def blend_cloud_products(product, inputfile_patterns, areaid, *scenes, cache_dir
         if satpy_composite_name in HEIGHT_PRODUCTS and is_polar:
             datasets.append("cma")
 
-        loader.load(datasets)
+        optional = [error_dataset_name] if error_dataset_name is not None else None
+        loader.load(datasets, optional=optional)
 
         if satpy_composite_name in HEIGHT_PRODUCTS and is_polar:
             prepare_height_for_resampling(loader.scene, satpy_composite_name)
@@ -252,14 +288,34 @@ def blend_cloud_products(product, inputfile_patterns, areaid, *scenes, cache_dir
         local = loaded_scenes[0].resample(areaid, radius_of_influence=RADIUS_OF_INFLUENCE,
                                           reduce_data=False, cache_dir=cache_dir,
                                           mask_area=True)
-        if satpy_composite_name  in HEIGHT_PRODUCTS:
+        if satpy_composite_name in HEIGHT_PRODUCTS:
             restore_height_missing_values(local, satpy_composite_name)
             local[satpy_composite_name].attrs["_FillValue"] = HEIGHT_FILL_VALUE
+            if error_dataset_name is not None and error_dataset_name in local:
+                local[error_dataset_name].attrs["_FillValue"] = HEIGHT_FILL_VALUE
+                _set_ancillary_error(local, satpy_composite_name, error_dataset_name)
 
         return local, satpy_composite_name
 
+    propagate_error = (
+        error_dataset_name is not None
+        and all(error_dataset_name in scene for scene in loaded_scenes)
+    )
+
+    # Error fields are optional.  Only propagate them when all scenes expose
+    # the same dataset; otherwise preserve the legacy primary-product-only
+    # blending path.
+    if not propagate_error and error_dataset_name is not None:
+        for scene in loaded_scenes:
+            if error_dataset_name in scene:
+                del scene[error_dataset_name]
+            scene[satpy_composite_name].attrs.pop("ancillary_variables", None)
+
     mscn = MultiScene(loaded_scenes)
     groups = {DataQuery(name=group_name): [satpy_composite_name]}
+    error_group_name = get_error_dataset_name(product, grouped=True) if propagate_error else None
+    if propagate_error:
+        groups[DataQuery(name=error_group_name)] = [error_dataset_name]
     mscn.group(groups)
 
     LOG.debug("Before call to resample on MultiScene...")
@@ -288,6 +344,9 @@ def blend_cloud_products(product, inputfile_patterns, areaid, *scenes, cache_dir
         try:
             blended[group_name] = blended[group_name].fillna(HEIGHT_FILL_VALUE)
             blended[group_name].attrs["_FillValue"] = HEIGHT_FILL_VALUE
+            if error_group_name is not None and error_group_name in blended:
+                blended[error_group_name].attrs["_FillValue"] = HEIGHT_FILL_VALUE
+                _set_ancillary_error(blended, group_name, error_group_name)
         except KeyError:
             LOG.exception("Failed setting fill value for %s.", group_name)
 
