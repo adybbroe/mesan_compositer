@@ -217,15 +217,15 @@ def test_height_compositor_writes_altitude_error_dataset():
     """Height composites should write the propagated altitude-error field."""
     compositor = object.__new__(CloudProductCompositor)
     compositor.product = "CTTH"
-    compositor.group_name = "CTTH_ALTI_group"
+    compositor.group_name = "ctth_alti"
     compositor.blended_scene = {
-        "CTTH_ALTI_group": object(),
-        "CTTH_ALTI_ERR_group": object(),
+        "ctth_alti": object(),
+        "ctth_alti_err": object(),
     }
 
     assert compositor._output_dataset_names() == [
-        "CTTH_ALTI_group",
-        "CTTH_ALTI_ERR_group",
+        "ctth_alti",
+        "ctth_alti_err",
     ]
 
 
@@ -233,7 +233,7 @@ def test_cloud_type_compositor_has_no_error_dataset():
     """Cloud type output should remain a single dataset."""
     compositor = object.__new__(CloudProductCompositor)
     compositor.product = "CT"
-    compositor.group_name = "CT_group"
-    compositor.blended_scene = {"CT_group": object()}
+    compositor.group_name = "ct"
+    compositor.blended_scene = {"ct": object()}
 
-    assert compositor._output_dataset_names() == ["CT_group"]
+    assert compositor._output_dataset_names() == ["ct"]
