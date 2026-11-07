@@ -57,21 +57,18 @@ PRODUCT_CONFIG = {
         "geo_filename": "msg_ct_filename",
         "description": "Cloud Type",
         "pps_log_name": "cloudtype",
-        "group_name": "CT_group",
     },
     "CTTH": {
         "composite_filename": "ctth_composite_filename",
         "geo_filename": "msg_ctth_filename",
         "description": "Cloud Top Temperature and Height",
         "pps_log_name": "ctth",
-        "group_name": "CTTH_group",
     },
     "CBH": {
         "composite_filename": "cbh_composite_filename",
         "geo_filename": "msg_cbh_filename",
         "description": "Cloud Base Height",
         "pps_log_name": "cbh",
-        "group_name": "CBH_group",
     },
 }
 
@@ -123,7 +120,7 @@ class CloudProductCompositor:
         self.pps_scenes = []
         self.msg_scenes = []
 
-        self.group_name = product_config["group_name"]
+        self.group_name = None
         self.blended_scene = None
 
     def _get_all_pps_files(self, pps_dir):
@@ -314,9 +311,7 @@ class CloudProductCompositor:
     def _output_dataset_names(self):
         """Return datasets that should be written to the composite file."""
         datasets = [self.group_name]
-        error_dataset_name = get_error_dataset_name(
-            self.product, grouped=self.group_name.endswith("_group")
-        )
+        error_dataset_name = get_error_dataset_name(self.product)
         if error_dataset_name is not None and error_dataset_name in self.blended_scene:
             datasets.append(error_dataset_name)
         return datasets
