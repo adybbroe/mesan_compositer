@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2026 Adam.Dybbroe
+# Copyright (c) 2026 Adam Dybbroe
 
 # Author(s):
 
-#   Adam.Dybbroe <a000680@c22526.ad.smhi.se>
+#   Adam Dybbroe <Firstname.Lastname at smhi.se>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
