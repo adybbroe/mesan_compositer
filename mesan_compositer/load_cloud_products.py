@@ -32,7 +32,7 @@ import dask.array as da
 import numpy as np
 import xarray as xr
 from pyorbital.orbital import Orbital
-from satpy import DataQuery, MultiScene, Scene
+from satpy import MultiScene, Scene
 from satpy import config as satpy_config
 from satpy.area import get_area_def
 from satpy.modifiers.angles import get_satellite_zenith_angle
@@ -45,7 +45,9 @@ debug_on()
 LOG = logging.getLogger(__name__)
 
 
-HEIGHT_FILL_VALUE = 65535.0
+OBSERVATION_VALIDITY = "_observation_validity"
+CLOUD_FREE_SENTINEL = -1.0
+CTTH_STATUS_FLAG = "ctth_status_flag"
 HEIGHT_PRODUCTS = {"ctth_alti", "cbh_alti"}
 PRODUCT_DATASETS = {
     "CT": {"primary": "ct", "error": None},
@@ -54,6 +56,10 @@ PRODUCT_DATASETS = {
 }
 
 HOME = os.environ.get("HOME")
+
+#RADIUS_OF_INFLUENCE = 6000
+RADIUS_OF_INFLUENCE = 4000
+
 
 class CloudProductsLoader:
     """Class to load and prepare cloud products on area."""
@@ -215,33 +221,87 @@ def generate_observation_time_array(data_array):
     return obs_time[:, np.newaxis]
 
 
-def prepare_height_for_resampling(scene, product):
-    """Prepare CTTH/CBH altitude for resampling using CMA validity."""
+def add_observation_validity(scene):
+    """Add a temporary mask identifying valid native CMA observations."""
+    cma = scene["cma"]
+    valid = cma.notnull()
+
+    # PPS categorical products may retain their encoded fill value instead of
+    # exposing it as NaN.  Treat either representation as no observation.
+    fill_value = cma.attrs.get("_FillValue")
+    if fill_value is None:
+        fill_value = cma.encoding.get("_FillValue")
+    if fill_value is not None:
+        valid = valid & (cma != fill_value)
+
+    observation_validity = xr.ones_like(cma, dtype=np.float32).where(valid)
+    observation_validity.attrs = cma.attrs.copy()
+    observation_validity.attrs["name"] = OBSERVATION_VALIDITY
+    observation_validity.attrs.pop("_FillValue", None)
+    observation_validity.encoding = {}
+    scene[OBSERVATION_VALIDITY] = observation_validity
+
+
+def prepare_ctth_for_resampling(scene, product="ctth_alti"):
+    """Preserve valid cloud-free CTTH pixels during resampling and stacking.
+
+    The CTTH field itself defines whether a valid cloud-top height exists.
+    ``ctth_status_flag`` is only used to identify the special case where a
+    missing CTTH value represents a valid cloud-free observation.  This is
+    important because other status bits may be set for perfectly valid cloudy
+    pixels, while fill/no-observation pixels must remain missing.
+    """
+    if CTTH_STATUS_FLAG not in scene:
+        return False
+
     data = scene[product]
-    valid_observation = scene["cma"].notnull()
+    status = scene[CTTH_STATUS_FLAG]
 
-    # Preserve valid cloud-free pixels through nearest-neighbour resampling.
-    # Missing heights at pixels with a valid CMA observation are represented
-    # temporarily by a sentinel, while pixels without a CMA observation stay
-    # missing and are ignored by the resampler.
-    data = data.fillna(HEIGHT_FILL_VALUE)
-    scene[product] = data.where(valid_observation)
+    status_fill_value = status.attrs.get("_FillValue")
+    if status_fill_value is None:
+        status_fill_value = status.encoding.get("_FillValue")
+
+    status_valid = status.notnull()
+    if status_fill_value is not None:
+        status_valid = status_valid & (status != status_fill_value)
+
+    height_valid = data.notnull()
+    height_fill_value = data.attrs.get("_FillValue")
+    if height_fill_value is None:
+        height_fill_value = data.encoding.get("_FillValue")
+    if height_fill_value is not None:
+        fill_is_nan = np.all(np.isnan(np.asarray(height_fill_value, dtype=float)))
+        if not fill_is_nan:
+            height_valid = height_valid & (data != height_fill_value)
+
+    # Bit 0 means Cloud-free.  Only use it to reclassify a *missing* CTTH
+    # value as a valid cloud-free observation.  A finite CTTH value always
+    # remains a valid cloud height, irrespective of the other status bits.
+    cloud_free = (~height_valid) & status_valid & ((status.fillna(0) % 2) == 1)
+
+    prepared = data.where(height_valid | cloud_free)
+    prepared = prepared.where(~cloud_free, CLOUD_FREE_SENTINEL)
+    prepared.attrs = data.attrs.copy()
+    scene[product] = prepared
+    return True
 
 
-def restore_height_missing_values(scene, product):
-    """Restore temporary fill values to NaN after resampling."""
+def restore_cloud_free_height(scene, product="ctth_alti", error_name=None):
+    """Restore cloud-free CTTH to NaN and keep its ancillary error consistent."""
+    if product not in scene:
+        return
+
     data = scene[product]
-    scene[product] = data.where(data != HEIGHT_FILL_VALUE)
+    cloud_free = data == CLOUD_FREE_SENTINEL
+    scene[product] = data.where(~cloud_free)
+
+    if error_name is not None and error_name in scene:
+        scene[error_name] = scene[error_name].where(~cloud_free)
 
 
-def get_error_dataset_name(product, grouped=False):
+def get_error_dataset_name(product):
     """Return the altitude-error dataset name for a height product."""
-    error_name = PRODUCT_DATASETS[product]["error"]
-    if error_name is None:
-        return None
-    if grouped:
-        return error_name.upper() + "_group"
-    return error_name
+    return PRODUCT_DATASETS[product]["error"]
 
 
 def _set_ancillary_error(scene, primary_name, error_name):
@@ -267,14 +327,24 @@ def blend_cloud_products(product, inputfile_patterns, areaid, *scenes, cache_dir
 
         datasets = [satpy_composite_name]
         is_polar = loader._reader == "nwcsaf-pps_nc"
-        if satpy_composite_name in HEIGHT_PRODUCTS and is_polar:
+        if satpy_composite_name == "cbh_alti" and is_polar:
             datasets.append("cma")
 
-        optional = [error_dataset_name] if error_dataset_name is not None else None
+        optional = []
+        if error_dataset_name is not None:
+            optional.append(error_dataset_name)
+        if satpy_composite_name == "ctth_alti":
+            optional.extend([CTTH_STATUS_FLAG, "cma"])
         loader.load(datasets, optional=optional)
 
-        if satpy_composite_name in HEIGHT_PRODUCTS and is_polar:
-            prepare_height_for_resampling(loader.scene, satpy_composite_name)
+        if satpy_composite_name == "ctth_alti":
+            prepared_from_status = prepare_ctth_for_resampling(loader.scene, satpy_composite_name)
+            if prepared_from_status:
+                del loader.scene[CTTH_STATUS_FLAG]
+            elif "cma" in loader.scene:
+                add_observation_validity(loader.scene)
+        elif satpy_composite_name == "cbh_alti" and is_polar:
+            add_observation_validity(loader.scene)
 
         LOG.debug("%s after load: dims=%s shape=%s", satpy_composite_name,
                   loader.scene[satpy_composite_name].dims,
@@ -282,17 +352,19 @@ def blend_cloud_products(product, inputfile_patterns, areaid, *scenes, cache_dir
         loader.prepare_satz_angles_on_area(satpy_composite_name, areaid)
         loaded_scenes.append(loader.scene)
 
-    RADIUS_OF_INFLUENCE = 6000
-    group_name = satpy_composite_name.upper() + "_group"
     if len(loaded_scenes) == 1:
         local = loaded_scenes[0].resample(areaid, radius_of_influence=RADIUS_OF_INFLUENCE,
                                           reduce_data=False, cache_dir=cache_dir,
                                           mask_area=True)
+
+        if satpy_composite_name == "ctth_alti":
+            restore_cloud_free_height(local, satpy_composite_name, error_dataset_name)
+
+        if OBSERVATION_VALIDITY in local:
+            del local[OBSERVATION_VALIDITY]
+
         if satpy_composite_name in HEIGHT_PRODUCTS:
-            restore_height_missing_values(local, satpy_composite_name)
-            local[satpy_composite_name].attrs["_FillValue"] = HEIGHT_FILL_VALUE
             if error_dataset_name is not None and error_dataset_name in local:
-                local[error_dataset_name].attrs["_FillValue"] = HEIGHT_FILL_VALUE
                 _set_ancillary_error(local, satpy_composite_name, error_dataset_name)
 
         return local, satpy_composite_name
@@ -302,7 +374,7 @@ def blend_cloud_products(product, inputfile_patterns, areaid, *scenes, cache_dir
         and all(error_dataset_name in scene for scene in loaded_scenes)
     )
 
-    # Error fields are optional.  Only propagate them when all scenes expose
+    # Error fields are optional. Only propagate them when all scenes expose
     # the same dataset; otherwise preserve the legacy primary-product-only
     # blending path.
     if not propagate_error and error_dataset_name is not None:
@@ -312,28 +384,21 @@ def blend_cloud_products(product, inputfile_patterns, areaid, *scenes, cache_dir
             scene[satpy_composite_name].attrs.pop("ancillary_variables", None)
 
     mscn = MultiScene(loaded_scenes)
-    groups = {DataQuery(name=group_name): [satpy_composite_name]}
-    error_group_name = get_error_dataset_name(product, grouped=True) if propagate_error else None
-    if propagate_error:
-        groups[DataQuery(name=error_group_name)] = [error_dataset_name]
-    mscn.group(groups)
 
     LOG.debug("Before call to resample on MultiScene...")
     resampled = mscn.resample(areaid, radius_of_influence=RADIUS_OF_INFLUENCE,
                               reduce_data=False, cache_dir=cache_dir, mask_area=True)
 
-    # Convert our temporary sentinel back to actual missing CTTH before
-    # the scenes are blended.
-    if satpy_composite_name  in HEIGHT_PRODUCTS:
-        for scene in resampled.scenes:
-            restore_height_missing_values(scene, satpy_composite_name)
-
     LOG.debug("Getting the weights...")
     weights = []
     for scene in resampled.scenes:
         wgt = 1 / scene["satz"]
-        wgt = _mask_weight_where_no_observation(scene, wgt)
+        wgt = _mask_weight_where_no_observation(scene, wgt, satpy_composite_name)
         weights.append(da.nan_to_num(wgt))
+
+        # Internal processing field; never expose it in the blended product.
+        if OBSERVATION_VALIDITY in scene:
+            del scene[OBSERVATION_VALIDITY]
 
     from functools import partial
     stack_with_weights = partial(stack, weights=weights)
@@ -341,32 +406,28 @@ def blend_cloud_products(product, inputfile_patterns, areaid, *scenes, cache_dir
     LOG.debug("Before blending...")
     blended = resampled.blend(blend_function=stack_with_weights)
 
-    if satpy_composite_name in HEIGHT_PRODUCTS:
-        try:
-            blended[group_name] = blended[group_name].fillna(HEIGHT_FILL_VALUE)
-            blended[group_name].attrs["_FillValue"] = HEIGHT_FILL_VALUE
-            if error_group_name is not None and error_group_name in blended:
-                blended[error_group_name].attrs["_FillValue"] = HEIGHT_FILL_VALUE
-                _set_ancillary_error(blended, group_name, error_group_name)
-        except KeyError:
-            LOG.exception("Failed setting fill value for %s.", group_name)
+    if satpy_composite_name == "ctth_alti":
+        restore_cloud_free_height(blended, satpy_composite_name, error_dataset_name)
+
+    if satpy_composite_name in HEIGHT_PRODUCTS and propagate_error and error_dataset_name in blended:
+        _set_ancillary_error(blended, satpy_composite_name, error_dataset_name)
 
     LOG.debug("Before returning the blended scene")
-    return blended, group_name
+    return blended, satpy_composite_name
 
 
-def _mask_weight_where_no_observation(scene, weight):
-    """Set blending weight to zero where CMA contains no observation."""
-    if "cma" not in scene:
-        return weight
+def _mask_weight_where_no_observation(scene, weight, product=None):
+    """Set blending weight to zero where no resampled observation is available."""
+    if OBSERVATION_VALIDITY in scene:
+        return weight.where(scene[OBSERVATION_VALIDITY].notnull(), 0)
 
-    cma = scene["cma"]
-    fill_value = cma.attrs.get("_FillValue")
+    # CTTH prepared from ctth_status_flag contains either a real height, the
+    # cloud-free sentinel, or NaN for no observation.  Its validity therefore
+    # directly defines whether this scene may win the stack selection.
+    if product == "ctth_alti" and product in scene:
+        return weight.where(scene[product].notnull(), 0)
 
-    if fill_value is None:
-        return weight.where(cma.notnull(), 0)
-
-    return weight.where(cma != fill_value, 0)
+    return weight
 
 
 if __name__ == "__main__":

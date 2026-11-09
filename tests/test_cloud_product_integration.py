@@ -143,10 +143,10 @@ def test_two_polar_ctth_scenes_blend_on_target_area(monkeypatch, tmp_path):
     blended, group_name = blend_cloud_products("CTTH", [], TARGET_AREA,
                                                scene_1, scene_2, cache_dir=str(tmp_path), )
 
-    assert group_name == "CTTH_ALTI_group"
+    assert group_name == "ctth_alti"
     assert blended[group_name].shape == TARGET_AREA.shape
-    assert blended["CTTH_ALTI_ERR_group"].shape == TARGET_AREA.shape
-    assert blended[group_name].attrs["ancillary_variables"][0].attrs["name"] == "CTTH_ALTI_ERR_group"
+    assert blended["ctth_alti_err"].shape == TARGET_AREA.shape
+    assert blended[group_name].attrs["ancillary_variables"][0].attrs["name"] == "ctth_alti_err"
 
 
 @pytest.mark.system
@@ -182,10 +182,10 @@ def test_mixed_geo_polar_ctth_propagates_common_error(monkeypatch, tmp_path):
     blended, group_name = blend_cloud_products("CTTH", [], GEO_TARGET_AREA,
                                                geo_scene, polar_scene, cache_dir=str(tmp_path))
 
-    assert group_name == "CTTH_ALTI_group"
+    assert group_name == "ctth_alti"
     assert blended[group_name].shape == GEO_TARGET_AREA.shape
-    assert blended["CTTH_ALTI_ERR_group"].shape == GEO_TARGET_AREA.shape
-    assert blended[group_name].attrs["ancillary_variables"][0].attrs["name"] == "CTTH_ALTI_ERR_group"
+    assert blended["ctth_alti_err"].shape == GEO_TARGET_AREA.shape
+    assert blended[group_name].attrs["ancillary_variables"][0].attrs["name"] == "ctth_alti_err"
 
 
 @pytest.mark.system
@@ -203,9 +203,9 @@ def test_mixed_geo_polar_ctth_skips_error_if_not_available_for_all(monkeypatch, 
     blended, group_name = blend_cloud_products("CTTH", [], GEO_TARGET_AREA,
                                                geo_scene, polar_scene, cache_dir=str(tmp_path))
 
-    assert group_name == "CTTH_ALTI_group"
+    assert group_name == "ctth_alti"
     assert blended[group_name].shape == GEO_TARGET_AREA.shape
-    assert "CTTH_ALTI_ERR_group" not in blended
+    assert "ctth_alti_err" not in blended
     assert "ancillary_variables" not in blended[group_name].attrs
 
 
@@ -251,7 +251,10 @@ def test_invalid_polar_observations_do_not_mask_valid_other_scene(monkeypatch, t
                                                scene_with_gap, valid_scene, cache_dir=str(tmp_path))
 
     cma = invalid["cma"]
-    no_observation = cma == cma.attrs["_FillValue"]
+    fill_value = cma.attrs.get("_FillValue")
+    no_observation = cma.isnull()
+    if fill_value is not None:
+        no_observation = no_observation | (cma == fill_value)
     assert no_observation.any().compute().item()
 
     valid_other_scene = valid[valid_name].notnull()
