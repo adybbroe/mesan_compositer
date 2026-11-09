@@ -47,8 +47,11 @@ LOG = logging.getLogger(__name__)
 
 OBSERVATION_VALIDITY = "_observation_validity"
 CLOUD_FREE_SENTINEL = -1.0
-CTTH_STATUS_FLAG = "ctth_status_flag"
 HEIGHT_PRODUCTS = {"ctth_alti", "cbh_alti"}
+HEIGHT_STATUS_FLAGS = {
+    "ctth_alti": "ctth_status_flag",
+    "cbh_alti": "cbh_status_flag",
+}
 PRODUCT_DATASETS = {
     "CT": {"primary": "ct", "error": None},
     "CTTH": {"primary": "ctth_alti", "error": "ctth_alti_err"},
@@ -242,20 +245,21 @@ def add_observation_validity(scene):
     scene[OBSERVATION_VALIDITY] = observation_validity
 
 
-def prepare_ctth_for_resampling(scene, product="ctth_alti"):
-    """Preserve valid cloud-free CTTH pixels during resampling and stacking.
+def prepare_height_for_resampling(scene, product):
+    """Preserve valid cloud-free height pixels during resampling and stacking.
 
-    The CTTH field itself defines whether a valid cloud-top height exists.
-    ``ctth_status_flag`` is only used to identify the special case where a
-    missing CTTH value represents a valid cloud-free observation.  This is
-    important because other status bits may be set for perfectly valid cloudy
-    pixels, while fill/no-observation pixels must remain missing.
+    The height field itself defines whether a valid cloud height exists. The
+    corresponding status flag is only used to identify the special case where
+    a missing height represents a valid cloud-free observation. Other status
+    bits may be set for perfectly valid cloudy pixels, while fill/no-observation
+    pixels must remain missing.
     """
-    if CTTH_STATUS_FLAG not in scene:
+    status_name = HEIGHT_STATUS_FLAGS[product]
+    if status_name not in scene:
         return False
 
     data = scene[product]
-    status = scene[CTTH_STATUS_FLAG]
+    status = scene[status_name]
 
     status_fill_value = status.attrs.get("_FillValue")
     if status_fill_value is None:
@@ -274,9 +278,9 @@ def prepare_ctth_for_resampling(scene, product="ctth_alti"):
         if not fill_is_nan:
             height_valid = height_valid & (data != height_fill_value)
 
-    # Bit 0 means Cloud-free.  Only use it to reclassify a *missing* CTTH
-    # value as a valid cloud-free observation.  A finite CTTH value always
-    # remains a valid cloud height, irrespective of the other status bits.
+    # Bit 0 means Cloud-free. Only use it to reclassify a *missing* height
+    # value as a valid cloud-free observation. A finite height value always
+    # remains valid, irrespective of the other status bits.
     cloud_free = (~height_valid) & status_valid & ((status.fillna(0) % 2) == 1)
 
     prepared = data.where(height_valid | cloud_free)
@@ -286,8 +290,8 @@ def prepare_ctth_for_resampling(scene, product="ctth_alti"):
     return True
 
 
-def restore_cloud_free_height(scene, product="ctth_alti", error_name=None):
-    """Restore cloud-free CTTH to NaN and keep its ancillary error consistent."""
+def restore_cloud_free_height(scene, product, error_name=None):
+    """Restore cloud-free height to NaN and keep its ancillary error consistent."""
     if product not in scene:
         return
 
@@ -326,25 +330,23 @@ def blend_cloud_products(product, inputfile_patterns, areaid, *scenes, cache_dir
         loader = CloudProductsLoader(files)
 
         datasets = [satpy_composite_name]
-        is_polar = loader._reader == "nwcsaf-pps_nc"
-        if satpy_composite_name == "cbh_alti" and is_polar:
-            datasets.append("cma")
 
         optional = []
         if error_dataset_name is not None:
             optional.append(error_dataset_name)
-        if satpy_composite_name == "ctth_alti":
-            optional.extend([CTTH_STATUS_FLAG, "cma"])
+        if satpy_composite_name in HEIGHT_PRODUCTS:
+            optional.extend([HEIGHT_STATUS_FLAGS[satpy_composite_name], "cma"])
         loader.load(datasets, optional=optional)
 
-        if satpy_composite_name == "ctth_alti":
-            prepared_from_status = prepare_ctth_for_resampling(loader.scene, satpy_composite_name)
+        if satpy_composite_name in HEIGHT_PRODUCTS:
+            status_name = HEIGHT_STATUS_FLAGS[satpy_composite_name]
+            prepared_from_status = prepare_height_for_resampling(
+                loader.scene, satpy_composite_name
+            )
             if prepared_from_status:
-                del loader.scene[CTTH_STATUS_FLAG]
+                del loader.scene[status_name]
             elif "cma" in loader.scene:
                 add_observation_validity(loader.scene)
-        elif satpy_composite_name == "cbh_alti" and is_polar:
-            add_observation_validity(loader.scene)
 
         LOG.debug("%s after load: dims=%s shape=%s", satpy_composite_name,
                   loader.scene[satpy_composite_name].dims,
@@ -357,7 +359,7 @@ def blend_cloud_products(product, inputfile_patterns, areaid, *scenes, cache_dir
                                           reduce_data=False, cache_dir=cache_dir,
                                           mask_area=True)
 
-        if satpy_composite_name == "ctth_alti":
+        if satpy_composite_name in HEIGHT_PRODUCTS:
             restore_cloud_free_height(local, satpy_composite_name, error_dataset_name)
 
         if OBSERVATION_VALIDITY in local:
@@ -406,7 +408,7 @@ def blend_cloud_products(product, inputfile_patterns, areaid, *scenes, cache_dir
     LOG.debug("Before blending...")
     blended = resampled.blend(blend_function=stack_with_weights)
 
-    if satpy_composite_name == "ctth_alti":
+    if satpy_composite_name in HEIGHT_PRODUCTS:
         restore_cloud_free_height(blended, satpy_composite_name, error_dataset_name)
 
     if satpy_composite_name in HEIGHT_PRODUCTS and propagate_error and error_dataset_name in blended:
@@ -421,10 +423,10 @@ def _mask_weight_where_no_observation(scene, weight, product=None):
     if OBSERVATION_VALIDITY in scene:
         return weight.where(scene[OBSERVATION_VALIDITY].notnull(), 0)
 
-    # CTTH prepared from ctth_status_flag contains either a real height, the
-    # cloud-free sentinel, or NaN for no observation.  Its validity therefore
-    # directly defines whether this scene may win the stack selection.
-    if product == "ctth_alti" and product in scene:
+    # A height prepared from its status flag contains either a real height,
+    # the cloud-free sentinel, or NaN for no observation.  Its validity
+    # therefore directly defines whether this scene may win stack selection.
+    if product in HEIGHT_PRODUCTS and product in scene:
         return weight.where(scene[product].notnull(), 0)
 
     return weight
